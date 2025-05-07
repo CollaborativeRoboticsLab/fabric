@@ -504,7 +504,7 @@ private:
    */
   void establish_bond()
   {
-    bond_client_cache_[bond_id_] = std::make_unique<BondClient>(shared_from_this(), bond_id_);
+    bond_client_cache_[bond_id_] = std::make_unique<BondClient>(shared_from_this(), event_, bond_id_);
     bond_client_cache_[bond_id_]->start();
 
     event_->info("Bond sucessfully established with bond id : " + bond_id_);
