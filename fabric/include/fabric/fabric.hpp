@@ -8,10 +8,10 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 
-#include <capabilities2_fabric/utils/xml_parser.hpp>
-#include <capabilities2_utils/bond_client.hpp>
+#include <fabric/utils/xml_parser.hpp>
+#include <fabric_msgs/action/plan.hpp>
 
-#include <capabilities2_msgs/action/plan.hpp>
+#include <capabilities2_utils/bond_client.hpp>
 
 #include <capabilities2_msgs/srv/establish_bond.hpp>
 #include <capabilities2_msgs/srv/get_interfaces.hpp>
@@ -32,10 +32,10 @@
  *
  */
 
-class CapabilitiesFabric : public rclcpp::Node
+class Fabric : public rclcpp::Node
 {
 public:
-  using Plan = capabilities2_msgs::action::Plan;
+  using Plan = fabric_msgs::action::Plan;
   using GoalHandlePlan = rclcpp_action::ServerGoalHandle<Plan>;
 
   using GetInterfaces = capabilities2_msgs::srv::GetInterfaces;
@@ -56,7 +56,7 @@ public:
   using ConfigureCapabilityClient = rclcpp::Client<ConfigureCapability>;
   using TriggerCapabilityClient = rclcpp::Client<TriggerCapability>;
 
-  CapabilitiesFabric(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("Capabilities2_Fabric", options)
+  Fabric(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("Fabric", options)
   {
     try
     {
@@ -85,9 +85,9 @@ public:
     event_ = std::make_shared<EventClient>(shared_from_this(), "fabric", "/events");
 
     this->planner_server_ = rclcpp_action::create_server<Plan>(
-        this, "/capabilities_fabric", std::bind(&CapabilitiesFabric::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
-        std::bind(&CapabilitiesFabric::handle_cancel, this, std::placeholders::_1),
-        std::bind(&CapabilitiesFabric::handle_accepted, this, std::placeholders::_1));
+        this, "/fabric", std::bind(&Fabric::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&Fabric::handle_cancel, this, std::placeholders::_1),
+        std::bind(&Fabric::handle_accepted, this, std::placeholders::_1));
 
     get_interfaces_client_ = this->create_client<GetInterfaces>("/capabilities/get_interfaces");
     get_sem_interf_client_ = this->create_client<GetSemanticInterfaces>("/capabilities/get_semantic_interfaces");

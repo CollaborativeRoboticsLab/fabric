@@ -10,30 +10,30 @@ Currently the system support 3 types of Control fuctions `sequential`, `parallel
 - Flexible Workflow Execution: Parses XML-based plans and identifies event-driven callbacks for success, failure, or in-progress states.
 
 
-## Launching capabilities2_fabric
+## Launching fabric
 
-`capabilities2_fabric/plans` folder includes sample XML plans that can be used to test the system. New plans can be added to the same folder or a different location. 
+`fabric/plans` folder includes sample XML plans that can be used to test the system. New plans can be added to the same folder or a different location. 
 
-Then modify the `capabilities2_fabric/config/fabric.yaml` file to change the active execution plan.
+Then modify the `fabric/config/fabric.yaml` file to change the active execution plan.
 A number of plans are availabe with the package and included in the `fabric.yaml` file that has been commented out. Uncomment them to use. Make sure to leave only one line uncommented.
 
 ```yaml
 /**:
   ros__parameters:
-    plan_file_path: "install/capabilities2_fabric/share/capabilities2_fabric/plans/default.xml"
+    plan_file_path: "install/fabric/share/fabric/plans/default.xml"
     
 ```
 Finally start the capabilities2 server. Run the following on a new terminal
 
 ```bash
 source install/setup.bash
-ros2 launch capabilities2_fabric fabric.launch.py
+ros2 launch fabric fabric.launch.py
 ```
 
 
 ## XML Plan Parsing
 
-The capabilities2_fabric package relies on XML-based plans to define workflows. These plans specify the sequence of capabilities to execute, along with the associated parameters. The XML format includes tags for capabilities as events, and control flows enabling complex workflows to be structured in a modular way.
+The fabric package relies on XML-based plans to define workflows. These plans specify the sequence of capabilities to execute, along with the associated parameters. The XML format includes tags for capabilities as events, and control flows enabling complex workflows to be structured in a modular way.
 
 Below is an example XML plan for configuring a set of capabilities:
 
@@ -70,7 +70,7 @@ Below is an example XML plan for configuring a set of capabilities:
 | Node |  Description |
 | :---  | :---            | 
 | `capabilities2_Fabric`   | Implemented the XML parsing and connection identification as well as communicating with `capabilities_server` to configure capability events |
-| `capabilities2_File_Parser`   | Reads an exection plan from a given path and sends it to the `capabilities2_fabric` node. Can be used as a sample action client to work with the `capabilities2_fabric` |
+| `capabilities2_File_Parser`   | Reads an exection plan from a given path and sends it to the `fabric` node. Can be used as a sample action client to work with the `fabric` |
 
 | Action | Action Message | Description |
 | :---  | :---            | :---        |

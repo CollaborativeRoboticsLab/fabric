@@ -1,11 +1,11 @@
-#include <capabilities2_fabric/capabilities_fabric.hpp>
+#include <fabric/fabric.hpp>
 
 int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
 
   // Create the node instance
-  auto node = std::make_shared<CapabilitiesFabric>();
+  auto node = std::make_shared<Fabric>();
 
   // Initialize the node components after construction
   node->initialize();

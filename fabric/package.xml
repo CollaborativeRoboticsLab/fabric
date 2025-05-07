@@ -1,10 +1,14 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>capabilities2_fabric</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="kalanaratnayake95@gmail.com">kalana</maintainer>
+  <name>fabric</name>
+  <version>0.1.0</version>
+  <description>A behaviour planning system based on capabilities2 system </description>
+
+  <maintainer email="kalana.ratnayakemudiyanselage@canberra.edu.au">Kalana Ratnayake</maintainer>
+  <maintainer email="kalanaratnayake@gmail.com">Kalana Ratnayake</maintainer>
+
+  <author email="kalana.ratnayakemudiyanselage@canberra.edu.au">Kalana Ratnayake</author>
 
   <license>MIT</license>
 
@@ -12,6 +16,7 @@
 
   <depend>rclcpp</depend>
   <depend>rclcpp_action</depend>
+  <depend>fabric_msgs</depend>
   <depend>capabilities2_msgs</depend>
   <depend>capabilities2_events</depend>
   <depend>capabilities2_utils</depend>

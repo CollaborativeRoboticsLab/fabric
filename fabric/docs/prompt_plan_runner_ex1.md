@@ -1,4 +1,4 @@
-## PromptOccupancyRunner Example
+## PromptPlanRunner Example
 
 ### Dependencies
 
@@ -6,7 +6,7 @@ This example uses prompt tools stack, nav2 stack and turtlebot3. Follow instruct
 
 ### Plan selection
 
-Uncomment the  line related to `prompt_2.xml` in the `config/fabric,yaml` file
+Uncomment the  line related to `prompt_4.xml` in the `config/fabric,yaml` file
 
 ### Build the package to apply changes
 
@@ -48,7 +48,7 @@ ros2 launch capabilities2_server server.launch.py
 
 ```bash
 source install/setup.bash
-ros2 launch capabilities2_fabric fabric.launch.py
+ros2 launch fabric fabric.launch.py
 ```
 
 ### Start the Capabilities2 Event Listener (Optional for Debugging)

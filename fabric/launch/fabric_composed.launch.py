@@ -17,11 +17,11 @@ def generate_launch_description():
         LaunchDescription: The launch description for capabilities2 executor
     """
     # load config file
-    fabric_config = os.path.join(get_package_share_directory('capabilities2_fabric'), 'config', 'fabric.yaml')
+    fabric_config = os.path.join(get_package_share_directory('fabric'), 'config', 'fabric.yaml')
 
     # create bridge composition
     fabric_container = ComposableNodeContainer(
-        name='capabilities2_fabric_container',
+        name='fabric_container',
         namespace='',
         package='rclcpp_components',
         executable='component_container_mt',
@@ -29,14 +29,14 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', 'info'],
         composable_node_descriptions=[
             ComposableNode(
-                package='capabilities2_fabric',
-                plugin='CapabilitiesFabric',
-                name='capabilities2_fabric',
+                package='fabric',
+                plugin='Fabric',
+                name='fabric',
                 output='screen'
             ),
             ComposableNode(
-                package='capabilities2_fabric',
-                plugin='CapabilitiesFabricClient',
+                package='fabric',
+                plugin='FabricClient',
                 name='fabric_client',
                 parameters=[fabric_config],
                 output='screen'

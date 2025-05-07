@@ -11,13 +11,13 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 
-#include <capabilities2_fabric/utils/xml_parser.hpp>
+#include <fabric/utils/xml_parser.hpp>
 
-#include <capabilities2_msgs/action/plan.hpp>
-#include <capabilities2_msgs/srv/set_fabric_plan.hpp>
-#include <capabilities2_msgs/srv/cancel_fabric_plan.hpp>
-#include <capabilities2_msgs/srv/get_fabric_status.hpp>
-#include <capabilities2_msgs/srv/complete_fabric.hpp>
+#include <fabric_msgs/action/plan.hpp>
+#include <fabric_msgs/srv/set_fabric_plan.hpp>
+#include <fabric_msgs/srv/cancel_fabric_plan.hpp>
+#include <fabric_msgs/srv/get_fabric_status.hpp>
+#include <fabric_msgs/srv/complete_fabric.hpp>
 
 #include <capabilities2_events/event_client.hpp>
 
@@ -28,7 +28,7 @@
  * Will read an XML file that implements a plan and send it to the server
  */
 
-class CapabilitiesFabricClient : public rclcpp::Node
+class Client : public rclcpp::Node
 {
   enum Status
   {
@@ -42,15 +42,15 @@ class CapabilitiesFabricClient : public rclcpp::Node
   };
 
 public:
-  using Plan = capabilities2_msgs::action::Plan;
+  using Plan = fabric_msgs::action::Plan;
   using GoalHandlePlan = rclcpp_action::ClientGoalHandle<Plan>;
 
-  using GetFabricStatus = capabilities2_msgs::srv::GetFabricStatus;
-  using SetFabricPlan = capabilities2_msgs::srv::SetFabricPlan;
-  using CancelFabricPlan = capabilities2_msgs::srv::CancelFabricPlan;
-  using CompleteFabric = capabilities2_msgs::srv::CompleteFabric;
+  using GetFabricStatus = fabric_msgs::srv::GetFabricStatus;
+  using SetFabricPlan = fabric_msgs::srv::SetFabricPlan;
+  using CancelFabricPlan = fabric_msgs::srv::CancelFabricPlan;
+  using CompleteFabric = fabric_msgs::srv::CompleteFabric;
 
-  CapabilitiesFabricClient(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("Capabilities2_Fabric_Client", options)
+  Client(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("Client", options)
   {
     try
     {
@@ -72,7 +72,7 @@ public:
    */
   void initialize()
   {
-    declare_parameter("plan_file_path", "install/capabilities2_fabric/share/capabilities2_fabric/plans/default.xml");
+    declare_parameter("plan_file_path", "install/fabric/share/fabric/plans/default.xml");
     plan_file_path = get_parameter("plan_file_path").as_string();
 
     fabric_state = Status::IDLE;
@@ -80,22 +80,22 @@ public:
     event_ = std::make_shared<EventClient>(shared_from_this(), "client", "/events");
 
     status_server_ =
-        this->create_service<GetFabricStatus>("/capabilities_fabric/get_status", std::bind(&CapabilitiesFabricClient::getStatusCallback, this,
+        this->create_service<GetFabricStatus>("/fabric/get_status", std::bind(&Client::getStatusCallback, this,
                                                                                            std::placeholders::_1, std::placeholders::_2));
 
     plan_server_ = this->create_service<SetFabricPlan>(
-        "/capabilities_fabric/set_plan", std::bind(&CapabilitiesFabricClient::setPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+        "/fabric/set_plan", std::bind(&Client::setPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     cancel_server_ =
-        this->create_service<CancelFabricPlan>("/capabilities_fabric/cancel_plan", std::bind(&CapabilitiesFabricClient::cancelPlanCallback, this,
+        this->create_service<CancelFabricPlan>("/fabric/cancel_plan", std::bind(&Client::cancelPlanCallback, this,
                                                                                              std::placeholders::_1, std::placeholders::_2));
 
     completion_server_ =
-        this->create_service<CompleteFabric>("/capabilities_fabric/set_completion", std::bind(&CapabilitiesFabricClient::setCompleteCallback, this,
+        this->create_service<CompleteFabric>("/fabric/set_completion", std::bind(&Client::setCompleteCallback, this,
                                                                                               std::placeholders::_1, std::placeholders::_2));
 
-    // Create the action client for capabilities_fabric after the node is fully constructed
-    this->planner_client_ = rclcpp_action::create_client<Plan>(shared_from_this(), "/capabilities_fabric");
+    // Create the action client for fabric after the node is fully constructed
+    this->planner_client_ = rclcpp_action::create_client<Plan>(shared_from_this(), "/fabric");
 
     if (!this->planner_client_->wait_for_action_server(std::chrono::seconds(5)))
     {
@@ -104,7 +104,7 @@ public:
       return;
     }
 
-    event_->info("Sucessfully connected to the capabilities_fabric action server");
+    event_->info("Sucessfully connected to the fabric action server");
 
     // try to load the file
     tinyxml2::XMLError xml_status = document.LoadFile(plan_file_path.c_str());
@@ -123,7 +123,7 @@ public:
 
     plan_queue.push_back(plan);
 
-    goal_send_thread = std::thread(&CapabilitiesFabricClient::manage_goal, this);
+    goal_send_thread = std::thread(&Client::manage_goal, this);
   }
 
 private:
@@ -155,7 +155,7 @@ private:
     goal_msg.plan = plan_queue[0];
     plan_queue.pop_front();
 
-    event_->info("Sending goal to the capabilities_fabric action server");
+    event_->info("Sending goal to the fabric action server");
 
     // send goal options
     auto send_goal_options = rclcpp_action::Client<Plan>::SendGoalOptions();
@@ -299,7 +299,7 @@ private:
     else
     {
       event_->info("Plan parsed and accepted");
-      goal_send_thread = std::thread(&CapabilitiesFabricClient::manage_goal, this);
+      goal_send_thread = std::thread(&Client::manage_goal, this);
     }
 
     response->success = true;
