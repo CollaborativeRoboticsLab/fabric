@@ -2,11 +2,11 @@
 
 ### Dependencies
 
-This example uses nav2 stack and turtlebot3. Follow instructions from [Nav2 Dependency Installation](../../docs/nav2_setup.md) to setup nav stack.
+This example uses nav2 stack and turtlebot3. Follow instructions from [Nav2 Dependency Installation](https://github.com/CollaborativeRoboticsLab/capabilities2/blob/develop/docs/nav2_setup.md) to setup nav stack.
 
 ### Plan selection
 
-Uncomment the  line related to `navigation_2.xml` in the `config/fabric,yaml` file
+Uncomment the  line related to `navigation_2.xml` in the `config/fabric.yaml` file
 
 ### Build the package to apply changes
 

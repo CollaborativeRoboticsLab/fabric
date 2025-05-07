@@ -2,11 +2,11 @@
 
 ### Dependencies
 
-This example uses prompt tools stack, nav2 stack and turtlebot3. Follow instructions from [Nav2 Dependency Installation](../../docs/nav2_setup.md) to setup nav stack and [Propmt Tools Dependency Installation](../../docs/prompt_tools_setup.md) to setup nav stack.
+This example uses prompt tools stack, nav2 stack and turtlebot3. Follow instructions from [Nav2 Dependency Installation](https://github.com/CollaborativeRoboticsLab/capabilities2/blob/develop/docs/nav2_setup.md) and [Propmt Tools Dependency Installation](https://github.com/CollaborativeRoboticsLab/capabilities2/blob/develop/docs/prompt_tools_setup.md) to setup Prompt tools.
 
 ### Plan selection
 
-Uncomment the  line related to `prompt_4.xml` in the `config/fabric,yaml` file
+Uncomment the  line related to `prompt_4.xml` in the `config/fabric.yaml` file
 
 ### Build the package to apply changes
 

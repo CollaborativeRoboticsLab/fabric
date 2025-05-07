@@ -1,8 +1,17 @@
-# Capabilities2_fabric
+# Fabric
 
-Capabilities2_fabric is a ROS2 package that provides a system to coordinate and manage various capabilities as defined by the Capabilities2 framework. This package extends the functionality of the Capabilities2 package to implement a control framework based on capabilities. It is designed to parse an execution plan given via an XML file and then to identify connections between various capabilities in the system.
+Fabric is a ROS2 package that provides a system to coordinate and manage various capabilities as defined by the [Capabilities2 framework](https://github.com/CollaborativeRoboticsLab/capabilities2). This package extends the functionality of the Capabilities2 package to implement a planning framework based on capabilities. It is designed to parse an execution plan given via an XML file and then to identify connections between various capabilities in the system.
 
-Currently the system support 3 types of Control fuctions `sequential`, `parallel` and `recovery`, and multitude of Event functions.
+Currently the system support 3 types of Control fuctions `sequential`, `parallel` and `recovery`, and a multitude of Event functions.
+
+## Starting the Fabric
+
+Start the capabilities2 server first. Then run the following on a new terminal
+
+```bash
+source install/setup.bash
+ros2 launch fabric fabric.launch.py
+```
 
 ## Features
 
@@ -67,36 +76,43 @@ Below is an example XML plan for configuring a set of capabilities:
 
 ## API
 
-| Node |  Description |
-| :---  | :---            | 
-| `capabilities2_Fabric`   | Implemented the XML parsing and connection identification as well as communicating with `capabilities_server` to configure capability events |
-| `capabilities2_File_Parser`   | Reads an exection plan from a given path and sends it to the `fabric` node. Can be used as a sample action client to work with the `fabric` |
+| Node      |  Description |
+| :---      | :---            | 
+| `Fabric`  | Implements the XML parsing and connection extraction as well as communicating with `capabilities_server` to configure capability events |
+| `Client`  | Reads an exection plan from a path or a ROS message and sends it to the `fabric` node. Provides additional services that expose the Fabric to outside |
 
-| Action | Action Message | Description |
-| :---  | :---            | :---        |
-| `~/capabilities_fabric`           | `Plan.action`         | Receive and XML plan via the message for execution|
+| Action    | Action Message | Description |
+| :---      | :---            | :---        |
+| `/fabric` | `Plan.action` | Receive and XML plan via the message for execution |
+
+| Service                   | Service Message           | Description |
+| :---                      | :---                      | :---        |
+| `/fabric/get_status`      | `GetFabricStatus.srv`     | Retrieve the status of the fabric |
+| `/fabric/cancel_plan`     | `CancelFabricPlan.srv`    | Cancel the current plan running in the Fabric |
+| `/fabric/set_completion`  | `CompleteFabric.srv`      | Update the status of the fabric as completed (used by capabilitie) |
+| `/fabric/set_plan`        | `SetFabricPlan`           | Add a new fabric plan to the queue |
 
 ## Samples and Testing
 
 ### Navigation
 
-1. [WaypointRunner Example 1](./docs/waypoint_runner_ex1.md)
+1. [WaypointRunner Example 1](.fabric/docs/waypoint_runner_ex1.md)
 Implements at the very basic fabric triggering that moves the robot from one point to another.
 
-2. [WaypointRunner Example 2](./docs/waypoint_runner_ex2.md)
+2. [WaypointRunner Example 2](.fabric/docs/waypoint_runner_ex2.md)
 Implements navigating through 2 points using 'sequential' control functionality.
 
 
 ### Prompting
 
-1. [PromptCapabilityRunner Example](./docs/prompt_capability_runner_ex1.md)
+1. [PromptCapabilityRunner Example](.fabric/docs/prompt_capability_runner_ex1.md)
 Implements requesting for robot's capabilities and prompting them to the LLM
 
-2. [PromptOccupancyRunner Example](./docs/prompt_occupancy_runner_ex1.md)
+2. [PromptOccupancyRunner Example](.fabric/docs/prompt_occupancy_runner_ex1.md)
 Implements listening for robot's occupancy grid and prompting them to the LLM
 
-2. [PromptPoseRunner Example](./docs/prompt_pose_runner_ex1.md)
+2. [PromptPoseRunner Example](.fabric/docs/prompt_pose_runner_ex1.md)
 Implements listening for robot's pose and prompting them to the LLM
 
-2. [PromptPlanRunner Example](./docs/prompt_plan_runner_ex1.md)
-Implements prompting the LLM for a plan for a new task and setting it to Capabilities Fabric
+2. [PromptPlanRunner Example](.fabric/docs/prompt_plan_runner_ex1.md)
+Implements prompting the LLM for a plan for a new task and setting it to Fabric

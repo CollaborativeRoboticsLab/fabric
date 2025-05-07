@@ -2,11 +2,11 @@
 
 ### Dependencies
 
-This example uses prompt tools stack. Follow instructions from [Propmt Tools Dependency Installation](../../docs/prompt_tools_setup.md) to setup Prompt tools stack.
+This example uses prompt tools stack. Follow instructions from [Prompt Tools Dependency Installation](https://github.com/CollaborativeRoboticsLab/capabilities2/blob/develop/docs/prompt_tools_setup.md) to setup Prompt tools stack.
 
 ### Plan selection
 
-Uncomment the  line related to `prompt_1.xml` in the `config/fabric,yaml` file
+Uncomment the  line related to `prompt_1.xml` in the `config/fabric.yaml` file
 
 ### Build the package to apply changes
 
