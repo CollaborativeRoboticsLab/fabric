@@ -96,23 +96,23 @@ Below is an example XML plan for configuring a set of capabilities:
 
 ### Navigation
 
-1. [WaypointRunner Example 1](.fabric/docs/waypoint_runner_ex1.md)
+1. [WaypointRunner Example 1](./fabric/docs/waypoint_runner_ex1.md)
 Implements at the very basic fabric triggering that moves the robot from one point to another.
 
-2. [WaypointRunner Example 2](.fabric/docs/waypoint_runner_ex2.md)
+2. [WaypointRunner Example 2](./fabric/docs/waypoint_runner_ex2.md)
 Implements navigating through 2 points using 'sequential' control functionality.
 
 
 ### Prompting
 
-1. [PromptCapabilityRunner Example](.fabric/docs/prompt_capability_runner_ex1.md)
+1. [PromptCapabilityRunner Example](./fabric/docs/prompt_capability_runner_ex1.md)
 Implements requesting for robot's capabilities and prompting them to the LLM
 
-2. [PromptOccupancyRunner Example](.fabric/docs/prompt_occupancy_runner_ex1.md)
+2. [PromptOccupancyRunner Example](./fabric/docs/prompt_occupancy_runner_ex1.md)
 Implements listening for robot's occupancy grid and prompting them to the LLM
 
-2. [PromptPoseRunner Example](.fabric/docs/prompt_pose_runner_ex1.md)
+2. [PromptPoseRunner Example](./fabric/docs/prompt_pose_runner_ex1.md)
 Implements listening for robot's pose and prompting them to the LLM
 
-2. [PromptPlanRunner Example](.fabric/docs/prompt_plan_runner_ex1.md)
+2. [PromptPlanRunner Example](./fabric/docs/prompt_plan_runner_ex1.md)
 Implements prompting the LLM for a plan for a new task and setting it to Fabric

@@ -44,9 +44,16 @@ source install/setup.bash
 ros2 launch fabric fabric.launch.py
 ```
 
-### Start the Capabilities2 Event Listener (Optional for Debugging)
+### Start the Capabilities2 Event Listener for on-device debugging (Optional)
 
 ```bash
 source install/setup.bash
 ros2 launch capabilities2_events listener.launch.py
+```
+
+### Start the foxglove-bridge for visualization and debugging (Optional)
+
+```bash
+source install/setup.bash
+ros2 launch capabilities2_events foxglove.launch.py
 ```
