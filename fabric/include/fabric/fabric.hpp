@@ -22,7 +22,7 @@
 #include <capabilities2_msgs/srv/configure_capability.hpp>
 #include <capabilities2_msgs/srv/trigger_capability.hpp>
 
-#include <capabilities2_events/event_client.hpp>
+#include <event_logger/event_client.hpp>
 
 /**
  * @brief Capabilities Fabric

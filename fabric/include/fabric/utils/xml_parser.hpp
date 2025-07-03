@@ -4,7 +4,7 @@
 #include <tinyxml2.h>
 #include <rclcpp/rclcpp.hpp>
 #include <capabilities2_utils/connection.hpp>
-#include <capabilities2_events/event_client.hpp>
+#include <event_logger/event_client.hpp>
 
 namespace xml_parser
 {

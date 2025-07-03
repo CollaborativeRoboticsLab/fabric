@@ -21,7 +21,8 @@ find_package(bondcpp REQUIRED)
 find_package(backward_ros REQUIRED)
 find_package(fabric_msgs REQUIRED)
 find_package(capabilities2_msgs REQUIRED)
-find_package(capabilities2_events REQUIRED)
+find_package(event_logger REQUIRED)
+find_package(event_logger_msgs REQUIRED)
 find_package(capabilities2_utils REQUIRED)
 
 include_directories(
@@ -42,7 +43,8 @@ ament_target_dependencies(${PROJECT_NAME}
   bondcpp
   fabric_msgs
   capabilities2_msgs
-  capabilities2_events
+  event_logger
+  event_logger_msgs
   capabilities2_utils
   TinyXML2
 )
@@ -66,7 +68,8 @@ ament_target_dependencies(${PROJECT_NAME}_comp
   bondcpp
   fabric_msgs
   capabilities2_msgs
-  capabilities2_events
+  event_logger
+  event_logger_msgs
   capabilities2_utils
   TinyXML2
 )
@@ -98,7 +101,8 @@ ament_target_dependencies(fabric_client
   rclcpp_action
   fabric_msgs
   capabilities2_msgs
-  capabilities2_events
+  event_logger
+  event_logger_msgs
   capabilities2_utils
   TinyXML2
 )
@@ -122,7 +126,8 @@ ament_target_dependencies(fabric_client_comp
   bondcpp
   fabric_msgs
   capabilities2_msgs
-  capabilities2_events
+  event_logger
+  event_logger_msgs
   capabilities2_utils
   TinyXML2
 )

@@ -18,7 +18,8 @@
   <depend>rclcpp_action</depend>
   <depend>fabric_msgs</depend>
   <depend>capabilities2_msgs</depend>
-  <depend>capabilities2_events</depend>
+  <depend>event_logger</depend>
+  <depend>event_logger_msgs</depend>
   <depend>capabilities2_utils</depend>
   <depend>tinyxml2_vendor</depend>
   <depend>backward_ros</depend>

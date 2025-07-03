@@ -19,7 +19,7 @@
 #include <fabric_msgs/srv/get_fabric_status.hpp>
 #include <fabric_msgs/srv/complete_fabric.hpp>
 
-#include <capabilities2_events/event_client.hpp>
+#include <event_logger/event_client.hpp>
 
 /**
  * @brief Capabilities Executor File Parser
