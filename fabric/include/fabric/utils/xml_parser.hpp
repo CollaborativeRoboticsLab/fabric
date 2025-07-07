@@ -130,8 +130,8 @@ void add_closing_event(tinyxml2::XMLDocument& document)
 bool check_tags(tinyxml2::XMLElement* element, std::vector<std::string>& events, std::vector<std::string>& providers,
                 std::vector<std::string>& control, std::vector<std::string>& rejected, std::string& error)
 {
-  const char* name;
-  const char* provider;
+  const char* name = nullptr;
+  const char* provider = nullptr;
 
   std::string parameter_string;
   convert_to_string(element, parameter_string);
@@ -225,8 +225,11 @@ int extract_connections(tinyxml2::XMLElement* element, std::map<int, capabilitie
 {
   int predecessor_id;
 
-  const char* name = element->Attribute("name");
-  const char* provider = element->Attribute("provider");
+  const char* name = nullptr;
+  const char* provider = nullptr;
+
+  name = element->Attribute("name");
+  provider = element->Attribute("provider");
 
   std::string typetag(element->Name());
 
