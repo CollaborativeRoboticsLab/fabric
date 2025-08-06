@@ -701,6 +701,8 @@ private:
       request_configure->target_on_failure.provider = "";
     }
 
+    request_configure->connection_description = capabilities[completed_configurations_].connection_description;
+
     std::string source_capability = capabilities[completed_configurations_].source.runner;
 
     // send the request

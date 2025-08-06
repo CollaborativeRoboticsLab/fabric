@@ -49,27 +49,27 @@ Below is an example XML plan for configuring a set of capabilities:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Plan name="navigate_or_return_fabric">
-    <Control name="sequential" name="contro_plan">
-        <Control name="sequential" name="main_execution_plan">
-            <Event interface="std_capabilities/CapabilityGetRunner" provider="std_capabilities/CapabilityGetRunner"/>
-            <Event interface="std_capabilities/PromptCapabilityRunner" provider="std_capabilities/PromptCapabilityRunner" />
-            <Control name="parallel" name="gather_occupancy_data">
-                <Control name="sequential" name="navigate_or_retur">
-                    <Event interface="std_capabilities/OccupancyGridRunner" provider="std_capabilities/OccupancyGridRunner"/>
-                    <Event interface="std_capabilities/PromptOccupancyRunner" provider="std_capabilities/PromptOccupancyRunner" /> 
-                <Control name="sequential">
+    <Control type="sequential" name="contro_plan">
+        <Control type="sequential" name="main_execution_plan">
+            <Runner interface="std_capabilities/CapabilityGetRunner" provider="std_capabilities/CapabilityGetRunner"/>
+            <Runner interface="std_capabilities/PromptCapabilityRunner" provider="std_capabilities/PromptCapabilityRunner" />
+            <Control type="parallel" name="gather_occupancy_data">
+                <Control type="sequential" name="navigate_or_retur">
+                    <Runner interface="std_capabilities/OccupancyGridRunner" provider="std_capabilities/OccupancyGridRunner"/>
+                    <Runner interface="std_capabilities/PromptOccupancyRunner" provider="std_capabilities/PromptOccupancyRunner" /> 
+                <Control type="sequential">
                 </Control>
-                <Control name="sequential" name="gather_position_data">
-                    <Event interface="std_capabilities/RobotPoseRunner" provider="std_capabilities/RobotPoseRunner" from="map" to="base_link"/>
-                    <Event interface="std_capabilities/PromptPoseRunner" provider="std_capabilities/PromptPoseRunner" />
+                <Control type="sequential" name="gather_position_data">
+                    <Runner interface="std_capabilities/RobotPoseRunner" provider="std_capabilities/RobotPoseRunner" from="map" to="base_link"/>
+                    <Runner interface="std_capabilities/PromptPoseRunner" provider="std_capabilities/PromptPoseRunner" />
                 </Control>
             </Control>
-            <Event interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="5.0" y="5.0" />
-            <Control name="recovery" name="return_to_home_if_lost">
-                <Event interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="0.0" y="0.0" />
+            <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="5.0" y="5.0" />
+            <Control type="recovery" name="return_to_home_if_lost">
+                <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="0.0" y="0.0" />
             </Control>
         </Control>
-        <Event interface="std_capabilities/FabricCompletionRunner" provider="std_capabilities/FabricCompletionRunner"/>
+        <Runner interface="std_capabilities/FabricCompletionRunner" provider="std_capabilities/FabricCompletionRunner"/>
     </Control>
 </Plan>
 ```

@@ -91,9 +91,10 @@ void add_closing_event(tinyxml2::XMLDocument& document)
   // Get the existing <Control> element inside <Plan>
   tinyxml2::XMLElement* innerControl = plan->FirstChildElement("Control");
 
-  // Create the outer <Control name="sequential"> element
+  // Create the outer <Control type="sequential"> element
   tinyxml2::XMLElement* outerControl = document.NewElement("Control");
-  outerControl->SetAttribute("name", "sequential");
+  outerControl->SetAttribute("type", "sequential");
+  outerControl->SetAttribute("name", "fabric_completion_control");
 
   // Clone the existing <Control> element instead of deleting it
   tinyxml2::XMLElement* clonedControl = innerControl->DeepClone(&document)->ToElement();
@@ -101,11 +102,11 @@ void add_closing_event(tinyxml2::XMLDocument& document)
   // Insert the cloned inner control inside the new outer control
   outerControl->InsertEndChild(clonedControl);
 
-  // Create and append the new <Event> element
-  tinyxml2::XMLElement* newEvent = document.NewElement("Event");
-  newEvent->SetAttribute("name", "std_capabilities/FabricCompletionRunner");
-  newEvent->SetAttribute("provider", "std_capabilities/FabricCompletionRunner");
-  outerControl->InsertEndChild(newEvent);
+  // Create and append the new <Runner> element
+  tinyxml2::XMLElement* newRunner = document.NewElement("Runner");
+  newRunner->SetAttribute("interface", "std_capabilities/FabricCompletionRunner");
+  newRunner->SetAttribute("provider", "std_capabilities/FabricCompletionRunner");
+  outerControl->InsertEndChild(newRunner);
 
   // Remove the original innerControl (after cloning)
   plan->DeleteChild(innerControl);
@@ -118,7 +119,6 @@ void add_closing_event(tinyxml2::XMLDocument& document)
  * @brief check the plan for invalid/unsupported control and event tags
  * uses recursive approach to go through the plan
  *
- * @param event EventClient used for logging and event publishing
  * @param element XML Element to be evaluated
  * @param events list containing valid event tags
  * @param providers list containing providers
@@ -130,41 +130,36 @@ void add_closing_event(tinyxml2::XMLDocument& document)
 bool check_tags(tinyxml2::XMLElement* element, std::vector<std::string>& events, std::vector<std::string>& providers,
                 std::vector<std::string>& control, std::vector<std::string>& rejected, std::string& error)
 {
-  const char* name = nullptr;
+  const char* type = nullptr;
+  const char* interface = nullptr;
   const char* provider = nullptr;
+
+  std::string runnertag(element->Name());
 
   std::string parameter_string;
   convert_to_string(element, parameter_string);
 
-  element->QueryStringAttribute("name", &name);
-  element->QueryStringAttribute("provider", &provider);
+  bool returnValue = true;
 
-  std::string nametag;
-  std::string providertag;
-  std::string typetag(element->Name());
-
-  if (name)
-    nametag = name;
-  else
-    nametag = "";
-
-  if (provider)
-    providertag = provider;
-  else
-    providertag = "";
+  std::string typetag = "";
+  std::string interfacetag = "";
+  std::string providertag = "";
 
   bool hasChildren = !element->NoChildren();
   bool hasSiblings = (element->NextSiblingElement() != nullptr);
-  bool foundInControl = xml_parser::search(control, nametag);
-  bool foundInEvents = xml_parser::search(events, nametag);
-  bool foundInProviders = xml_parser::search(providers, providertag);
-  bool returnValue = true;
 
-  if (typetag == "Control")
+  if (runnertag == "Control")
   {
+    element->QueryStringAttribute("type", &type);
+
+    if (type)
+      typetag = type;
+
+    bool foundInControl = xml_parser::search(control, typetag);
+
     if (!foundInControl)
     {
-      error = "Control tag '" + nametag + "' not available in the valid list";
+      error = "Control tag '" + typetag + "' not available in the valid list";
       rejected.push_back(parameter_string);
       return false;
     }
@@ -175,11 +170,23 @@ bool check_tags(tinyxml2::XMLElement* element, std::vector<std::string>& events,
     if (hasSiblings)
       returnValue &= xml_parser::check_tags(element->NextSiblingElement(), events, providers, control, rejected, error);
   }
-  else if (typetag == "Event")
+  else if (runnertag == "Runner")
   {
-    if (!foundInEvents || !foundInProviders)
+    element->QueryStringAttribute("interface", &interface);
+    element->QueryStringAttribute("provider", &provider);
+
+    if (interface)
+      interfacetag = interface;
+
+    if (provider)
+      providertag = provider;
+
+    bool foundInRunners = xml_parser::search(events, interfacetag);
+    bool foundInProviders = xml_parser::search(providers, providertag);
+
+    if (!foundInRunners || !foundInProviders)
     {
-      error = "Event tag name '" + nametag + "' or provider '" + providertag + "' not available in the valid list";
+      error = "Runner tag interface '" + interfacetag + "' or provider '" + providertag + "' not available in the valid list";
       rejected.push_back(parameter_string);
       return false;
     }
@@ -219,69 +226,79 @@ std::vector<std::string> get_control_list()
  * @param connections std::map containing extracted connections
  * @param connection_id numerical id of the connection
  * @param connection_type the type of connection
+ * @param connection_description the name of the control tag
  */
 int extract_connections(tinyxml2::XMLElement* element, std::map<int, capabilities2::node_t>& connections, int connection_id = 0,
-                        capabilities2::connection_type_t connection_type = capabilities2::connection_type_t::ON_SUCCESS)
+                        capabilities2::connection_type_t connection_type = capabilities2::connection_type_t::ON_SUCCESS, std::string connection_description= "")
 {
   int predecessor_id;
 
+  const char* type = nullptr;
   const char* name = nullptr;
+  const char* interface = nullptr;
   const char* provider = nullptr;
 
-  name = element->Attribute("name");
-  provider = element->Attribute("provider");
+  std::string runnertag(element->Name());
 
-  std::string typetag(element->Name());
-
-  std::string nametag;
-  std::string providertag;
-
-  if (name)
-    nametag = name;
-  else
-    nametag = "";
-
-  if (provider)
-    providertag = provider;
-  else
-    providertag = "";
+  std::string typetag = "";
+  std::string nameDescription = "";
+  std::string interfacetag = "";
+  std::string providertag = "";
 
   bool hasChildren = (element->FirstChildElement() != nullptr);
   bool hasSiblings = (element->NextSiblingElement() != nullptr);
 
-  if (typetag == "Control")
+  if (runnertag == "Control")
   {
-    if (nametag == "sequential")
+    type = element->Attribute("type");
+    name = element->Attribute("name");
+
+    if (type)
+      typetag = type;
+
+    if (name)
+      nameDescription = name;
+
+    if (typetag == "sequential")
     {
       if (hasChildren)
         predecessor_id =
-            xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, capabilities2::connection_type_t::ON_SUCCESS);
+            xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, capabilities2::connection_type_t::ON_SUCCESS, nameDescription);
     }
-    else if (nametag == "parallel")
+    else if (typetag == "parallel")
     {
       if (hasChildren)
         predecessor_id =
-            xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, capabilities2::connection_type_t::ON_START);
+            xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, capabilities2::connection_type_t::ON_START, nameDescription);
     }
-    else if (nametag == "recovery")
+    else if (typetag == "recovery")
     {
       if (hasChildren)
         predecessor_id =
-            xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, capabilities2::connection_type_t::ON_FAILURE);
+            xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, capabilities2::connection_type_t::ON_FAILURE, nameDescription);
     }
 
     if (hasSiblings)
     {
-      predecessor_id = xml_parser::extract_connections(element->NextSiblingElement(), connections, predecessor_id + 1, connection_type);
+      predecessor_id = xml_parser::extract_connections(element->NextSiblingElement(), connections, predecessor_id + 1, connection_type, connection_description);
     }
 
     return predecessor_id;
   }
-  else if (typetag == "Event")
+  else if (runnertag == "Runner")
   {
+    interface = element->Attribute("interface");
+    provider = element->Attribute("provider");
+
+    if (interface)
+      interfacetag = interface;
+
+    if (provider)
+      providertag = provider;
+
     capabilities2::node_t node;
 
-    node.source.runner = nametag;
+    node.source.runner = interfacetag;
     node.source.provider = providertag;
     node.source.parameters = element;
 
@@ -291,6 +308,7 @@ int extract_connections(tinyxml2::XMLElement* element, std::map<int, capabilitie
       connection_id += 1;
 
     connections[connection_id] = node;
+    connections[connection_id].connection_description = connection_description;
 
     if (connection_id != 0)
     {
