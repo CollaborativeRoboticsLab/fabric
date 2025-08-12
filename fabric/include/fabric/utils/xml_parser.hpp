@@ -8,6 +8,9 @@
 
 namespace xml_parser
 {
+
+using CType = capabilities2::connection_type_t;
+
 /**
  * @brief extract elements related plan and return the first child element
  *
@@ -104,8 +107,8 @@ void add_closing_event(tinyxml2::XMLDocument& document)
 
   // Create and append the new <Runner> element
   tinyxml2::XMLElement* newRunner = document.NewElement("Runner");
-  newRunner->SetAttribute("interface", "std_capabilities/FabricCompletionRunner");
-  newRunner->SetAttribute("provider", "std_capabilities/FabricCompletionRunner");
+  newRunner->SetAttribute("interface", "system_capabilities/CompletionRunner");
+  newRunner->SetAttribute("provider", "system_capabilities/CompletionRunner");
   outerControl->InsertEndChild(newRunner);
 
   // Remove the original innerControl (after cloning)
@@ -134,7 +137,7 @@ bool check_tags(tinyxml2::XMLElement* element, std::vector<std::string>& events,
   const char* interface = nullptr;
   const char* provider = nullptr;
 
-  std::string runnertag(element->Name());
+  std::string elementTag(element->Name());
 
   std::string parameter_string;
   convert_to_string(element, parameter_string);
@@ -148,7 +151,7 @@ bool check_tags(tinyxml2::XMLElement* element, std::vector<std::string>& events,
   bool hasChildren = !element->NoChildren();
   bool hasSiblings = (element->NextSiblingElement() != nullptr);
 
-  if (runnertag == "Control")
+  if (elementTag == "Control")
   {
     element->QueryStringAttribute("type", &type);
 
@@ -170,7 +173,7 @@ bool check_tags(tinyxml2::XMLElement* element, std::vector<std::string>& events,
     if (hasSiblings)
       returnValue &= xml_parser::check_tags(element->NextSiblingElement(), events, providers, control, rejected, error);
   }
-  else if (runnertag == "Runner")
+  else if (elementTag == "Runner")
   {
     element->QueryStringAttribute("interface", &interface);
     element->QueryStringAttribute("provider", &provider);
@@ -213,10 +216,83 @@ std::vector<std::string> get_control_list()
   std::vector<std::string> tag_list;
 
   tag_list.push_back("sequential");
-  tag_list.push_back("parallel");
+  tag_list.push_back("parallel_any");
+  tag_list.push_back("parallel_all");
   tag_list.push_back("recovery");
 
   return tag_list;
+}
+
+/**
+ * @brief Adds a system connection for parallel input multiplexing with waiting for all inputs
+ *
+ * @param connections std::map containing connections
+ * @param connection_id connection id to be used for the new connection
+ * @param description description of the connection
+ * @return int next connection id
+ */
+int add_parallel_all(std::map<int, capabilities2::node_t>& connections, int connection_id = 0, std::string description = "")
+{
+  int input_count = 0;
+
+  // check for parallel connections without success connections to identify number of connections
+  for (const auto& connection : connections)
+  {
+    if (connection.second.target_on_success.runner == "")
+      input_count += 1;
+  }
+
+  capabilities2::node_t node;
+
+  node.source.runner = "system_capabilities/InputMultiplexAllRunner";
+  node.source.provider = "system_capabilities/InputMultiplexAllRunner";
+  node.source.parameters = nullptr;
+  node.source.input_count = input_count;
+
+  connections[connection_id] = node;
+  connections[connection_id].connection_description = description;
+
+  // set the target_on_success for the new connection
+  for (auto& connection : connections)
+    if (connection.second.target_on_success.runner == "")
+      connection.second.target_on_success = connections[connection_id].source;
+
+  return connection_id;  // return the next connection id
+}
+
+/**
+ * @brief Adds a system connection for parallel input multiplexing with waiting for any inputs
+ *
+ * @param connections std::map containing connections
+ * @param connection_id connection id to be used for the new connection
+ * @param description description of the connection
+ * @return int next connection id
+ */
+int add_parallel_any(std::map<int, capabilities2::node_t>& connections, int connection_id = 0, std::string description = "")
+{
+  int input_count = 0;
+
+  // check for parallel connections without success connections to identify number of connections
+  for (const auto& connection : connections)
+    if (connection.second.target_on_success.runner == "")
+      input_count += 1;
+
+  capabilities2::node_t node;
+
+  node.source.runner = "system_capabilities/InputMultiplexAnyRunner";
+  node.source.provider = "system_capabilities/InputMultiplexAnyRunner";
+  node.source.parameters = nullptr;
+  node.source.input_count = input_count;
+
+  connections[connection_id] = node;
+  connections[connection_id].connection_description = description;
+
+  // set the target_on_success for the new connection
+  for (auto& connection : connections)
+    if (connection.second.target_on_success.runner == "")
+      connection.second.target_on_success = connections[connection_id].source;
+
+  return connection_id;  // return the next connection id
 }
 
 /**
@@ -229,26 +305,27 @@ std::vector<std::string> get_control_list()
  * @param connection_description the name of the control tag
  */
 int extract_connections(tinyxml2::XMLElement* element, std::map<int, capabilities2::node_t>& connections, int connection_id = 0,
-                        capabilities2::connection_type_t connection_type = capabilities2::connection_type_t::ON_SUCCESS, std::string connection_description= "")
+                        CType connection_type = CType::ON_SUCCESS, std::string connection_description = "")
 {
   int predecessor_id;
+  int last_conn_id;
 
   const char* type = nullptr;
   const char* name = nullptr;
   const char* interface = nullptr;
   const char* provider = nullptr;
 
-  std::string runnertag(element->Name());
+  std::string elementTag(element->Name());
 
   std::string typetag = "";
-  std::string nameDescription = "";
+  std::string description = "";
   std::string interfacetag = "";
   std::string providertag = "";
 
   bool hasChildren = (element->FirstChildElement() != nullptr);
   bool hasSiblings = (element->NextSiblingElement() != nullptr);
 
-  if (runnertag == "Control")
+  if (elementTag == "Control")
   {
     type = element->Attribute("type");
     name = element->Attribute("name");
@@ -257,35 +334,53 @@ int extract_connections(tinyxml2::XMLElement* element, std::map<int, capabilitie
       typetag = type;
 
     if (name)
-      nameDescription = name;
+      description = name;
 
     if (typetag == "sequential")
     {
       if (hasChildren)
-        predecessor_id =
-            xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, capabilities2::connection_type_t::ON_SUCCESS, nameDescription);
+        last_conn_id = xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, CType::ON_SUCCESS, description);
     }
-    else if (typetag == "parallel")
+    else if (typetag == "parallel_any")
     {
       if (hasChildren)
-        predecessor_id =
-            xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, capabilities2::connection_type_t::ON_START, nameDescription);
+      {
+        last_conn_id = xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, CType::ON_START, description);
+
+        // add a system connection for parallel_any to proceed when at least one parallel runner is completed
+        last_conn_id = add_parallel_any(connections, last_conn_id + 1, "System capability for collecting inputs from multiple parallel runners");
+      }
+    }
+    else if (typetag == "parallel_all")
+    {
+      if (hasChildren)
+      {
+        last_conn_id = xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, CType::ON_START, description);
+
+        // add a system connection for parallel_all to proceed when all parallel runners are completed
+        last_conn_id = add_parallel_all(connections, last_conn_id + 1, "System capability for collecting inputs from multiple parallel runners");
+      }
     }
     else if (typetag == "recovery")
     {
       if (hasChildren)
-        predecessor_id =
-            xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, capabilities2::connection_type_t::ON_FAILURE, nameDescription);
+      {
+        last_conn_id = xml_parser::extract_connections(element->FirstChildElement(), connections, connection_id, CType::ON_FAILURE, description);
+
+        // add a system connection for recovery to proceed when the original runner or at least one recovery runner is completed
+        last_conn_id = add_parallel_any(connections, last_conn_id + 1, "System capability for collecting inputs from multiple recovery runners");
+      }
     }
 
     if (hasSiblings)
     {
-      predecessor_id = xml_parser::extract_connections(element->NextSiblingElement(), connections, predecessor_id + 1, connection_type, connection_description);
+      last_conn_id =
+          xml_parser::extract_connections(element->NextSiblingElement(), connections, last_conn_id + 1, connection_type, connection_description);
     }
 
-    return predecessor_id;
+    return last_conn_id;
   }
-  else if (runnertag == "Runner")
+  else if (elementTag == "Runner")
   {
     interface = element->Attribute("interface");
     provider = element->Attribute("provider");
@@ -300,34 +395,41 @@ int extract_connections(tinyxml2::XMLElement* element, std::map<int, capabilitie
 
     node.source.runner = interfacetag;
     node.source.provider = providertag;
+    node.source.input_count = 1;
     node.source.parameters = element;
 
     predecessor_id = connection_id - 1;
 
-    while (connections.count(connection_id) > 0)
-      connection_id += 1;
+    // while (connections.count(connection_id) > 0)
+    //   connection_id += 1;
 
     connections[connection_id] = node;
     connections[connection_id].connection_description = connection_description;
 
     if (connection_id != 0)
     {
-      if (connection_type == capabilities2::connection_type_t::ON_SUCCESS)
+      if (connection_type == CType::ON_SUCCESS)
+      {
         connections[predecessor_id].target_on_success = connections[connection_id].source;
+      }
 
-      else if (connection_type == capabilities2::connection_type_t::ON_START)
+      else if (connection_type == CType::ON_START)
+      {
         connections[predecessor_id].target_on_start = connections[connection_id].source;
+      }
 
-      else if (connection_type == capabilities2::connection_type_t::ON_FAILURE)
+      else if (connection_type == CType::ON_FAILURE)
+      {
         connections[predecessor_id].target_on_failure = connections[connection_id].source;
+      }
     }
 
     if (hasSiblings)
-      predecessor_id = extract_connections(element->NextSiblingElement(), connections, connection_id + 1, connection_type);
+      last_conn_id = extract_connections(element->NextSiblingElement(), connections, connection_id + 1, connection_type);
     else
-      predecessor_id += 1;  // connection_id
+      last_conn_id = predecessor_id + 1;  // connection_id
 
-    return predecessor_id;
+    return last_conn_id;
   }
 }
 
