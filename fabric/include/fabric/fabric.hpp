@@ -181,7 +181,7 @@ private:
   {
     event_->info("A new execution started");
 
-    xml_parser::add_closing_event(document);
+    xml_parser::add_completion_runner(document);
     xml_parser::convert_to_string(document, modified_plan);
 
     event_->info("Plan after adding closing event :\n\n " + modified_plan);
@@ -397,7 +397,7 @@ private:
 
     // extract the components within the 'plan' tags
     bool extraction_success = false;
-    tinyxml2::XMLElement* plan = xml_parser::get_plan(document, extraction_success);
+    tinyxml2::XMLElement* plan = xml_parser::extract_plan(document, extraction_success);
 
     if (!extraction_success)
     {
@@ -538,10 +538,12 @@ private:
   {
     std::string capability = capabilities[completed_capabilities_].source.runner;
     std::string provider = capabilities[completed_capabilities_].source.provider;
+    int input_count = capabilities[completed_capabilities_].source.input_count;
 
     auto request_use = std::make_shared<UseCapability::Request>();
     request_use->capability = capability;
     request_use->preferred_provider = provider;
+    request_use->input_count = input_count;
     request_use->bond_id = bond_id_;
 
     event_->info("Starting capability of Runner " + std::to_string(completed_capabilities_) + " : " +

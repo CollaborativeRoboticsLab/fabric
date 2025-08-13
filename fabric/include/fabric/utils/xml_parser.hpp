@@ -19,7 +19,7 @@ using CType = capabilities2::connection_type_t;
  *
  * @return plan in the form of tinyxml2::XMLElement*
  */
-tinyxml2::XMLElement* get_plan(tinyxml2::XMLDocument& document, bool& success)
+tinyxml2::XMLElement* extract_plan(tinyxml2::XMLDocument& document, bool& success)
 {
   std::string plan_tag(document.FirstChildElement()->Name());
 
@@ -86,7 +86,8 @@ void convert_to_string(tinyxml2::XMLDocument& document_xml, std::string& documen
   document_string = printer.CStr();
 }
 
-void add_closing_event(tinyxml2::XMLDocument& document)
+
+void add_completion_runner(tinyxml2::XMLDocument& document)
 {
   // Get the root <Plan> element
   tinyxml2::XMLElement* plan = document.FirstChildElement("Plan");
