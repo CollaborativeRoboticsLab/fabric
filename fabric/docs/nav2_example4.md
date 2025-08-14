@@ -1,4 +1,4 @@
-## WaypointRunner Example 1 - Single Goal
+## WaypointRunner Example 2 - Goal Sequence
 
 ### Dependencies
 
@@ -6,7 +6,7 @@ This example uses nav2 stack and turtlebot3. Follow instructions from [Nav2 Depe
 
 ### Plan selection
 
-Uncomment the  line related to `navigation_1.xml` in the `config/fabric.yaml` file
+Uncomment the  line related to `navigation_4.xml` in the `config/fabric.yaml` file
 
 ### Build the package to apply changes
 
@@ -19,6 +19,7 @@ colcon build
 ### Start the turtlebot simulation
 
 ```bash
+source install/setup.bash
 export TURTLEBOT3_MODEL=waffle
 ros2 launch nav_stack turtlebot3_world.launch.py
 ```
