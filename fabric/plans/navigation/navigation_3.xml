@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Plan>
     <Control type="sequential" name="multi_point_navigation_with_recovery">
-        <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="0.0" y="2.0" />
+        <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="0.5" y="2.0" />
         <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="1.0" y="2.0" />
         <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="2.0" y="0.5" />
         <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="2.0" y="-3.0" />

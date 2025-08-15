@@ -4,7 +4,7 @@
 
 This example uses nav2 stack and turtlebot3. Follow instructions from [Nav2 Dependency Installation](https://github.com/CollaborativeRoboticsLab/capabilities2/blob/develop/docs/nav2_setup.md) to setup nav stack.
 
-In this example, (0,2) (1,2) (-2,0) are reachable, (3,0.5) (2,-3) points are not reachable.Because of this, the robot moves to the (0,0.5) as a recovery action. (1,2) (-2,0) points also have recovery actions linked, but they are not triggered as the point is accessible.
+In this example, (0.5,2) (1,2) (-2,0) are reachable, (2,-3) point is not reachable. Because of this, the robot moves to the (0,0.5) as a recovery action.
 
 ### Plan selection
 
