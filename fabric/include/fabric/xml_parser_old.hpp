@@ -86,37 +86,36 @@ void convert_to_string(tinyxml2::XMLDocument& document_xml, std::string& documen
   document_string = printer.CStr();
 }
 
-
+/**
+ * @brief add a completion runner to the plan
+ * This function adds a new <Control> element with type "sequential" and a <Runner> element for the completion runner
+ * to the existing <Plan> element in the XML document.
+ *
+ * @param document XML document to which the completion runner will be added
+ */
 void add_completion_runner(tinyxml2::XMLDocument& document)
 {
   // Get the root <Plan> element
   tinyxml2::XMLElement* plan = document.FirstChildElement("Plan");
-
-  // Get the existing <Control> element inside <Plan>
-  tinyxml2::XMLElement* innerControl = plan->FirstChildElement("Control");
 
   // Create the outer <Control type="sequential"> element
   tinyxml2::XMLElement* outerControl = document.NewElement("Control");
   outerControl->SetAttribute("type", "sequential");
   outerControl->SetAttribute("name", "fabric_completion_control");
 
-  // Clone the existing <Control> element instead of deleting it
-  tinyxml2::XMLElement* clonedControl = innerControl->DeepClone(&document)->ToElement();
+  // Move all existing children of <Plan> into the new outer control
+  while (tinyxml2::XMLNode* child = plan->FirstChild()) {
+    outerControl->InsertEndChild(child);
+  }
 
-  // Insert the cloned inner control inside the new outer control
-  outerControl->InsertEndChild(clonedControl);
+  // Add the new outer control to the <Plan>
+  plan->InsertEndChild(outerControl);
 
   // Create and append the new <Runner> element
   tinyxml2::XMLElement* newRunner = document.NewElement("Runner");
   newRunner->SetAttribute("interface", "system_capabilities/CompletionRunner");
   newRunner->SetAttribute("provider", "system_capabilities/CompletionRunner");
   outerControl->InsertEndChild(newRunner);
-
-  // Remove the original innerControl (after cloning)
-  plan->DeleteChild(innerControl);
-
-  // Append the new outer control to <Plan>
-  plan->InsertEndChild(outerControl);
 }
 
 /**

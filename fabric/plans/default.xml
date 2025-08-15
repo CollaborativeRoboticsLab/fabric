@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Plan>
-    <Control type="sequential">
+    <Control type="sequential" >
         <Runner interface="std_capabilities/CapabilityGetRunner" provider="std_capabilities/CapabilityGetRunner"/>
         <Runner interface="std_capabilities/PromptCapabilityRunner" provider="std_capabilities/PromptCapabilityRunner" />
         <Runner interface="std_capabilities/OccupancyGridRunner" provider="std_capabilities/OccupancyGridRunner"/>

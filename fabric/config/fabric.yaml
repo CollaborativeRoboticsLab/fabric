@@ -1,7 +1,7 @@
 fabric_client:
   ros__parameters:
     # plan_file_path: "install/fabric/share/fabric/plans/default.xml"
-    # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_1.xml"   # 1 point navigation example
+    plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_1.xml"   # 1 point navigation example
     # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_2.xml"   # 5 point navigation example
     # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_3.xml"   # 5 point navigation with 1 point inaccessible (1 recoveries) example
     # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_4.xml"   # 5 point navigation with 4 point inaccessible (4 recoveries) example
