@@ -8,7 +8,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 
-#include <fabric/utils/xml_parser.hpp>
+#include <fabric/xml_parser.hpp>
 #include <fabric_msgs/action/plan.hpp>
 
 #include <capabilities2_utils/bond_client.hpp>
@@ -80,7 +80,8 @@ public:
    */
   void initialize()
   {
-    control_tag_list = xml_parser::get_control_list();
+    // Initialize the XML parser
+    xml_parser_ = std::make_shared<XMLParser>();
 
     event_ = std::make_shared<EventClient>(shared_from_this(), "fabric", "/events");
 
@@ -181,8 +182,8 @@ private:
   {
     event_->info("A new execution started");
 
-    xml_parser::add_closing_event(document);
-    xml_parser::convert_to_string(document, modified_plan);
+    xml_parser_->add_completion_runner(document);
+    xml_parser_->convert_to_string(document, modified_plan);
 
     event_->info("Plan after adding closing event :\n\n " + modified_plan);
 
@@ -397,7 +398,7 @@ private:
 
     // extract the components within the 'plan' tags
     bool extraction_success = false;
-    tinyxml2::XMLElement* plan = xml_parser::get_plan(document, extraction_success);
+    tinyxml2::XMLElement* plan = xml_parser_->extract_plan(document, extraction_success);
 
     if (!extraction_success)
     {
@@ -413,7 +414,7 @@ private:
     // verify whether the plan is valid by checking the tags
     std::string error_message;
 
-    if (!xml_parser::check_tags(plan, interface_list, providers_list, control_tag_list, rejected_list, error_message))
+    if (!xml_parser_->check_tags(plan, interface_list, providers_list, rejected_list, error_message))
     {
       result_msg->success = false;
       result_msg->message = "Execution plan is faulty. Please recheck and update";
@@ -460,7 +461,7 @@ private:
     event_->info("Plan verification successful. Proceeding with connections extraction");
 
     // Extract the connections from the plan
-    xml_parser::extract_connections(plan, connection_map);
+    xml_parser_->extract_connections(plan, connection_map);
 
     event_->info("Connection extraction successful");
 
@@ -642,7 +643,7 @@ private:
     event_->info("Configuring capability of Runner " + std::to_string(completed_configurations_) + " named " +
                  capabilities[completed_configurations_].source.runner);
 
-    if (xml_parser::convert_to_string(capabilities[completed_configurations_].source.parameters, request_configure->source.parameters))
+    if (xml_parser_->convert_to_string(capabilities[completed_configurations_].source.parameters, request_configure->source.parameters))
     {
       request_configure->source.capability = capabilities[completed_configurations_].source.runner;
       request_configure->source.provider = capabilities[completed_configurations_].source.provider;
@@ -653,7 +654,7 @@ private:
       request_configure->source.provider = "";
     }
 
-    if (xml_parser::convert_to_string(capabilities[completed_configurations_].target_on_start.parameters,
+    if (xml_parser_->convert_to_string(capabilities[completed_configurations_].target_on_start.parameters,
                                       request_configure->target_on_start.parameters))
     {
       request_configure->target_on_start.capability = capabilities[completed_configurations_].target_on_start.runner;
@@ -665,7 +666,7 @@ private:
       request_configure->target_on_start.provider = "";
     }
 
-    if (xml_parser::convert_to_string(capabilities[completed_configurations_].target_on_stop.parameters,
+    if (xml_parser_->convert_to_string(capabilities[completed_configurations_].target_on_stop.parameters,
                                       request_configure->target_on_stop.parameters))
     {
       request_configure->target_on_stop.capability = capabilities[completed_configurations_].target_on_stop.runner;
@@ -677,7 +678,7 @@ private:
       request_configure->target_on_stop.provider = "";
     }
 
-    if (xml_parser::convert_to_string(capabilities[completed_configurations_].target_on_success.parameters,
+    if (xml_parser_->convert_to_string(capabilities[completed_configurations_].target_on_success.parameters,
                                       request_configure->target_on_success.parameters))
     {
       request_configure->target_on_success.capability = capabilities[completed_configurations_].target_on_success.runner;
@@ -689,7 +690,7 @@ private:
       request_configure->target_on_success.provider = "";
     }
 
-    if (xml_parser::convert_to_string(capabilities[completed_configurations_].target_on_failure.parameters,
+    if (xml_parser_->convert_to_string(capabilities[completed_configurations_].target_on_failure.parameters,
                                       request_configure->target_on_failure.parameters))
     {
       request_configure->target_on_failure.capability = capabilities[completed_configurations_].target_on_failure.runner;
@@ -700,6 +701,9 @@ private:
       request_configure->target_on_failure.capability = "";
       request_configure->target_on_failure.provider = "";
     }
+
+    request_configure->connection_description = capabilities[completed_configurations_].connection_description;
+    request_configure->trigger_id = capabilities[completed_configurations_].trigger_id;
 
     std::string source_capability = capabilities[completed_configurations_].source.runner;
 
@@ -744,7 +748,7 @@ private:
     auto request_trigger = std::make_shared<TriggerCapability::Request>();
 
     std::string parameter_string;
-    xml_parser::convert_to_string(connection_map[0].source.parameters, parameter_string);
+    xml_parser_->convert_to_string(connection_map[0].source.parameters, parameter_string);
     request_trigger->capability = connection_map[0].source.runner;
     request_trigger->parameters = parameter_string;
 
@@ -763,7 +767,8 @@ private:
       event_->info("Successfully triggered capability " + connection_map[0].source.runner);
 
       result_msg->success = true;
-      result_msg->message = "Successfully completed capabilities2 fabric";
+      result_msg->message = "Successfully started fabric execution with " + std::to_string(expected_capabilities_) +
+                            " capabilities and " + std::to_string(expected_configurations_) + " configurations";
       event_->info(result_msg->message);
       goal_handle_->succeed(result_msg);
     });
@@ -824,9 +829,6 @@ private:
   /** Providers List */
   std::vector<std::string> providers_list;
 
-  /** Control flow List */
-  std::vector<std::string> control_tag_list;
-
   /** Invalid events list */
   std::vector<std::string> rejected_list;
 
@@ -865,6 +867,9 @@ private:
 
   /** Event client for publishing events */
   std::shared_ptr<EventClient> event_;
+
+  /** XMLParser engine */
+  std::shared_ptr<XMLParser> xml_parser_;
 
   /** capabilities2 server and fabric synchronization tools */
   // std::mutex mutex_;

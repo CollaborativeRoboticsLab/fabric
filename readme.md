@@ -49,27 +49,27 @@ Below is an example XML plan for configuring a set of capabilities:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <Plan name="navigate_or_return_fabric">
-    <Control name="sequential" name="contro_plan">
-        <Control name="sequential" name="main_execution_plan">
-            <Event interface="std_capabilities/CapabilityGetRunner" provider="std_capabilities/CapabilityGetRunner"/>
-            <Event interface="std_capabilities/PromptCapabilityRunner" provider="std_capabilities/PromptCapabilityRunner" />
-            <Control name="parallel" name="gather_occupancy_data">
-                <Control name="sequential" name="navigate_or_retur">
-                    <Event interface="std_capabilities/OccupancyGridRunner" provider="std_capabilities/OccupancyGridRunner"/>
-                    <Event interface="std_capabilities/PromptOccupancyRunner" provider="std_capabilities/PromptOccupancyRunner" /> 
-                <Control name="sequential">
+    <Control type="sequential" name="contro_plan">
+        <Control type="sequential" name="main_execution_plan">
+            <Runner interface="std_capabilities/CapabilityGetRunner" provider="std_capabilities/CapabilityGetRunner"/>
+            <Runner interface="std_capabilities/PromptCapabilityRunner" provider="std_capabilities/PromptCapabilityRunner" />
+            <Control type="parallel" name="gather_occupancy_data">
+                <Control type="sequential" name="navigate_or_retur">
+                    <Runner interface="std_capabilities/OccupancyGridRunner" provider="std_capabilities/OccupancyGridRunner"/>
+                    <Runner interface="std_capabilities/PromptOccupancyRunner" provider="std_capabilities/PromptOccupancyRunner" /> 
+                <Control type="sequential">
                 </Control>
-                <Control name="sequential" name="gather_position_data">
-                    <Event interface="std_capabilities/RobotPoseRunner" provider="std_capabilities/RobotPoseRunner" from="map" to="base_link"/>
-                    <Event interface="std_capabilities/PromptPoseRunner" provider="std_capabilities/PromptPoseRunner" />
+                <Control type="sequential" name="gather_position_data">
+                    <Runner interface="std_capabilities/RobotPoseRunner" provider="std_capabilities/RobotPoseRunner" from="map" to="base_link"/>
+                    <Runner interface="std_capabilities/PromptPoseRunner" provider="std_capabilities/PromptPoseRunner" />
                 </Control>
             </Control>
-            <Event interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="5.0" y="5.0" />
-            <Control name="recovery" name="return_to_home_if_lost">
-                <Event interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="0.0" y="0.0" />
+            <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="5.0" y="5.0" />
+            <Control type="recovery" name="return_to_home_if_lost">
+                <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="0.0" y="0.0" />
             </Control>
         </Control>
-        <Event interface="std_capabilities/FabricCompletionRunner" provider="std_capabilities/FabricCompletionRunner"/>
+        <Runner interface="std_capabilities/FabricCompletionRunner" provider="std_capabilities/FabricCompletionRunner"/>
     </Control>
 </Plan>
 ```
@@ -96,23 +96,19 @@ Below is an example XML plan for configuring a set of capabilities:
 
 ### Navigation
 
-1. [WaypointRunner Example 1](./fabric/docs/waypoint_runner_ex1.md)
-Implements at the very basic fabric triggering that moves the robot from one point to another.
-
-2. [WaypointRunner Example 2](./fabric/docs/waypoint_runner_ex2.md)
-Implements navigating through 2 points using 'sequential' control functionality.
+| Example | Description |
+| ---     | ---         |
+| [Example 1](./fabric/docs/nav2_example1.md) | Implements at the basic fabric triggering that moves the robot from one point to another. |
+| [Example 2](./fabric/docs/nav2_example2.md) | Implements navigating through 5 points using 'sequential' control functionality. |
+| [Example 3](./fabric/docs/nav2_example3.md) | Implements navigating through 5 points inluding 1 inaccessible point (1 recovery point) using `sequential` and `recovery` control functionality. |
+| [Example 3](./fabric/docs/nav2_example4.md) | Implements navigating through 5 points inluding 4 inaccessible point (4 recovery point) using `sequential` and `recovery` control functionality. |
 
 
 ### Prompting
 
-1. [PromptCapabilityRunner Example](./fabric/docs/prompt_capability_runner_ex1.md)
-Implements requesting for robot's capabilities and prompting them to the LLM
-
-2. [PromptOccupancyRunner Example](./fabric/docs/prompt_occupancy_runner_ex1.md)
-Implements listening for robot's occupancy grid and prompting them to the LLM
-
-2. [PromptPoseRunner Example](./fabric/docs/prompt_pose_runner_ex1.md)
-Implements listening for robot's pose and prompting them to the LLM
-
-2. [PromptPlanRunner Example](./fabric/docs/prompt_plan_runner_ex1.md)
-Implements prompting the LLM for a plan for a new task and setting it to Fabric
+| Example | Description |
+| ---     | ---         |
+| [Example 1](./fabric/docs/prompt_example1.md) | Implements requesting for robot's capabilities and prompting them to the LLM |
+| [Example 2](./fabric/docs/prompt_example2.md) | Implements listening for robot's occupancy grid and prompting them to the LLM |
+| [Example 3](./fabric/docs/prompt_example3.md) | Implements listening for robot's pose and prompting them to the LLM 
+| [Example 4](./fabric/docs/prompt_example4.md) | Implements prompting the LLM for a plan for a new task and setting it to Fabric |
