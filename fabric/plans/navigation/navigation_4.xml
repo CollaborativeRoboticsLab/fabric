@@ -6,7 +6,7 @@
         <Control type="recovery" name="recovery_navigation_1">
             <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="0.0" y="0.5" />
         </Control>
-        <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="3.0" y="0.5" />
+        <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="2.0" y="1.0" />
         <Control type="recovery" name="recovery_navigation_2">
             <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="0.0" y="0.5" />
         </Control>

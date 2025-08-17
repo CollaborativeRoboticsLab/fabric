@@ -703,6 +703,7 @@ private:
     }
 
     request_configure->connection_description = capabilities[completed_configurations_].connection_description;
+    request_configure->trigger_id = capabilities[completed_configurations_].trigger_id;
 
     std::string source_capability = capabilities[completed_configurations_].source.runner;
 
@@ -766,7 +767,8 @@ private:
       event_->info("Successfully triggered capability " + connection_map[0].source.runner);
 
       result_msg->success = true;
-      result_msg->message = "Successfully completed capabilities2 fabric";
+      result_msg->message = "Successfully started fabric execution with " + std::to_string(expected_capabilities_) +
+                            " capabilities and " + std::to_string(expected_configurations_) + " configurations";
       event_->info(result_msg->message);
       goal_handle_->succeed(result_msg);
     });

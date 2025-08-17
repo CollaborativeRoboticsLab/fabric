@@ -239,7 +239,7 @@ public:
     runner->SetAttribute("interface", interface.c_str());
     runner->SetAttribute("provider", provider.c_str());
     runner->SetAttribute("input_count", input_count);
-    runner->SetAttribute("uid", id);
+    runner->SetAttribute("id", id);
 
     system_doc.InsertEndChild(runner);
 
@@ -270,10 +270,11 @@ public:
 
     node.source.runner = "system_capabilities/InputMultiplexAllRunner";
     node.source.provider = "system_capabilities/InputMultiplexAllRunner";
-    node.source.parameters = this->system_runner_xml(node.source.runner, node.source.provider, input_count, multiplex_all_index);
+    node.source.parameters = this->system_runner_xml(node.source.runner, node.source.provider, input_count, runner_index);
 
     connections[connection_id] = node;
     connections[connection_id].connection_description = description;
+    connections[connection_id].trigger_id = runner_index;
 
     // set the target_on_success for the new connection
     for (auto& connection : connections)
@@ -281,7 +282,7 @@ public:
         connection.second.target_on_success = connections[connection_id].source;
 
     // increment the index for the next parallel all connection
-    multiplex_all_index += 1;
+    runner_index += 1;
 
     // return the next connection id
     return connection_id;
@@ -308,10 +309,11 @@ public:
 
     node.source.runner = "system_capabilities/InputMultiplexAnyRunner";
     node.source.provider = "system_capabilities/InputMultiplexAnyRunner";
-    node.source.parameters = this->system_runner_xml(node.source.runner, node.source.provider, input_count, multiplex_any_index);
+    node.source.parameters = this->system_runner_xml(node.source.runner, node.source.provider, input_count, runner_index);
 
     connections[connection_id] = node;
     connections[connection_id].connection_description = description;
+    connections[connection_id].trigger_id = runner_index;
 
     // set the target_on_success for the new connection
     for (auto& connection : connections)
@@ -319,36 +321,36 @@ public:
         connection.second.target_on_success = connections[connection_id].source;
 
     // increment the index for the next parallel any connection
-    multiplex_any_index += 1;
+    runner_index += 1;
 
     // return the next connection id
     return connection_id;
   }
 
   /**
-   * @brief Check and update the system runner uid for the successor based on the predecessor's uid
+   * @brief Check and update the system runner id for the successor based on the predecessor's id
    *
    * This function checks if the predecessor is a system runner and has parameters.
-   * If so, it updates the successor's parameters with the predecessor's uid.
+   * If so, it updates the successor's parameters with the predecessor's id.
    *
    * @param predecessor The predecessor node_t containing the source runner
    * @param successor The successor node_t to be updated
    */
-  void check_and_update_system_runner_uid(capabilities2::node_t& predecessor, capabilities2::node_t& successor)
+  void check_and_update_runner_id(capabilities2::node_t& predecessor, capabilities2::node_t& successor)
   {
     // check if predecessor is a system runner and has parameters
     if (predecessor.source.runner.find("system_capabilities/InputMultiplexAnyRunner") != std::string::npos ||
         predecessor.source.runner.find("system_capabilities/InputMultiplexAllRunner") != std::string::npos)
     {
-      // If the predecessor is a system runner, we need to update the successor's parameters with the predecessor's uid
-      if (!predecessor.source.parameters)
+      // If the predecessor is a system runner, we need to update the successor's parameters with the predecessor's id
+      if (predecessor.source.parameters)
       {
-        // Get the uid attribute from the predecessor system runner
-        int predecessor_uid = 0;
-        predecessor.source.parameters->QueryIntAttribute("uid", &predecessor_uid);
+        // Get the id attribute from the predecessor system runner
+        const char* id = nullptr;
+        id = predecessor.source.parameters->Attribute("id");
 
-        // Set the uid attribute for the successor system runner
-        successor.source.parameters->SetAttribute("uid", predecessor_uid);
+        // Set the id attribute for the successor system runner
+        successor.source.parameters->SetAttribute("id", id);
       }
     }
   }
@@ -459,34 +461,36 @@ public:
       node.source.provider = providertag;
       node.source.parameters = element;
 
+      // set runner id unique identifier
+      node.source.parameters->SetAttribute("id", runner_index);
+
       predecessor_id = connection_id - 1;
 
       connections[connection_id] = node;
       connections[connection_id].connection_description = connection_description;
 
+      // match the trigger id with the runner index
+      connections[connection_id].trigger_id = runner_index;
+
+      runner_index += 1;
+
       if (connection_id != 0)
       {
+        // if the predecessor is a system runner, we need to update the successor's parameters with the predecessor's id
+        // this->check_and_update_runner_id(connections[predecessor_id], connections[connection_id]);
+
         if (connection_type == CType::ON_SUCCESS)
         {
-          // If the connection type is ON_SUCCESS, we need to check and update the system runner uid
-          this->check_and_update_system_runner_uid(connections[predecessor_id], connections[connection_id]);
-
           // Set the target_on_success for the predecessor connection
           connections[predecessor_id].target_on_success = connections[connection_id].source;
         }
         else if (connection_type == CType::ON_START)
         {
-          // If the connection type is ON_START, we need to check and update the system runner uid
-          this->check_and_update_system_runner_uid(connections[predecessor_id], connections[connection_id]);
-
           // Set the target_on_start for the predecessor connection
           connections[predecessor_id].target_on_start = connections[connection_id].source;
         }
         else if (connection_type == CType::ON_FAILURE)
         {
-          // If the connection type is ON_FAILURE, we need to check and update the system runner uid
-          this->check_and_update_system_runner_uid(connections[predecessor_id], connections[connection_id]);
-
           // Set the target_on_failure for the predecessor connection
           connections[predecessor_id].target_on_failure = connections[connection_id].source;
         }
@@ -495,7 +499,7 @@ public:
       if (hasSiblings)
         last_conn_id = this->extract_connections(element->NextSiblingElement(), connections, connection_id + 1, connection_type);
       else
-        last_conn_id = predecessor_id + 1;  // connection_id
+        last_conn_id = connection_id;
 
       return last_conn_id;
     }
@@ -511,9 +515,6 @@ private:
   // System xml document
   tinyxml2::XMLDocument system_doc;
 
-  // index for InputMultiplexAllRunner
-  int multiplex_all_index = 0;
-
-  // index for InputMultiplexAnyRunner
-  int multiplex_any_index = 0;
+  // Unique index for runners
+  int runner_index = 0;
 };

@@ -3,8 +3,8 @@ fabric_client:
     # plan_file_path: "install/fabric/share/fabric/plans/default.xml"
     # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_1.xml"   # 1 point navigation example
     # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_2.xml"   # 5 point navigation example
-    # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_3.xml"   # 5 point navigation with 1 point inaccessible (1 recoveries) example
-    plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_4.xml"   # 5 point navigation with 4 point inaccessible (4 recoveries) example
+    plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_3.xml"   # 5 point navigation with 1 point inaccessible (1 recoveries) example
+    # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_4.xml"   # 5 point navigation with 4 point inaccessible (4 recoveries) example
     # plan_file_path: "install/fabric/share/fabric/plans/prompting/prompt_1.xml"        # PromptCapabilityRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/prompting/prompt_2.xml"        # PromptOccupancyRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/prompting/prompt_3.xml"        # PromptPoseRunner Example
