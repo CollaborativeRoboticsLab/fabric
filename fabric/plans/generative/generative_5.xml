@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Plan>
+    <Control type="sequential" >
+        <Runner interface="std_capabilities/CapabilityGetRunner" provider="std_capabilities/CapabilityGetRunner"/>
+        <Runner interface="std_capabilities/PromptCapabilityRunner" provider="std_capabilities/PromptCapabilityRunner" />
+        <Runner interface="std_capabilities/OccupancyGridRunner" provider="std_capabilities/OccupancyGridRunner"/>
+        <Runner interface="std_capabilities/PromptOccupancyRunner" provider="std_capabilities/PromptOccupancyRunner" />
+        <Runner interface="std_capabilities/RobotPoseRunner" provider="std_capabilities/RobotPoseRunner" from="map" to="base_link"/>
+        <Runner interface="std_capabilities/PromptPoseRunner" provider="std_capabilities/PromptPoseRunner" />
+        <Runner interface="std_capabilities/PromptPlanRunner" provider="std_capabilities/PromptPlanRunner" replan="false" task="move to (2.0, -0.5), (1.0, 3.0), (-3.0, -1.0), (0.0, -2.0) in order. If (2.0, -0.5) cannot be reached, move to (0.0, 2.0).  If (1.0, 3.0) cannot be reached, move to (0.0, 2.0). If (-3.0, -1.0) cannot be reached, move to (-2.0, 0.0). If (0.0, -2.0) cannot be reached, move to (-2.0, 0.0) position" />
+        <Runner interface="std_capabilities/FabricSetPlanRunner" provider="std_capabilities/FabricSetPlanRunner"/>
+    </Control>
+</Plan>
