@@ -40,7 +40,7 @@ source install/setup.bash
 ros2 launch capabilities2_server server.launch.py
 ```
 
-### Start the Capabilities2 Fabric
+### Start the Fabric
 
 ```bash
 source install/setup.bash

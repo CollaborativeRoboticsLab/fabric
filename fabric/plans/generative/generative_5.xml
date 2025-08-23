@@ -5,7 +5,7 @@
         <Runner interface="capabilities2_runner_prompt/PromptCapabilityRunner" provider="capabilities2_runner_prompt/PromptCapabilityRunner" />
         <Runner interface="capabilities2_runner_nav2/OccupancyGridRunner" provider="capabilities2_runner_nav2/OccupancyGridRunner"/>
         <Runner interface="capabilities2_runner_prompt/PromptOccupancyRunner" provider="capabilities2_runner_prompt/PromptOccupancyRunner" />
-        <Runner interface="capabilities2_runner_nav2/RobotPoseRunner" provider="capabilities2_runner_nav2/RobotPoseRunner" from="map" to="base_link"/>
+        <Runner interface="capabilities2_runner_nav2/RobotPoseRunner" provider="capabilities2_runner_nav2/RobotPoseRunner" map="map" odom="odom" robot="base_link"/>
         <Runner interface="capabilities2_runner_prompt/PromptPoseRunner" provider="capabilities2_runner_prompt/PromptPoseRunner" />
         <Runner interface="capabilities2_runner_prompt/PromptPlanRunner" provider="capabilities2_runner_prompt/PromptPlanRunner" replan="false" task="move to (2.0, -0.5), (1.0, 3.0), (-3.0, -1.0), (0.0, -2.0) in order. If (2.0, -0.5) cannot be reached, move to (0.0, 2.0).  If (1.0, 3.0) cannot be reached, move to (0.0, 2.0). If (-3.0, -1.0) cannot be reached, move to (-2.0, 0.0). If (0.0, -2.0) cannot be reached, move to (-2.0, 0.0) position" />
         <Runner interface="capabilities2_runner_fabric/FabricSetPlanRunner" provider="capabilities2_runner_fabric/FabricSetPlanRunner"/>

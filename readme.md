@@ -47,30 +47,30 @@ The fabric package relies on XML-based plans to define workflows. These plans sp
 Below is an example XML plan for configuring a set of capabilities:
 
 ```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<Plan name="navigate_or_return_fabric">
-    <Control type="sequential" name="contro_plan">
-        <Control type="sequential" name="main_execution_plan">
-            <Runner interface="std_capabilities/CapabilityGetRunner" provider="std_capabilities/CapabilityGetRunner"/>
-            <Runner interface="std_capabilities/PromptCapabilityRunner" provider="std_capabilities/PromptCapabilityRunner" />
-            <Control type="parallel" name="gather_occupancy_data">
-                <Control type="sequential" name="navigate_or_retur">
-                    <Runner interface="std_capabilities/OccupancyGridRunner" provider="std_capabilities/OccupancyGridRunner"/>
-                    <Runner interface="std_capabilities/PromptOccupancyRunner" provider="std_capabilities/PromptOccupancyRunner" /> 
-                <Control type="sequential">
-                </Control>
-                <Control type="sequential" name="gather_position_data">
-                    <Runner interface="std_capabilities/RobotPoseRunner" provider="std_capabilities/RobotPoseRunner" from="map" to="base_link"/>
-                    <Runner interface="std_capabilities/PromptPoseRunner" provider="std_capabilities/PromptPoseRunner" />
-                </Control>
-            </Control>
-            <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="5.0" y="5.0" />
-            <Control type="recovery" name="return_to_home_if_lost">
-                <Runner interface="std_capabilities/WaypointRunner" provider="std_capabilities/WaypointRunner" x="0.0" y="0.0" />
-            </Control>
+<?xml version='1.0' encoding='UTF-8'?>
+<Plan name='navigate_or_return_fabric'>
+  <Control type='sequential' name='contro_plan'>
+    <Control type='sequential' name='main_execution_plan'>
+      <Runner interface='capabilities2_runner_capabilities/CapabilityGetRunner' provider='capabilities2_runner_capabilities/CapabilityGetRunner'/>
+      <Runner interface='capabilities2_runner_prompt/PromptCapabilityRunner' provider='capabilities2_runner_prompt/PromptCapabilityRunner' />
+      <Control type='parallel' name='gather_occupancy_data'>
+        <Control type='sequential' name='navigate_or_retur'>
+          <Runner interface='capabilities2_runner_nav2/OccupancyGridRunner' provider='capabilities2_runner_nav2/OccupancyGridRunner'/>
+          <Runner interface='capabilities2_runner_prompt/PromptOccupancyRunner' provider='capabilities2_runner_prompt/PromptOccupancyRunner' /> 
+        <Control type='sequential'>
         </Control>
-        <Runner interface="std_capabilities/FabricCompletionRunner" provider="std_capabilities/FabricCompletionRunner"/>
+        <Control type='sequential' name='gather_position_data'>
+          <Runner interface='capabilities2_runner_nav2/RobotPoseRunner' provider='capabilities2_runner_nav2/RobotPoseRunner' from='map' to='base_link'/>
+          <Runner interface='capabilities2_runner_prompt/PromptPoseRunner' provider='capabilities2_runner_prompt/PromptPoseRunner' />
+        </Control>
+      </Control>
+      <Runner interface='capabilities2_runner_nav2/WaypointRunner' provider='capabilities2_runner_nav2/WaypointRunner' x='5.0' y='5.0' />
+      <Control type='recovery' name='return_to_home_if_lost'>
+          <Runner interface='capabilities2_runner_nav2/WaypointRunner' provider='capabilities2_runner_nav2/WaypointRunner' x='0.0' y='0.0' />
+      </Control>
     </Control>
+    <Runner interface='capabilities2_runner_fabric/FabricCompletionRunner' provider='capabilities2_runner_fabric/FabricCompletionRunner'/>
+  </Control>
 </Plan>
 ```
 
