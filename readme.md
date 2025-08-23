@@ -96,7 +96,7 @@ Below is an example XML plan for configuring a set of capabilities:
 
 ### Navigation
 
-| Example | Description |
+| <div style="width:75px">Example</div> | Description |
 | ---     | ---         |
 | [Example 1](./fabric/docs/nav2_example1.md) | Implements the basic fabric triggering that moves the robot from one point to another. |
 | [Example 2](./fabric/docs/nav2_example2.md) | Implements navigating through 5 points using 'sequential' control functionality. |
@@ -105,7 +105,7 @@ Below is an example XML plan for configuring a set of capabilities:
 
 ### Prompting
 
-| Example | Description |
+| <div style="width:75px">Example</div> | Description |
 | ---     | ---         |
 | [Example 1](./fabric/docs/prompt_example1.md) | Implements requesting for robot's capabilities and prompting them to the LLM |
 | [Example 2](./fabric/docs/prompt_example2.md) | Implements listening for robot's occupancy grid and prompting them to the LLM |
@@ -114,7 +114,7 @@ Below is an example XML plan for configuring a set of capabilities:
 
 ### Navigation
 
-| Example | Description |
+| <div style="width:75px">Example</div> | Description |
 | ---     | ---         |
 | [Example 1](./fabric/docs/generative_example1.md) | Implements the execution plan generation to acheive one point to another. |
 | [Example 2](./fabric/docs/generative_example2.md) | Implements the execution plan generation to acheive waypoint navigation. |
