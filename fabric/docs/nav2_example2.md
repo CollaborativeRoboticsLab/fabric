@@ -1,10 +1,10 @@
 ## WaypointRunner Example 2 - Goal Sequence
 
+In this example, (0.5,2) (1,2) (2,0.5) (-2,0) points are reachable. And the robot moves through those points.
+
 ### Dependencies
 
 This example uses nav2 stack and turtlebot3. Follow instructions from [Nav2 Dependency Installation](https://github.com/CollaborativeRoboticsLab/capabilities2/blob/develop/docs/nav2_setup.md) to setup nav stack.
-
-In this example, (0.5,2) (1,2) (2,0.5) (-2,0) points are reachable. And the robot moves through those points.
 
 ### Plan selection
 

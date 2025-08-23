@@ -1,10 +1,10 @@
 ## WaypointRunner Example 1 - Single Goal
 
+In this example (0.5,2) point is reachable. And the robot moves to that point.
+
 ### Dependencies
 
 This example uses nav2 stack and turtlebot3. Follow instructions from [Nav2 Dependency Installation](https://github.com/CollaborativeRoboticsLab/capabilities2/blob/develop/docs/nav2_setup.md) to setup nav stack.
-
-In this example (0.5,2) point is reachable. And the robot moves to that point.
 
 ### Plan selection
 

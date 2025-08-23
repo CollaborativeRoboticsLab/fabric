@@ -417,7 +417,7 @@ private:
     if (!xml_parser_->check_tags(plan, interface_list, providers_list, rejected_list, error_message))
     {
       result_msg->success = false;
-      result_msg->message = "Execution plan is faulty. Please recheck and update";
+      result_msg->message = "Plan verification failed: " + error_message;
       event_->error(result_msg->message);
       goal_handle_->abort(result_msg);
       verification_success = false;

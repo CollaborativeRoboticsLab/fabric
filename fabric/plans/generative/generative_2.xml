@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Plan>
     <Control type="sequential" >
-        <Runner interface="std_capabilities/CapabilityGetRunner" provider="std_capabilities/CapabilityGetRunner"/>
-        <Runner interface="std_capabilities/PromptCapabilityRunner" provider="std_capabilities/PromptCapabilityRunner" />
-        <Runner interface="std_capabilities/OccupancyGridRunner" provider="std_capabilities/OccupancyGridRunner"/>
-        <Runner interface="std_capabilities/PromptOccupancyRunner" provider="std_capabilities/PromptOccupancyRunner" />
-        <Runner interface="std_capabilities/RobotPoseRunner" provider="std_capabilities/RobotPoseRunner" from="map" to="base_link"/>
-        <Runner interface="std_capabilities/PromptPoseRunner" provider="std_capabilities/PromptPoseRunner" />
-        <Runner interface="std_capabilities/PromptPlanRunner" provider="std_capabilities/PromptPlanRunner" replan="false" task="move to (2.0, -0.5), (0.0, 2.0), (-2.0, 0.0), (0.0, -2.0) in order" />
-        <Runner interface="std_capabilities/FabricSetPlanRunner" provider="std_capabilities/FabricSetPlanRunner"/>
+        <Runner interface="capabilities2_runner_capabilities/CapabilityGetRunner" provider="capabilities2_runner_capabilities/CapabilityGetRunner"/>
+        <Runner interface="capabilities2_runner_prompt/PromptCapabilityRunner" provider="capabilities2_runner_prompt/PromptCapabilityRunner" />
+        <Runner interface="capabilities2_runner_nav2/OccupancyGridRunner" provider="capabilities2_runner_nav2/OccupancyGridRunner"/>
+        <Runner interface="capabilities2_runner_prompt/PromptOccupancyRunner" provider="capabilities2_runner_prompt/PromptOccupancyRunner" />
+        <Runner interface="capabilities2_runner_nav2/RobotPoseRunner" provider="capabilities2_runner_nav2/RobotPoseRunner" from="map" to="base_link"/>
+        <Runner interface="capabilities2_runner_prompt/PromptPoseRunner" provider="capabilities2_runner_prompt/PromptPoseRunner" />
+        <Runner interface="capabilities2_runner_prompt/PromptPlanRunner" provider="capabilities2_runner_prompt/PromptPlanRunner" replan="false" task="move to (2.0, -0.5), (0.0, 2.0), (-2.0, 0.0), (0.0, -2.0) in order" />
+        <Runner interface="capabilities2_runner_fabric/FabricSetPlanRunner" provider="capabilities2_runner_fabric/FabricSetPlanRunner"/>
     </Control>
 </Plan>

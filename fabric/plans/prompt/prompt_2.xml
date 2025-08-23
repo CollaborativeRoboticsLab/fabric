@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Plan>
+    <Control type="sequential">
+        <Runner interface="capabilities2_runner_nav2/OccupancyGridRunner" provider="capabilities2_runner_nav2/OccupancyGridRunner"/>
+        <Runner interface="capabilities2_runner_prompt/PromptOccupancyRunner" provider="capabilities2_runner_prompt/PromptOccupancyRunner" />
+    </Control>
+</Plan>

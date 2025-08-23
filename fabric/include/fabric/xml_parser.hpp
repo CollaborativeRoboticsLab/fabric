@@ -130,8 +130,8 @@ public:
 
     // Create and append the new <Runner> element
     tinyxml2::XMLElement* newRunner = document.NewElement("Runner");
-    newRunner->SetAttribute("interface", "system_capabilities/CompletionRunner");
-    newRunner->SetAttribute("provider", "system_capabilities/CompletionRunner");
+    newRunner->SetAttribute("interface", "capabilities2_runner_fabric/FabricCompletionRunner");
+    newRunner->SetAttribute("provider", "capabilities2_runner_fabric/FabricCompletionRunner");
     outerControl->InsertEndChild(newRunner);
   }
 
@@ -268,8 +268,8 @@ public:
 
     capabilities2::node_t node;
 
-    node.source.runner = "system_capabilities/InputMultiplexAllRunner";
-    node.source.provider = "system_capabilities/InputMultiplexAllRunner";
+    node.source.runner = "capabilities2_runner_system/InputMultiplexAllRunner";
+    node.source.provider = "capabilities2_runner_system/InputMultiplexAllRunner";
     node.source.parameters = this->system_runner_xml(node.source.runner, node.source.provider, input_count, runner_index);
 
     connections[connection_id] = node;
@@ -307,8 +307,8 @@ public:
 
     capabilities2::node_t node;
 
-    node.source.runner = "system_capabilities/InputMultiplexAnyRunner";
-    node.source.provider = "system_capabilities/InputMultiplexAnyRunner";
+    node.source.runner = "capabilities2_runner_system/InputMultiplexAnyRunner";
+    node.source.provider = "capabilities2_runner_system/InputMultiplexAnyRunner";
     node.source.parameters = this->system_runner_xml(node.source.runner, node.source.provider, input_count, runner_index);
 
     connections[connection_id] = node;
@@ -339,8 +339,8 @@ public:
   void check_and_update_runner_id(capabilities2::node_t& predecessor, capabilities2::node_t& successor)
   {
     // check if predecessor is a system runner and has parameters
-    if (predecessor.source.runner.find("system_capabilities/InputMultiplexAnyRunner") != std::string::npos ||
-        predecessor.source.runner.find("system_capabilities/InputMultiplexAllRunner") != std::string::npos)
+    if (predecessor.source.runner.find("capabilities2_runner_system/InputMultiplexAnyRunner") != std::string::npos ||
+        predecessor.source.runner.find("capabilities2_runner_system/InputMultiplexAllRunner") != std::string::npos)
     {
       // If the predecessor is a system runner, we need to update the successor's parameters with the predecessor's id
       if (predecessor.source.parameters)
