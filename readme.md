@@ -6,6 +6,16 @@ Currently the system support 3 types of Control fuctions `sequential`, `parallel
 
 ## Starting the Fabric
 
+Clone the repo into a workspace
+
+```bash
+mkdir -p workspace/src
+cd workspace/src
+git clone https://github.com/CollaborativeRoboticsLab/fabric.git
+```
+
+Setup the [capabilities2 repository](https://github.com/CollaborativeRoboticsLab/capabilities2)
+
 Start the capabilities2 server first. Then run the following on a new terminal
 
 ```bash
