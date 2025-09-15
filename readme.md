@@ -1,10 +1,21 @@
 # Fabric
 
-Fabric is a ROS2 package that provides a system to coordinate and manage various capabilities as defined by the [Capabilities2 framework](https://github.com/CollaborativeRoboticsLab/capabilities2). This package extends the functionality of the Capabilities2 package to implement a planning framework based on capabilities. It is designed to parse an execution plan given via an XML file and then to identify connections between various capabilities in the system.
+Fabric is a ROS2 package that provides a system to coordinate and manage various capabilities as defined by the [Capabilities2 framework](https://github.com/CollaborativeRoboticsLab/capabilities2). This package extends the functionality of the Capabilities2 package to implement a Finite State Machine based on capabilities. It is designed to parse an execution plan given via an XML file and  identify connections between various capabilities in the system which would be relayed back to Capabilities2 framework to execute.
 
-Currently the system support 3 types of Control fuctions `sequential`, `parallel` and `recovery`, and a multitude of Event functions.
+Currently the system support 4 types of Control fuctions 
+- `sequential` : provides sequential triggering of capabilities. Exits if any capabilities fail
+- `parallel-all` : provides parallel triggering of capabilities and waits until at least one completes to proceed
+- `parallel-any` : provides parallel triggering of capabilities and waits until all completes to proceed
+- `recovery` : provides sequential triggering of recovery capabilities if the predecessor outside the recovery block fails. Exits if any recovery capabilities succeed
 
-## Starting the Fabric
+## Features
+
+- Implements a Finite State Machine based on the XML execution plan
+- Validates the XML plan for compatibility with robot.
+- Parses XML-based plans and identifies connections between capabilities.
+- Informs capabilities2 framework regarding the capability connections and orchestrate a FSM
+
+## Setting the Fabric
 
 Clone the repo into a workspace
 
@@ -14,19 +25,7 @@ cd workspace/src
 git clone https://github.com/CollaborativeRoboticsLab/fabric.git
 ```
 
-Setup the [capabilities2 repository](https://github.com/CollaborativeRoboticsLab/capabilities2)
-
-Start the capabilities2 server first. Then run the following on a new terminal
-
-```bash
-source install/setup.bash
-ros2 launch fabric fabric.launch.py
-```
-
-## Features
-
-- Dynamic Capability Loading: Interacts with and manages capabilities defined by the capabilities2 framework.
-- Flexible Workflow Execution: Parses XML-based plans and identifies event-driven callbacks for success, failure, or in-progress states.
+Setup the [capabilities2](https://github.com/CollaborativeRoboticsLab/capabilities2) framework as instructed.
 
 
 ## Launching fabric
@@ -49,85 +48,8 @@ source install/setup.bash
 ros2 launch fabric fabric.launch.py
 ```
 
+## More information
 
-## XML Plan Parsing
-
-The fabric package relies on XML-based plans to define workflows. These plans specify the sequence of capabilities to execute, along with the associated parameters. The XML format includes tags for capabilities as events, and control flows enabling complex workflows to be structured in a modular way.
-
-Below is an example XML plan for configuring a set of capabilities:
-
-```xml
-<?xml version='1.0' encoding='UTF-8'?>
-<Plan name='navigate_or_return_fabric'>
-  <Control type='sequential' name='contro_plan'>
-    <Control type='sequential' name='main_execution_plan'>
-      <Runner interface='capabilities2_runner_capabilities/CapabilityGetRunner' provider='capabilities2_runner_capabilities/CapabilityGetRunner'/>
-      <Runner interface='capabilities2_runner_prompt/PromptCapabilityRunner' provider='capabilities2_runner_prompt/PromptCapabilityRunner' />
-      <Control type='parallel' name='gather_occupancy_data'>
-        <Control type='sequential' name='navigate_or_retur'>
-          <Runner interface='capabilities2_runner_nav2/OccupancyGridRunner' provider='capabilities2_runner_nav2/OccupancyGridRunner'/>
-          <Runner interface='capabilities2_runner_prompt/PromptOccupancyRunner' provider='capabilities2_runner_prompt/PromptOccupancyRunner' /> 
-        <Control type='sequential'>
-        </Control>
-        <Control type='sequential' name='gather_position_data'>
-          <Runner interface='capabilities2_runner_nav2/RobotPoseRunner' provider='capabilities2_runner_nav2/RobotPoseRunner' from='map' to='base_link'/>
-          <Runner interface='capabilities2_runner_prompt/PromptPoseRunner' provider='capabilities2_runner_prompt/PromptPoseRunner' />
-        </Control>
-      </Control>
-      <Runner interface='capabilities2_runner_nav2/WaypointRunner' provider='capabilities2_runner_nav2/WaypointRunner' x='5.0' y='5.0' />
-      <Control type='recovery' name='return_to_home_if_lost'>
-          <Runner interface='capabilities2_runner_nav2/WaypointRunner' provider='capabilities2_runner_nav2/WaypointRunner' x='0.0' y='0.0' />
-      </Control>
-    </Control>
-    <Runner interface='capabilities2_runner_fabric/FabricCompletionRunner' provider='capabilities2_runner_fabric/FabricCompletionRunner'/>
-  </Control>
-</Plan>
-```
-
-## API
-
-| Node      |  Description |
-| :---      | :---            | 
-| `Fabric`  | Implements the XML parsing and connection extraction as well as communicating with `capabilities_server` to configure capability events |
-| `Client`  | Reads an exection plan from a path or a ROS message and sends it to the `fabric` node. Provides additional services that expose the Fabric to outside |
-
-| Action    | Action Message | Description |
-| :---      | :---            | :---        |
-| `/fabric` | `Plan.action` | Receive and XML plan via the message for execution |
-
-| Service                   | Service Message           | Description |
-| :---                      | :---                      | :---        |
-| `/fabric/get_status`      | `GetFabricStatus.srv`     | Retrieve the status of the fabric |
-| `/fabric/cancel_plan`     | `CancelFabricPlan.srv`    | Cancel the current plan running in the Fabric |
-| `/fabric/set_completion`  | `CompleteFabric.srv`      | Update the status of the fabric as completed (used by capabilitie) |
-| `/fabric/set_plan`        | `SetFabricPlan`           | Add a new fabric plan to the queue |
-
-## Samples and Testing
-
-### Navigation
-
-| &nbsp; Example &nbsp; | Description |
-| ---     | ---         |
-| [Example 1](./fabric/docs/nav2_example1.md) | Implements the basic fabric triggering that moves the robot from one point to another. |
-| [Example 2](./fabric/docs/nav2_example2.md) | Implements navigating through 5 points using 'sequential' control functionality. |
-| [Example 3](./fabric/docs/nav2_example3.md) | Implements navigating through 5 points inluding 1 inaccessible point (1 recovery point) using `sequential` and `recovery` control functionality. |
-| [Example 4](./fabric/docs/nav2_example4.md) | Implements navigating through 5 points inluding 4 inaccessible point (4 recovery point) using `sequential` and `recovery` control functionality. |
-
-### Prompting
-
-| &nbsp; Example &nbsp; | Description |
-| ---     | ---         |
-| [Example 1](./fabric/docs/prompt_example1.md) | Implements requesting for robot's capabilities and prompting them to the LLM |
-| [Example 2](./fabric/docs/prompt_example2.md) | Implements listening for robot's occupancy grid and prompting them to the LLM |
-| [Example 3](./fabric/docs/prompt_example3.md) | Implements listening for robot's pose and prompting them to the LLM 
-| [Example 4](./fabric/docs/prompt_example4.md) | Implements prompting the LLM for a plan for a new task and setting it to Fabric |
-
-### Navigation
-
-| &nbsp; Example &nbsp; | Description |
-| ---     | ---         |
-| [Example 1](./fabric/docs/generative_example1.md) | Implements the execution plan generation to acheive one point to another. |
-| [Example 2](./fabric/docs/generative_example2.md) | Implements the execution plan generation to acheive waypoint navigation. |
-| [Example 3](./fabric/docs/generative_example3.md) | Implements the execution plan generation to acheive waypoint navigation with  one unreachable point having recovery point. |
-| [Example 4](./fabric/docs/generative_example4.md) | Implements the execution plan generation to acheive waypoint navigation with two unreachable points having recovery points. |
-| [Example 5](./fabric/docs/generative_example5.md) | Implements the execution plan generation to acheive waypoint navigation with two unreachable points having two recovery points. Two reachable points also have two recovery points. |
+- [XML Plan parsing](./docs/xml-plan=parsing.md)
+- [API information](./docs/api.md)
+- [Examples and Testing](./docs/examples.md)
