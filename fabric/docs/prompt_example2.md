@@ -19,8 +19,9 @@ colcon build
 ### Start the turtlebot simulation
 
 ```bash
+source install/setup.bash
 export TURTLEBOT3_MODEL=waffle
-ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+ros2 launch nav_stack turtlebot3_world.launch.py
 ```
 
 ### Start the Navigation2 stack
@@ -44,23 +45,20 @@ source install/setup.bash
 ros2 launch capabilities2_server server.launch.py
 ```
 
-### Start the Capabilities2 Fabric
+### Start the Fabric
 
 ```bash
 source install/setup.bash
 ros2 launch fabric fabric.launch.py
 ```
 
-### Start the Capabilities2 Event Listener for on-device debugging (Optional)
+### Start the logging (Optional)
+
+for on-device/terminal logging
 
 ```bash
 source install/setup.bash
-ros2 launch capabilities2_events listener.launch.py
+ros2 launch event_logger listener.launch.py
 ```
 
-### Start the foxglove-bridge for visualization and debugging (Optional)
-
-```bash
-source install/setup.bash
-ros2 launch capabilities2_events foxglove.launch.py
-```
+or for visualization use [CollaborativeRoboticsLab/event_logger_ui](https://github.com/CollaborativeRoboticsLab/event_logger_ui)

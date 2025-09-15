@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Plan>
+    <Control type="sequential">
+        <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="1.0" y="2.0" />
+        <Runner interface="capabilities2_runner_nav2/RobotPoseRunner" provider="capabilities2_runner_nav2/RobotPoseRunner" map="map" odom="odom" robot="base_link"/>
+        <Runner interface="capabilities2_runner_prompt/PromptPoseRunner" provider="capabilities2_runner_prompt/PromptPoseRunner" />
+    </Control>
+</Plan>

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 #include <thread>
 #include <string>
@@ -11,7 +13,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 
-#include <fabric/utils/xml_parser.hpp>
+#include <fabric/xml_parser.hpp>
 
 #include <fabric_msgs/action/plan.hpp>
 #include <fabric_msgs/srv/set_fabric_plan.hpp>
@@ -75,24 +77,24 @@ public:
     declare_parameter("plan_file_path", "install/fabric/share/fabric/plans/default.xml");
     plan_file_path = get_parameter("plan_file_path").as_string();
 
+    // Initialize the XML parser
+    xml_parser_ = std::make_shared<XMLParser>();
+
     fabric_state = Status::IDLE;
 
     event_ = std::make_shared<EventClient>(shared_from_this(), "client", "/events");
 
-    status_server_ =
-        this->create_service<GetFabricStatus>("/fabric/get_status", std::bind(&Client::getStatusCallback, this,
-                                                                                           std::placeholders::_1, std::placeholders::_2));
+    status_server_ = this->create_service<GetFabricStatus>("/fabric/get_status",
+                                                           std::bind(&Client::getStatusCallback, this, std::placeholders::_1, std::placeholders::_2));
 
-    plan_server_ = this->create_service<SetFabricPlan>(
-        "/fabric/set_plan", std::bind(&Client::setPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+    plan_server_ = this->create_service<SetFabricPlan>("/fabric/set_plan",
+                                                       std::bind(&Client::setPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
-    cancel_server_ =
-        this->create_service<CancelFabricPlan>("/fabric/cancel_plan", std::bind(&Client::cancelPlanCallback, this,
-                                                                                             std::placeholders::_1, std::placeholders::_2));
+    cancel_server_ = this->create_service<CancelFabricPlan>(
+        "/fabric/cancel_plan", std::bind(&Client::cancelPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
-    completion_server_ =
-        this->create_service<CompleteFabric>("/fabric/set_completion", std::bind(&Client::setCompleteCallback, this,
-                                                                                              std::placeholders::_1, std::placeholders::_2));
+    completion_server_ = this->create_service<CompleteFabric>(
+        "/fabric/set_completion", std::bind(&Client::setCompleteCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     // Create the action client for fabric after the node is fully constructed
     this->planner_client_ = rclcpp_action::create_client<Plan>(shared_from_this(), "/fabric");
@@ -119,7 +121,7 @@ public:
     event_->info("Plan loaded from : " + plan_file_path);
 
     std::string plan;
-    xml_parser::convert_to_string(document, plan);
+    xml_parser_->convert_to_string(document, plan);
 
     plan_queue.push_back(plan);
 
@@ -356,4 +358,7 @@ private:
 
   /** flag for threadpool synchronisation. */
   bool completed_;
+
+  /** XMLParser engine */
+  std::shared_ptr<XMLParser> xml_parser_;
 };

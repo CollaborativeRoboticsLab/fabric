@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Plan>
+    <Control type="sequential" name="multi_point_navigation_with_recovery">
+        <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="0.5" y="2.0" />
+        <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="1.0" y="2.0" />
+        <Control type="recovery" name="recovery_navigation_1">
+            <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="0.0" y="0.5" />
+        </Control>
+        <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="2.0" y="1.0" />
+        <Control type="recovery" name="recovery_navigation_2">
+            <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="0.0" y="0.5" />
+        </Control>
+        <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="2.0" y="-3.0" />
+        <Control type="recovery" name="recovery_navigation_3">
+            <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="0.0" y="-3.0" />
+            <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="0.0" y="0.5" />
+        </Control>
+        <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="-2.0" y="0.0" />
+        <Control type="recovery" name="recovery_navigation_4">
+            <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="0.0" y="0.5" />
+        </Control>
+    </Control>
+</Plan>
