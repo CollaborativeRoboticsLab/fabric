@@ -1,0 +1,5 @@
+<Plan>
+  <Control type="sequential" name="navigate_to_position">
+    <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="2.0" y="-0.5" />
+  </Control>
+</Plan>

@@ -1,0 +1,28 @@
+<Plan>
+    <Control type="sequential" name="main_flow">
+        <Control type="sequential" name="move_to_2_-0.5">
+            <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="2.0" y="-0.5" />
+            <Control type="recovery" name="recovery_2_-0.5">
+                <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="0.0" y="2.0" />
+            </Control>
+        </Control>
+        <Control type="sequential" name="move_to_1_3">
+            <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="1.0" y="3.0" />
+            <Control type="recovery" name="recovery_1_3">
+                <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="0.0" y="2.0" />
+            </Control>
+        </Control>
+        <Control type="sequential" name="move_to_-3_-1">
+            <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="-3.0" y="-1.0" />
+            <Control type="recovery" name="recovery_-3_-1">
+                <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="-2.0" y="0.0" />
+            </Control>
+        </Control>
+        <Control type="sequential" name="move_to_0_-2">
+            <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="0.0" y="-2.0" />
+            <Control type="recovery" name="recovery_0_-2">
+                <Runner interface="capabilities2_runner_nav2/WaypointRunner" provider="capabilities2_runner_nav2/WaypointRunner" x="-2.0" y="0.0" />
+            </Control>
+        </Control>
+    </Control>
+</Plan>

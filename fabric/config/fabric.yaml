@@ -1,6 +1,6 @@
 fabric_client:
   ros__parameters:
-    plan_file_path: "install/fabric/share/fabric/plans/default.xml"
+    # plan_file_path: "install/fabric/share/fabric/plans/default.xml"
     # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_1.xml"   # 1 point navigation example
     # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_2.xml"   # 5 point navigation example
     # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_3.xml"   # 5 point navigation with 1 point inaccessible (1 recoveries) example
@@ -14,4 +14,43 @@ fabric_client:
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_3.xml"   # PromptPoseRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_4.xml"   # PromptPlanRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_5.xml"   # PromptPlanRunner Example
+
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_1/codellama-base-zeroshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_1/codellama-fine-zeroshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_1/gpt-4.1-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_1/gpt-4.1-zeroshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_1/gpt-4o-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_1/gpt-4o-zeroshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_1/gpt-5-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_1/gpt-5-zeroshot-all.xml"   
+
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_2/codellama-base-zeroshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_2/codellama-fine-zeroshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_2/gpt-4.1-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_2/gpt-4.1-zeroshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_2/gpt-4o-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_2/gpt-4o-zeroshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_2/gpt-5-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_2/gpt-5-zeroshot-all.xml"   
+
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_3/gpt-4.1-oneshot-7.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_3/gpt-4.1-zeroshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_3/gpt-4o-oneshot-9.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_3/gpt-4o-zeroshot-8.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_3/gpt-5-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_3/gpt-5-zeroshot-all.xml"   
+
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_4/gpt-4.1-oneshot-9.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_4/gpt-4.1-zeroshot-8.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_4/gpt-4o-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_4/gpt-5-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_4/gpt-5-zeroshot-all.xml"   
+
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_5/gpt-4.1-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_5/gpt-4.1-zeroshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_5/gpt-4o-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_5/gpt-4o-zeroshot-3.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_5/gpt-5-oneshot-all.xml"   
+    # plan_file_path: "install/fabric/share/fabric/plans/icra2026/generative_5/gpt-5-zeroshot-all.xml"   
+  
 
