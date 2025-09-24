@@ -11,10 +11,18 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME
 
 RUN apt-get update && apt-get upgrade -y \
-    && apt-get install -y \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install --no-install-recommends -y \
     sudo \
     git \
-    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    libpoco-dev \
+    ros-${ROS_DISTRO}-navigation2 \
+    ros-${ROS_DISTRO}-geometry-msgs \
+    ros-${ROS_DISTRO}-backward-ros \
+    && rm -rf /var/lib/apt/lists/*
+    
+RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
 # Switch from root to user
@@ -30,7 +38,6 @@ RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 WORKDIR /home/$USERNAME/colcon_ws/src 
 
 RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2.git -b develop
-RUN git clone https://github.com/CollaborativeRoboticsLab/nav_stack.git -b humble
 # RUN git clone https://github.com/CollaborativeRoboticsLab/prompt_tools.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/event_logger.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2_runner_nav2.git
