@@ -22,7 +22,15 @@ Clone the repo into a workspace
 ```bash
 mkdir -p workspace/src
 cd workspace/src
+```
+
+```bash
 git clone https://github.com/CollaborativeRoboticsLab/fabric.git
+```
+
+```bash
+cd ..
+rosdep install --from-paths src --ignore-src -r -y
 ```
 
 Setup the [capabilities2](https://github.com/CollaborativeRoboticsLab/capabilities2) framework as instructed.

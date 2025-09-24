@@ -1,0 +1,29 @@
+{
+  "name": "Fabric humble devcontainer",
+  "dockerFile": "Dockerfile",
+  "remoteUser": "ubuntu",
+  "containerEnv": {
+    "DISPLAY": "${localEnv:DISPLAY}"
+  },
+  "runArgs": [
+    "--privileged",
+    "--network=host"
+  ],
+  "workspaceMount": "source=${localWorkspaceFolder},target=/home/ubuntu/colcon_ws/src/${localWorkspaceFolderBasename},type=bind",
+  "workspaceFolder": "/home/ubuntu/colcon_ws",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/ubuntu/.bash_history,type=bind"
+  ],
+  "customizations": { 
+    "vscode": {
+        "extensions": [
+            "ms-vscode.cpptools",
+            "ms-vscode.cmake-tools"
+          ]
+    },
+    "settings": {
+        "terminal.integrated.shell.*": "/bin/bash"
+    }
+  }     
+
+}
