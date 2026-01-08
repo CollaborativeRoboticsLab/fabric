@@ -19,11 +19,6 @@ public:
    */
   XMLParser()
   {
-    control_list.push_back("sequential");
-    control_list.push_back("parallel_any");
-    control_list.push_back("parallel_all");
-    control_list.push_back("recovery");
-
     auto* decl = system_doc.NewDeclaration(R"(xml version="1.0" encoding="UTF-8")");
     system_doc.InsertEndChild(decl);
   }
@@ -222,30 +217,6 @@ public:
     return returnValue;
   }
 
-  /**
-   * @brief Build a system runner document
-   *
-   * This function initializes the system XML document and adds a <Runner> element with the specified attributes.
-   *
-   * @param interface The interface of the runner
-   * @param provider The provider of the runner
-   * @param input_count The number of inputs for the runner
-   * @param id The ID of the runner
-   */
-  tinyxml2::XMLElement* system_runner_xml(const std::string& interface, const std::string& provider, int input_count = 0, int id = 0)
-  {
-    // Create the <Runner .../> element
-    tinyxml2::XMLElement* runner = system_doc.NewElement("Runner");
-    runner->SetAttribute("interface", interface.c_str());
-    runner->SetAttribute("provider", provider.c_str());
-    runner->SetAttribute("input_count", input_count);
-    runner->SetAttribute("id", id);
-
-    system_doc.InsertEndChild(runner);
-
-    // Return the created <Runner> element
-    return runner;
-  }
 
   /**
    * @brief Adds a system connection for parallel input multiplexing with waiting for all inputs
