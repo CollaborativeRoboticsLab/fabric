@@ -182,10 +182,6 @@ private:
   {
     event_->info("A new execution started");
 
-    xml_parser_->add_completion_runner(document);
-    xml_parser_->convert_to_string(document, modified_plan);
-
-    event_->info("Plan after adding closing event :\n\n " + modified_plan);
 
     interface_list.clear();
     providers_list.clear();

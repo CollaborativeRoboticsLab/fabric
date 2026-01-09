@@ -1,22 +1,23 @@
 #pragma once
-#include <any>
 #include <string>
 #include <vector>
 #include <tinyxml2.h>
 #include <rclcpp/rclcpp.hpp>
+#include <fabric_base/structs.hpp>
 
 namespace fabric
 {
 
 /**
- * @brief Abstract base class for XML plan validation plugins.
+ * @brief Abstract base class for XML plan parsing plugins.
  *
- * Implementations should provide a validate() method that checks the XML plan for errors.
+ * Implementations should provide a parse() method that extracts information from the XML 
+ * plan and return a fabric::Plan object.
  */
-class ValidationBase
+class ParserBase
 {
 public:
-  virtual ~ValidationBase() = default;
+  virtual ~ParserBase() = default;
 
   /**
    * @brief Initialize the validation plugin with the given ROS2 node.
@@ -26,22 +27,17 @@ public:
    */
   virtual void initialize(const rclcpp::Node::SharedPtr& node)
   {
-    initialize_base(node, "ValidationBasePlugin");
+    initialize_base(node, "ParserBasePlugin");
   }
 
   /**
-   * @brief Validate the given XML plan.
+   * @brief Parse the given XML plan.
    *
    * @param document The XMLDocument representing the plan.
    * @param error_msg Output string for error messages, if any.
-   * @return true if the plan is valid, false otherwise.
+   * @return true if parsing was successful, false otherwise.
    */
-  virtual bool validate(tinyxml2::XMLDocument& document, std::string& error_msg) = 0;
-
-  /**
-   * @brief Set the evaluation source data for the validation.
-   */
-  virtual void set_evaluation_source(std::any eval_data) = 0;
+  virtual fabric::Plan parse(tinyxml2::XMLDocument& document, std::string& error_msg) = 0;
 
 protected:
   /**
