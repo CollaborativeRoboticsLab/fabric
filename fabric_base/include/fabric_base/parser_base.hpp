@@ -34,10 +34,9 @@ public:
    * @brief Parse the given XML plan.
    *
    * @param document The XMLDocument representing the plan.
-   * @param error_msg Output string for error messages, if any.
-   * @return true if parsing was successful, false otherwise.
+   * @param plan The parsed plan.
    */
-  virtual fabric::Plan parse(tinyxml2::XMLDocument& document, std::string& error_msg) = 0;
+  virtual void parse(tinyxml2::XMLDocument& document, fabric::Plan& plan) = 0;
 
 protected:
   /**

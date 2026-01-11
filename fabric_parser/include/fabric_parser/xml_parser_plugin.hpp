@@ -34,40 +34,61 @@ public:
   }
 
   /**
-   * @brief Parse the given XML plan.
-   *
-   * @param plan The XMLElement representing the plan.
-   * @param error_msg Output string for error messages, if any.
-   * @return fabric::Plan containing the parsed connections.
-   */
-  fabric::Plan parse(tinyxml2::XMLDocument& document, std::string& error_msg) override
+    * @brief Parse the given XML plan.
+    *
+    * @param document The XMLDocument representing the plan.
+    * @param plan The parsed plan.
+    */
+  void parse(tinyxml2::XMLDocument& document, fabric::Plan& plan) override
   {
-    RCLCPP_INFO(node_->get_logger(), "Parsing the plan");
-
+    // Add a completion runner to the plan
     RCLCPP_INFO(node_->get_logger(), "Adding completion runner to the plan");
     add_completion_runner(document);
 
+    // Debug: print the modified plan
     std::string modified_plan;
     convert_to_string(document, modified_plan);
     RCLCPP_DEBUG(node_->get_logger(), "Plan after adding closing event :\n\n %s", modified_plan.c_str());
 
-    bool success;
-    plan = extract_plan(document, success);
+    RCLCPP_INFO(node_->get_logger(), "Completion runner added successfully. Extracting the plan element.");
 
-    if (success)
+    // extract the plan element
+    plan_ = extract_plan(document);
+
+    if (plan_ == nullptr)
     {
-      fabric::Plan connections;
-      extract_connections(plan, connections);
+      RCLCPP_ERROR(node_->get_logger(), "No <Plan> element found in the provided plan.");
+      throw fabric::fabric_exception("XML plan parsing failed: No <Plan> element found.");
+    }
+    RCLCPP_INFO(node_->get_logger(), "<Plan> element extracted successfully. Checking required attributes availability.");
 
+    // check the syntax of the plan to make sure it contains valid XML elements and required attributes
+    std::string error_msg;
+    std::vector<std::string> control_list = { "sequential", "parallel_any", "parallel_all", "recovery" };
+
+    bool syntax_valid = check_syntax(plan_, control_list, plan.rejected_list, error_msg);
+
+    if (!syntax_valid)
+    {
+      RCLCPP_ERROR(node_->get_logger(), "Plan syntax validation failed: %s", error_msg.c_str());
+
+      for (const auto& rejected_element : plan.rejected_list)
+        RCLCPP_ERROR(node_->get_logger(), "Rejected element: %s", rejected_element.c_str());
+      
+      throw fabric::fabric_exception("XML plan parsing failed: " + error_msg);
+    }
+    RCLCPP_INFO(node_->get_logger(), "Plan syntax validation successful. Proceeding to capability retrieval.");
+
+    // extract connections from the plan
+    if (plan_ != nullptr)
+    {
+      extract_connections(plan_, plan);
       RCLCPP_INFO(node_->get_logger(), "Finished parsing the plan");
-      error_msg = "";
-      return connections;
     }
     else
     {
-      error_msg = "Failed to extract <Plan> element from XML document.";
-      RCLCPP_ERROR(node_->get_logger(), "%s", error_msg.c_str());
-      return fabric::Plan();
+      RCLCPP_ERROR(node_->get_logger(), "No <Plan> element found in the provided plan.");
+      throw fabric::fabric_exception("XML plan parsing failed: No <Plan> element found.");
     }
   }
 
@@ -372,12 +393,12 @@ protected:
         else if (connection_type == fabric::event::ON_FAILURE)
         {
           // Set the target_on_failure for the predecessor connection
-          plan.connections[predecessor_id].target_on_failure = connections[connection_id].source;
+          plan.connections[predecessor_id].target_on_failure = plan.connections[connection_id].source;
         }
       }
 
       if (hasSiblings)
-        last_conn_id = this->extract_connections(element->NextSiblingElement(), connections, connection_id + 1, connection_type);
+        last_conn_id = this->extract_connections(element->NextSiblingElement(), plan, connection_id + 1, connection_type);
       else
         last_conn_id = connection_id;
 
@@ -406,6 +427,6 @@ protected:
   /**
    * @brief Pointer to the plan element in the XML document
    */
-  tinyxml2::XMLElement* plan = nullptr;
+  tinyxml2::XMLElement* plan_ = nullptr;
 };
 }  // namespace fabric

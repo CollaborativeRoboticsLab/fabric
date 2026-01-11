@@ -32,16 +32,11 @@ public:
   /**
    * @brief Validate the given XML plan.
    *
-   * @param document The XMLDocument representing the plan.
-   * @param error_msg Output string for error messages, if any.
+   * @param plan The fabric::Plan to validate.
+   * @param eval_data Additional evaluation data as std::any.
    * @return true if the plan is valid, false otherwise.
    */
-  virtual bool validate(tinyxml2::XMLDocument& document, std::string& error_msg) = 0;
-
-  /**
-   * @brief Set the evaluation source data for the validation.
-   */
-  virtual void set_evaluation_source(std::any eval_data) = 0;
+  virtual bool validate(fabric::Plan, std::any eval_data) = 0;
 
 protected:
   /**

@@ -5,379 +5,14 @@
 #include <algorithm>
 #include <tinyxml2.h>
 
-#include <rclcpp/rclcpp.hpp>
-#include <rclcpp_action/rclcpp_action.hpp>
+
 
 #include <fabric/xml_parser.hpp>
-#include <fabric_msgs/action/plan.hpp>
 
-#include <capabilities2_utils/bond_client.hpp>
 
-#include <capabilities2_msgs/srv/establish_bond.hpp>
-#include <capabilities2_msgs/srv/get_interfaces.hpp>
-#include <capabilities2_msgs/srv/get_semantic_interfaces.hpp>
-#include <capabilities2_msgs/srv/get_providers.hpp>
-#include <capabilities2_msgs/srv/use_capability.hpp>
-#include <capabilities2_msgs/srv/free_capability.hpp>
-#include <capabilities2_msgs/srv/configure_capability.hpp>
-#include <capabilities2_msgs/srv/trigger_capability.hpp>
 
-#include <event_logger/event_client.hpp>
 
-/**
- * @brief Capabilities Fabric
- *
- * Capabilities fabric node that provides a ROS client for the capabilities server.
- * Able to receive a XML file that implements a plan via action server that it exposes
- *
- */
 
-class Fabric : public rclcpp::Node
-{
-public:
-  using Plan = fabric_msgs::action::Plan;
-  using GoalHandlePlan = rclcpp_action::ServerGoalHandle<Plan>;
-
-  using GetInterfaces = capabilities2_msgs::srv::GetInterfaces;
-  using GetSemanticInterfaces = capabilities2_msgs::srv::GetSemanticInterfaces;
-  using GetProviders = capabilities2_msgs::srv::GetProviders;
-  using EstablishBond = capabilities2_msgs::srv::EstablishBond;
-  using UseCapability = capabilities2_msgs::srv::UseCapability;
-  using FreeCapability = capabilities2_msgs::srv::FreeCapability;
-  using ConfigureCapability = capabilities2_msgs::srv::ConfigureCapability;
-  using TriggerCapability = capabilities2_msgs::srv::TriggerCapability;
-
-  using GetInterfacesClient = rclcpp::Client<GetInterfaces>;
-  using GetSemanticInterfacesClient = rclcpp::Client<GetSemanticInterfaces>;
-  using GetProvidersClient = rclcpp::Client<GetProviders>;
-  using EstablishBondClient = rclcpp::Client<EstablishBond>;
-  using UseCapabilityClient = rclcpp::Client<UseCapability>;
-  using FreeCapabilityClient = rclcpp::Client<FreeCapability>;
-  using ConfigureCapabilityClient = rclcpp::Client<ConfigureCapability>;
-  using TriggerCapabilityClient = rclcpp::Client<TriggerCapability>;
-
-  Fabric(const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("Fabric", options)
-  {
-    try
-    {
-      // Only call setup if this object is already owned by a shared_ptr
-      if (shared_from_this())
-      {
-        initialize();
-      }
-    }
-    catch (const std::bad_weak_ptr&)
-    {
-      // Not yet safe — probably standalone without make_shared
-    }
-  }
-
-  /**
-   * @brief Initializer function for Ccapabilities2 fabric.
-   * Configure the action server for the capabilieites fabric and configure server clients for the capability runners from the
-   * capabilities2 server
-   *
-   */
-  void initialize()
-  {
-    // Initialize the XML parser
-    xml_parser_ = std::make_shared<XMLParser>();
-
-    event_ = std::make_shared<EventClient>(shared_from_this(), "fabric", "/events");
-
-    this->planner_server_ = rclcpp_action::create_server<Plan>(
-        this, "/fabric", std::bind(&Fabric::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
-        std::bind(&Fabric::handle_cancel, this, std::placeholders::_1),
-        std::bind(&Fabric::handle_accepted, this, std::placeholders::_1));
-
-    get_interfaces_client_ = this->create_client<GetInterfaces>("/capabilities/get_interfaces");
-    get_sem_interf_client_ = this->create_client<GetSemanticInterfaces>("/capabilities/get_semantic_interfaces");
-    get_providers_client_ = this->create_client<GetProviders>("/capabilities/get_providers");
-    establish_bond_client_ = this->create_client<EstablishBond>("/capabilities/establish_bond");
-    use_capability_client_ = this->create_client<UseCapability>("/capabilities/use_capability");
-    free_capability_client_ = this->create_client<FreeCapability>("/capabilities/free_capability");
-    trig_capability_client_ = this->create_client<TriggerCapability>("/capabilities/trigger_capability");
-    conf_capability_client_ = this->create_client<ConfigureCapability>("/capabilities/configure_capability");
-
-    // Wait for services to become available
-    check_service(!get_interfaces_client_->wait_for_service(std::chrono::seconds(1)), "/capabilities/get_interfaces");
-    check_service(!get_sem_interf_client_->wait_for_service(std::chrono::seconds(1)), "/capabilities/get_semantic_interfaces");
-    check_service(!get_providers_client_->wait_for_service(std::chrono::seconds(1)), "/capabilities/get_providers");
-    check_service(!establish_bond_client_->wait_for_service(std::chrono::seconds(1)), "/capabilities/establish_bond");
-    check_service(!use_capability_client_->wait_for_service(std::chrono::seconds(1)), "/capabilities/use_capability");
-    check_service(!free_capability_client_->wait_for_service(std::chrono::seconds(1)), "/capabilities/free_capability");
-    check_service(!trig_capability_client_->wait_for_service(std::chrono::seconds(1)), "/capabilities/trigger_capability");
-    check_service(!conf_capability_client_->wait_for_service(std::chrono::seconds(1)), "/capabilities/configure_capability");
-
-    result_msg = std::make_shared<Plan::Result>();
-  }
-
-private:
-  /**
-   * @brief Handle the goal request that comes in from client. returns whether goal is accepted or rejected
-   *
-   *
-   * @param uuid uuid of the goal
-   * @param goal pointer to the action goal message
-   * @return rclcpp_action::GoalResponse
-   */
-  rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID& uuid, std::shared_ptr<const Plan::Goal> goal)
-  {
-    event_->info("Received the goal request with the plan");
-
-    (void)uuid;
-
-    event_->info("Following plan was received :\n\n " + goal->plan);
-
-    // try to parse the std::string plan from capabilities_msgs/Plan to the to a XMLDocument file
-    tinyxml2::XMLError xml_status = document.Parse(goal->plan.c_str());
-
-    // check if the file parsing failed
-    if (xml_status != tinyxml2::XMLError::XML_SUCCESS)
-    {
-      event_->error("Parsing the plan from goal message failed");
-      return rclcpp_action::GoalResponse::REJECT;
-    }
-
-    event_->info("Plan parsed and accepted");
-    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-  }
-
-  /**
-   * @brief Handle the goal cancel request that comes in from client.
-   *
-   * @param goal_handle pointer to the action goal handle
-   * @return rclcpp_action::GoalResponse
-   */
-  rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<GoalHandlePlan> goal_handle)
-  {
-    event_->info("Received the request to cancel the plan");
-    (void)goal_handle;
-
-    for (auto& [bond_id, bond_client] : bond_client_cache_)
-    {
-      bond_client->stop();
-    }
-
-    return rclcpp_action::CancelResponse::ACCEPT;
-  }
-
-  /**
-   * @brief Handle the goal accept event originating from handle_goal.
-   *
-   * @param goal_handle pointer to the action goal handle
-   */
-  void handle_accepted(const std::shared_ptr<GoalHandlePlan> goal_handle)
-  {
-    goal_handle_ = goal_handle;
-    event_->info("Goal handle accepted");
-
-    execution();
-  }
-
-  /**
-   * @brief Start the execution of the capabilities2 fabric
-   */
-  void execution()
-  {
-    event_->info("A new execution started");
-
-
-    interface_list.clear();
-    providers_list.clear();
-    rejected_list.clear();
-    connection_map.clear();
-
-    expected_providers_ = 0;
-    completed_providers_ = 0;
-
-    expected_interfaces_ = 0;
-    completed_interfaces_ = 0;
-
-    expected_capabilities_ = 0;
-    completed_capabilities_ = 0;
-    freed_capabilities_ = 0;
-
-    expected_configurations_ = 0;
-    completed_configurations_ = 0;
-
-    getInterfaces();
-  }
-
-  /**
-   * @brief Get Interfaces available in the capabilities2 server via relavant service
-   */
-  void getInterfaces()
-  {
-    event_->info("Requesting Interface information");
-
-    auto request_interface = std::make_shared<GetInterfaces::Request>();
-
-    // request data from the server
-    auto result_future = get_interfaces_client_->async_send_request(request_interface, [this](GetInterfacesClient::SharedFuture future) {
-      auto result = std::make_shared<Plan::Result>();
-
-      if (!future.valid())
-      {
-        result_msg->success = false;
-        result_msg->message = "Failed to get Interface information. Server execution cancelled";
-        event_->error(result_msg->message);
-        goal_handle_->abort(result_msg);
-        return;
-      }
-
-      auto response = future.get();
-      expected_interfaces_ = response->interfaces.size();
-
-      event_->info("Received Interfaces. Requsting " + std::to_string(expected_interfaces_) + " semantic interface information");
-
-      // Request each interface recursively for Semantic interfaces
-      getSemanticInterfaces(response->interfaces);
-    });
-  }
-
-  /**
-   * @brief Get the Semantic Interfaces from the capabilities2 server via related service client
-   *
-   * @param interfaces std::vector of interfaces for which the semantic interfaces will be requested
-   */
-  void getSemanticInterfaces(const std::vector<std::string>& interfaces)
-  {
-    std::string requested_interface = interfaces[completed_interfaces_];
-
-    event_->info("Requesting semantic interfaces for " + requested_interface);
-
-    auto request_semantic = std::make_shared<GetSemanticInterfaces::Request>();
-    request_semantic->interface = requested_interface;
-
-    // request semantic interface from the server
-    auto result_semantic_future = get_sem_interf_client_->async_send_request(
-        request_semantic, [this, interfaces, requested_interface](GetSemanticInterfacesClient::SharedFuture future) {
-          if (!future.valid())
-          {
-            result_msg->success = false;
-            result_msg->message = "Failed to get Semantic Interface information. Server execution cancelled";
-            event_->error(result_msg->message);
-            goal_handle_->abort(result_msg);
-            return;
-          }
-
-          completed_interfaces_++;
-          auto response = future.get();
-
-          // if semantic interfaces are availble for a given interface, add the semantic interface
-          if (response->semantic_interfaces.size() > 0)
-          {
-            for (const auto& semantic_interface : response->semantic_interfaces)
-            {
-              interface_list.push_back(semantic_interface);
-              is_semantic_list.push_back(true);
-
-              event_->info(std::to_string(completed_interfaces_) + "/" + std::to_string(expected_interfaces_) + " : Received " + semantic_interface +
-                           " for " + requested_interface + ". So added " + semantic_interface);
-            }
-          }
-          // if no semantic interfaces are availble for a given interface, add the interface instead
-          else
-          {
-            interface_list.push_back(requested_interface);
-            is_semantic_list.push_back(false);
-
-            event_->info(std::to_string(completed_interfaces_) + "/" + std::to_string(expected_interfaces_) + " : Received none for " +
-                         requested_interface + ". So added " + requested_interface);
-          }
-
-          if (completed_interfaces_ != expected_interfaces_)
-          {
-            // Request next interface recursively for Semantic interfaces
-            getSemanticInterfaces(interfaces);
-          }
-          else
-          {
-            event_->info("Received all requested Interface information");
-
-            expected_providers_ = interface_list.size();
-
-            event_->info("Requsting Provider information for " + std::to_string(expected_providers_) + " providers");
-
-            // request providers from the interfaces in the interfaces_list
-            getProvider(interface_list, is_semantic_list);
-          }
-        });
-  }
-
-  /**
-   * @brief Get the Provider information for the related interfaces
-   *
-   * @param interfaces std::vector of interfaces
-   * @param is_semantic std::vector of masks about interfaces with true value for semantic interfaces
-   */
-  void getProvider(const std::vector<std::string>& interfaces, const std::vector<bool>& is_semantic)
-  {
-    std::string requested_interface = interfaces[completed_providers_];
-    bool semantic_flag = is_semantic[completed_providers_];
-
-    event_->info("Requesting provider for " + requested_interface);
-
-    auto request_providers = std::make_shared<GetProviders::Request>();
-
-    // request providers of the semantic interface
-    request_providers->interface = requested_interface;
-    request_providers->include_semantic = semantic_flag;
-
-    auto result_providers_future = get_providers_client_->async_send_request(request_providers, [this, is_semantic, requested_interface, interfaces](
-                                                                                                    GetProvidersClient::SharedFuture future) {
-      if (!future.valid())
-      {
-        result_msg->success = false;
-        result_msg->message = "Failed to retrieve providers for interface: " + requested_interface;
-        event_->error(result_msg->message);
-        goal_handle_->abort(result_msg);
-        return;
-      }
-
-      completed_providers_++;
-      auto response = future.get();
-
-      if (response->default_provider != "")
-      {
-        // add defualt provider to the list
-        providers_list.push_back(response->default_provider);
-
-        event_->info(std::to_string(completed_providers_) + "/" + std::to_string(expected_providers_) + " : Received " + response->default_provider +
-                     " for " + requested_interface + ". So added " + response->default_provider);
-      }
-
-      // add additional providers to the list if available
-      if (response->providers.size() > 0)
-      {
-        for (const auto& provider : response->providers)
-        {
-          providers_list.push_back(provider);
-
-          event_->info(std::to_string(completed_providers_) + "/" + std::to_string(expected_providers_) + " : Received and added " + provider +
-                       " for " + requested_interface);
-        }
-      }
-      else
-      {
-        event_->info(std::to_string(completed_providers_) + "/" + std::to_string(expected_providers_) + " : No providers for " + requested_interface);
-      }
-
-      // Check if all expected calls are completed before calling verify_plan
-      if (completed_providers_ != expected_providers_)
-      {
-        // request providers for the next interface in the interfaces_list
-        getProvider(interfaces, is_semantic);
-      }
-      else
-      {
-        event_->info("All requested interface, semantic interface and provider data recieved");
-
-        verify_and_continue();
-      }
-    });
-  }
 
   /**
    * @brief Verify the plan before continuing the execution using xml parsing and collected interface, semantic interface
@@ -390,7 +25,6 @@ private:
 
     bool verification_success = true;
 
-    auto result = std::make_shared<Plan::Result>();
 
     // extract the components within the 'plan' tags
     bool extraction_success = false;
@@ -770,17 +404,6 @@ private:
     });
   }
 
-  void check_service(bool wait_for_logic, const std::string& service_name)
-  {
-    while (wait_for_logic)
-    {
-      event_->error(service_name + " not available");
-      rclcpp::shutdown();
-      return;
-    }
-    event_->info(service_name + " connected");
-  }
-
 private:
   /** File Path link */
   std::string plan_file_path;
@@ -804,11 +427,6 @@ private:
   int expected_configurations_;
   int completed_configurations_;
 
-  /** Bond id */
-  std::string bond_id_;
-
-  /** Manages bond between capabilities server and this client */
-  std::map<std::string, std::shared_ptr<BondClient>> bond_client_cache_;
 
   /** XML Document */
   tinyxml2::XMLDocument document;
@@ -819,47 +437,13 @@ private:
   /** Interface List */
   std::vector<bool> is_semantic_list;
 
-  /** Interface List */
-  std::vector<std::string> interface_list;
 
-  /** Providers List */
-  std::vector<std::string> providers_list;
 
-  /** Invalid events list */
-  std::vector<std::string> rejected_list;
 
-  /** Result message for plan action server*/
-  std::shared_ptr<Plan::Result> result_msg;
 
-  /** action server that exposes executor*/
-  std::shared_ptr<rclcpp_action::Server<Plan>> planner_server_;
 
-  /** action server goal handle*/
-  std::shared_ptr<GoalHandlePlan> goal_handle_;
+ 
 
-  /** Get interfaces from capabilities server */
-  GetInterfacesClient::SharedPtr get_interfaces_client_;
-
-  /** Get semantic interfaces from capabilities server */
-  GetSemanticInterfacesClient::SharedPtr get_sem_interf_client_;
-
-  /** Get providers from capabilities server */
-  GetProvidersClient::SharedPtr get_providers_client_;
-
-  /** establish bond */
-  EstablishBondClient::SharedPtr establish_bond_client_;
-
-  /** use an selected capability */
-  UseCapabilityClient::SharedPtr use_capability_client_;
-
-  /** free an selected capability */
-  FreeCapabilityClient::SharedPtr free_capability_client_;
-
-  /** configure an selected capability */
-  ConfigureCapabilityClient::SharedPtr conf_capability_client_;
-
-  /** trigger an selected capability */
-  TriggerCapabilityClient::SharedPtr trig_capability_client_;
 
   /** Event client for publishing events */
   std::shared_ptr<EventClient> event_;

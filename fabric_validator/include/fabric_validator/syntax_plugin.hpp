@@ -5,7 +5,9 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <fabric_base/validation_base.hpp>
+#include <fabric_base/parser_base.hpp>
 #include <fabric_base/xml_helper.hpp>
+#include <fabric_base/structs.hpp>
 
 namespace fabric
 {
@@ -14,27 +16,18 @@ namespace fabric
  *
  * This plugin checks the XML plan for basic syntax errors (well-formedness, root tag, etc).
  */
-class SyntaxValidation : public ValidationBase
+class CompatibilityValidation : public ValidationBase
 {
 public:
-  SyntaxValidation() = default;
-  virtual ~SyntaxValidation() = default;
+  CompatibilityValidation() = default;
+  virtual ~CompatibilityValidation() = default;
 
   /**
    * @brief Initialize the syntax validation plugin.
    */
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
-    initialize_base(node, "SyntaxValidationPlugin");
-  }
-
-  /**
-   * @brief Set the evaluation source data for the validation.
-   */
-  void set_evaluation_source(std::any eval_data) override
-  {
-    // cast to syntax validation data
-    data_ = std::any_cast<SyntaxValidationData>(eval_data);
+    initialize_base(node, "CompatibilityValidationPlugin");
   }
 
   /**
@@ -44,7 +37,7 @@ public:
    * @param error_msg Output string for error messages, if any.
    * @return true if the plan is syntactically valid, false otherwise.
    */
-  bool validate(tinyxml2::XMLDocument& document, std::string& error_msg) override
+  bool validate(tinyxml2::XMLDocument& document, std::any eval_data) override
   {
     // extract the components within the 'plan' tags
     bool success = false;
@@ -149,7 +142,7 @@ protected:
   /**
    * @brief Syntax validation data containing valid tags
    */
-  SyntaxValidationData data_;
+  std::vector<CapabilityInfo> data_;
 
   /**
    * @brief extracted plan element from the XML document

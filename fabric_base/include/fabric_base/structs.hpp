@@ -44,15 +44,19 @@ struct connection
 
 struct Plan
 {
+  std::string bond_id;
+  std::string plan;
   std::map<int, connection> connections;
+  std::vector<std::string> rejected_list;
 };
 
-struct SyntaxValidationData
+struct CapabilityInfo
 {
-  std::vector<std::string> control_list;
-  std::vector<std::string> interface_list;
-  std::vector<std::string> provider_list;
+  std::string interface;
+  std::string provider;
+  bool has_semantic;
+  std::vector<std::string> semantic_interfaces;
+  std::vector<std::string> alt_providers;
 };
-
 
 }  // namespace fabric
