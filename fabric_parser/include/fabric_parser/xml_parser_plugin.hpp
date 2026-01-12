@@ -34,11 +34,11 @@ public:
   }
 
   /**
-    * @brief Parse the given XML plan.
-    *
-    * @param document The XMLDocument representing the plan.
-    * @param plan The parsed plan.
-    */
+   * @brief Parse the given XML plan.
+   *
+   * @param document The XMLDocument representing the plan.
+   * @param plan The parsed plan.
+   */
   void parse(tinyxml2::XMLDocument& document, fabric::Plan& plan) override
   {
     // Add a completion runner to the plan
@@ -74,7 +74,7 @@ public:
 
       for (const auto& rejected_element : plan.rejected_list)
         RCLCPP_ERROR(node_->get_logger(), "Rejected element: %s", rejected_element.c_str());
-      
+
       throw fabric::fabric_exception("XML plan parsing failed: " + error_msg);
     }
     RCLCPP_INFO(node_->get_logger(), "Plan syntax validation successful. Proceeding to capability retrieval.");
@@ -164,15 +164,15 @@ protected:
     // check for parallel connections without success connections to identify number of connections
     for (const auto& connection : plan.connections)
     {
-      if (connection.second.target_on_success.runner == "")
+      if (connection.second.target_on_success.interface == "")
         input_count += 1;
     }
 
     fabric::connection node;
 
-    node.source.runner = "capabilities2_runner_system/InputMultiplexAllRunner";
+    node.source.interface = "capabilities2_runner_system/InputMultiplexAllRunner";
     node.source.provider = "capabilities2_runner_system/InputMultiplexAllRunner";
-    node.source.parameters = this->system_runner_xml(node.source.runner, node.source.provider, input_count, runner_index);
+    node.source.parameters = this->system_runner_xml(node.source.interface, node.source.provider, input_count, runner_index);
 
     plan.connections[connection_id] = node;
     plan.connections[connection_id].description = description;
@@ -180,7 +180,7 @@ protected:
 
     // set the target_on_success for the new connection
     for (auto& connection : plan.connections)
-      if (connection.second.target_on_success.runner == "")
+      if (connection.second.target_on_success.interface == "")
         connection.second.target_on_success = plan.connections[connection_id].source;
 
     // increment the index for the next parallel all connection
@@ -204,14 +204,14 @@ protected:
 
     // check for parallel connections without success connections to identify number of connections
     for (const auto& connection : plan.connections)
-      if (connection.second.target_on_success.runner == "")
+      if (connection.second.target_on_success.interface == "")
         input_count += 1;
 
     fabric::connection node;
 
-    node.source.runner = "capabilities2_runner_system/InputMultiplexAnyRunner";
+    node.source.interface = "capabilities2_runner_system/InputMultiplexAnyRunner";
     node.source.provider = "capabilities2_runner_system/InputMultiplexAnyRunner";
-    node.source.parameters = this->system_runner_xml(node.source.runner, node.source.provider, input_count, runner_index);
+    node.source.parameters = this->system_runner_xml(node.source.interface, node.source.provider, input_count, runner_index);
 
     plan.connections[connection_id] = node;
     plan.connections[connection_id].description = description;
@@ -219,7 +219,7 @@ protected:
 
     // set the target_on_success for the new connection
     for (auto& connection : plan.connections)
-      if (connection.second.target_on_success.runner == "")
+      if (connection.second.target_on_success.interface == "")
         connection.second.target_on_success = plan.connections[connection_id].source;
 
     // increment the index for the next parallel any connection
@@ -241,8 +241,8 @@ protected:
   void check_and_update_runner_id(fabric::connection& predecessor, fabric::connection& successor)
   {
     // check if predecessor is a system runner and has parameters
-    if (predecessor.source.runner.find("capabilities2_runner_system/InputMultiplexAnyRunner") != std::string::npos ||
-        predecessor.source.runner.find("capabilities2_runner_system/InputMultiplexAllRunner") != std::string::npos)
+    if (predecessor.source.interface.find("capabilities2_runner_system/InputMultiplexAnyRunner") != std::string::npos ||
+        predecessor.source.interface.find("capabilities2_runner_system/InputMultiplexAllRunner") != std::string::npos)
     {
       // If the predecessor is a system runner, we need to update the successor's parameters with the predecessor's id
       if (predecessor.source.parameters)
@@ -358,7 +358,7 @@ protected:
 
       fabric::connection connection;
 
-      connection.source.runner = interfacetag;
+      connection.source.interface = interfacetag;
       connection.source.provider = providertag;
       connection.source.parameters = element;
 
@@ -383,17 +383,17 @@ protected:
         if (connection_type == fabric::event::ON_SUCCESS)
         {
           // Set the target_on_success for the predecessor connection
-          plan.connections[predecessor_id].target_on_success = plan.connections[connection_id].source;
+          plan.connections[predecessor_id].on_success = plan.connections[connection_id].source;
         }
         else if (connection_type == fabric::event::ON_START)
         {
           // Set the target_on_start for the predecessor connection
-          plan.connections[predecessor_id].target_on_start = plan.connections[connection_id].source;
+          plan.connections[predecessor_id].on_start = plan.connections[connection_id].source;
         }
         else if (connection_type == fabric::event::ON_FAILURE)
         {
           // Set the target_on_failure for the predecessor connection
-          plan.connections[predecessor_id].target_on_failure = plan.connections[connection_id].source;
+          plan.connections[predecessor_id].on_failure = plan.connections[connection_id].source;
         }
       }
 

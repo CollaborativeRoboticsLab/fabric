@@ -2,7 +2,9 @@
 
 #include <map>
 #include <string>
+#include <vector>
 #include <tinyxml2.h>
+#include <fabric_base/xml_helper.hpp>
 
 namespace fabric
 {
@@ -23,9 +25,21 @@ enum event
  */
 struct node
 {
-  std::string runner = "";
+  std::string interface = "";
   std::string provider = "";
   tinyxml2::XMLElement* parameters = nullptr;
+
+  bool exists()
+  {
+    return (interface != "" && provider != "" && parameters != nullptr);
+  }
+
+  std::string parameter_to_string()
+  {
+    std::string parameter_string;
+    convert_to_string(parameters, parameter_string);
+    return parameter_string;
+  }
 };
 
 /**
@@ -34,10 +48,10 @@ struct node
 struct connection
 {
   node source;
-  node target_on_start;
-  node target_on_stop;
-  node target_on_success;
-  node target_on_failure;
+  node on_start;
+  node on_stop;
+  node on_success;
+  node on_failure;
   std::string description;
   int trigger_id = -1;
 };
@@ -54,8 +68,7 @@ struct CapabilityInfo
 {
   std::string interface;
   std::string provider;
-  bool has_semantic;
-  std::vector<std::string> semantic_interfaces;
+  bool is_semantic;
   std::vector<std::string> alt_providers;
 };
 

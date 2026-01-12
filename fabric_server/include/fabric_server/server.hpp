@@ -12,6 +12,7 @@
 
 #include <fabric_base/xml_helper.hpp>
 #include <fabric_base/validation_base.hpp>
+#include <fabric_base/parser_base.hpp>
 #include <fabric_base/structs.hpp>
 
 #include <fabric_server/capability_client.hpp>
@@ -161,6 +162,9 @@ protected:
   {
     while (plan_queue.size() > 0)
     {
+      // reset internal data structures
+      reset();
+
       RCLCPP_INFO(this->get_logger(), "A new Fabric plan processing starting");
 
       // get the next plan and parse it into a XML document
@@ -171,11 +175,19 @@ protected:
       // parse the plan to extract connections
       try
       {
-        current_plan_ = parsing_plugin_->parse(current_document_);
+        parsing_plugin_->parse(current_document_, current_plan_);
       }
-      catch(const fabric::fabric_exception& e)
+      catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "Fabric plan parsing failed with error: %s", e.what());
+
+        if (current_plan_.rejected_list.size() > 0)
+        {
+          RCLCPP_ERROR(this->get_logger(), "Rejected elements in the plan:");
+
+          for (const auto& rejected_element : current_plan_.rejected_list)
+            RCLCPP_ERROR(this->get_logger(), "  %s", rejected_element.c_str());
+        }
         continue;
       }
       RCLCPP_INFO(this->get_logger(), "Fabric plan parsing completed successfully.");
@@ -185,9 +197,46 @@ protected:
       capability_client_->getSemanticInterfaces(capability_list_);
       capability_client_->getProviders(capability_list_);
 
-      RCLCPP_INFO(this->get_logger(), "Capability information retrieval completed successfully");
+      RCLCPP_INFO(this->get_logger(), "Capability information retrieval completed successfully.");
 
+      // Request bond from capabilities2 server
+      RCLCPP_INFO(this->get_logger(), "Requesting bond from capabilities2 server.");
+      current_plan_.bond_id = capability_client_->requestBond();
 
+      // Start new bond client for the new bond id
+      RCLCPP_INFO(this->get_logger(), "Establishing bond with id : %s", current_plan_.bond_id.c_str());
+      bond_client_cache_[current_plan_.bond_id] = std::make_unique<BondClient>(shared_from_this(), current_plan_.bond_id);
+      bond_client_cache_[current_plan_.bond_id]->start();
+
+      // Remove old bonds if any
+      if (bond_client_cache_.size() > 1)
+        for (auto& [old_bond_id, bond_client] : bond_client_cache_)
+          if (old_bond_id != current_plan_.bond_id)
+          {
+            bond_client->stop();
+            RCLCPP_INFO(this->get_logger(), "Stopping and removing old bond with id : %s", old_bond_id.c_str());
+          }
+
+      RCLCPP_INFO(this->get_logger(), "Bond established with id : %s", current_plan_.bond_id.c_str());
+      
+      // Request use of capabilities for the plan
+      RCLCPP_INFO(this->get_logger(), "Requesting use of capabilities for the plan.");
+
+      try
+      {
+        capability_client_->use_capabilities(current_plan_);
+      }
+      catch (const fabric::fabric_exception& e)
+      {
+        RCLCPP_ERROR(this->get_logger(), "Capability usage failed with error: %s", e.what());
+        capability_client_->free_capabilities(current_plan_);
+        continue;
+      }
+
+      // connect the capabilities as per the plan
+      RCLCPP_INFO(this->get_logger(), "Connecting capabilities as per the plan.");
+      
+      parsing_plugin_->connect_capabilities(current_plan_);
 
       RCLCPP_INFO(this->get_logger(), "Fabric processing completed. Waiting for next plan.");
     }
@@ -235,19 +284,17 @@ protected:
     cv_.notify_all();
   }
 
+  /**
+   * @brief Reset internal data structures for processing a new plan.
+   *
+   */
   void reset()
   {
-    interface_list.clear();
-    providers_list.clear();
-    rejected_list.clear();
-    connection_map.clear();
-
-    expected_capabilities_ = 0;
-    completed_capabilities_ = 0;
-    freed_capabilities_ = 0;
-
-    expected_configurations_ = 0;
-    completed_configurations_ = 0;
+    current_plan_ = fabric::Plan();
+    current_document_.Clear();
+    current_plan_element_ = nullptr;
+    capability_list_.clear();
+    bond_id_.clear();
   }
 
   /** Vector of plans */
