@@ -21,37 +21,9 @@
    */
   void verify_and_continue()
   {
-    event_->info("Verifying the plan");
 
-    bool verification_success = true;
-
-
-    // extract the components within the 'plan' tags
-    bool extraction_success = false;
-    tinyxml2::XMLElement* plan = xml_parser_->extract_plan(document, extraction_success);
-
-    if (!extraction_success)
-    {
-      result_msg->success = false;
-      result_msg->message = "Execution plan is not compatible. Please recheck and update";
-      event_->error(result_msg->message);
-      goal_handle_->abort(result_msg);
-      verification_success = false;
-    }
-
-    event_->info("Plan extraction complete");
 
     // verify whether the plan is valid by checking the tags
-    std::string error_message;
-
-    if (!xml_parser_->check_tags(plan, interface_list, providers_list, rejected_list, error_message))
-    {
-      result_msg->success = false;
-      result_msg->message = "Plan verification failed: " + error_message;
-      event_->error(result_msg->message);
-      goal_handle_->abort(result_msg);
-      verification_success = false;
-    }
 
     event_->info("Checking tags successful");
 
