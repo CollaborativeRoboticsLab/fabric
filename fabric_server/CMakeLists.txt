@@ -17,8 +17,12 @@ find_package(tinyxml2_vendor REQUIRED)
 find_package(TinyXML2 REQUIRED)  # provided by tinyxml2 upstream, or tinyxml2_vendor
 find_package(bondcpp REQUIRED)
 
+find_package(PkgConfig)
+pkg_check_modules(UUID REQUIRED uuid)
+
 include_directories(
   include
+  ${UUID_INCLUDE_DIRS}
 )
 
 ############################################################################
@@ -37,6 +41,7 @@ ament_target_dependencies(${PROJECT_NAME}
   fabric_base
   capabilities2_msgs
   TinyXML2
+  UUID
 )
 
 install(TARGETS ${PROJECT_NAME}
@@ -61,6 +66,7 @@ ament_target_dependencies(${PROJECT_NAME}_comp
   fabric_base
   capabilities2_msgs
   TinyXML2
+  UUID
 )
 
 rclcpp_components_register_node(${PROJECT_NAME}_comp

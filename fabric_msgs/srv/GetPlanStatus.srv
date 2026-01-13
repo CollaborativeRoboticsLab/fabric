@@ -2,4 +2,5 @@ std_msgs/Header header
 string plan_id
 ---
 std_msgs/Header header
-bool success
+FabricStatus status
+string[] rejected_list

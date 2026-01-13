@@ -66,12 +66,32 @@ struct connection
   int trigger_id = -1;
 };
 
+enum class PlanStatus {
+  UNKNOWN,
+  QUEUED,
+  PARSING,
+  PARSE_FAILED,
+  VALIDATING,
+  VALIDATION_FAILED,
+  BONDING,
+  BOND_FAILED,
+  CAPABILITY_STARTING,
+  CAPABILITY_START_FAILED,
+  CAPABILITY_CONNECTING,
+  CAPABILITY_CONNECT_FAILED,
+  RUNNING,
+  COMPLETED,
+  CANCELLED
+};
+
 struct Plan
 {
-  std::string bond_id;
+  std::string plan_id;
   std::string plan;
+  std::string bond_id;
   std::map<int, connection> connections;
   std::vector<std::string> rejected_list;
+  PlanStatus status = PlanStatus::UNKNOWN;
 };
 
 struct CapabilityInfo

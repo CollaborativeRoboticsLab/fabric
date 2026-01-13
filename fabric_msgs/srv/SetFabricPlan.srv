@@ -2,4 +2,7 @@ std_msgs/Header header
 string plan
 ---
 std_msgs/Header header
-bool success
+
+# if plan_id is set it mean plan got accepted. 
+# if empty (""), it got rejected.
+string plan_id

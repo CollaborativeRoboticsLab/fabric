@@ -6,6 +6,7 @@
 #include <thread>
 
 #include <tinyxml2.h>
+#include <uuid/uuid.h>
 #include <rclcpp/rclcpp.hpp>
 #include <pluginlib/class_loader.hpp>
 
@@ -20,6 +21,8 @@
 #include <fabric_msgs/srv/set_fabric_plan.hpp>
 #include <fabric_msgs/srv/cancel_fabric_plan.hpp>
 #include <fabric_msgs/srv/complete_fabric.hpp>
+#include <fabric_msgs/srv/get_plan_status.hpp>
+#include <fabric_msgs/msg/fabric_status.hpp>
 
 namespace fabric
 {
@@ -34,6 +37,7 @@ public:
   using SetFabricPlan = fabric_msgs::srv::SetFabricPlan;
   using CancelFabricPlan = fabric_msgs::srv::CancelFabricPlan;
   using CompleteFabric = fabric_msgs::srv::CompleteFabric;
+  using GetPlanStatus = fabric_msgs::srv::GetPlanStatus;
 
   /**
    * @brief Construct a new Fabric object
@@ -80,6 +84,9 @@ public:
 
     completion_server_ = this->create_service<CompleteFabric>(
         "/fabric/set_completion", std::bind(&Fabric::setCompleteCallback, this, std::placeholders::_1, std::placeholders::_2));
+
+    get_plan_status_server_ = this->create_service<GetPlanStatus>(
+        "/fabric/get_plan_status", std::bind(&Fabric::getPlanStatusCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     /*************************************************************************
      * Initialize Compatibility Validation Plugin
@@ -165,19 +172,14 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "Parsing the fabric plan.");
+        current_plan_.status = PlanStatus::PARSING;
+
         parsing_plugin_->parse(current_document_, current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "Fabric plan parsing failed with error: %s", e.what());
-
-        if (current_plan_.rejected_list.size() > 0)
-        {
-          RCLCPP_ERROR(this->get_logger(), "Rejected elements in the plan:");
-
-          for (const auto& rejected_element : current_plan_.rejected_list)
-            RCLCPP_ERROR(this->get_logger(), "  %s", rejected_element.c_str());
-        }
+        current_plan_.status = PlanStatus::PARSE_FAILED;
         continue;
       }
       RCLCPP_INFO(this->get_logger(), "Fabric plan parsing completed successfully.");
@@ -186,6 +188,7 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "Getting capabilities required for the plan.");
+        current_plan_.status = PlanStatus::VALIDATING;
         capability_client_->getInterfaces(capability_list_);
         capability_client_->getSemanticInterfaces(capability_list_);
         capability_client_->getProviders(capability_list_);
@@ -193,6 +196,8 @@ protected:
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "Capability information retrieval failed with error: %s", e.what());
+        current_plan_.status = PlanStatus::VALIDATION_FAILED;
+        continue;
       }
 
       RCLCPP_INFO(this->get_logger(), "Capability information retrieval completed successfully.");
@@ -201,11 +206,13 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "Validating the fabric plan for compatibility.");
+
         compatibility_validation_plugin_->validate(current_plan_, capability_list_);
       }
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "Compatibility validation failed with error: %s", e.what());
+        current_plan_.status = PlanStatus::VALIDATION_FAILED;
         continue;
       }
 
@@ -213,11 +220,15 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "Requesting bond from capabilities2 server.");
+        current_plan_.status = PlanStatus::BONDING;
+
         current_plan_.bond_id = capability_client_->request_bond();
       }
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "Capability bond request failed with error: %s", e.what());
+        current_plan_.status = PlanStatus::BOND_FAILED;
+        continue;
       }
 
       // Start new bond client for the new bond id
@@ -240,11 +251,15 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "Requesting use of capabilities for the plan.");
+        current_plan_.status = PlanStatus::CAPABILITY_STARTING;
+
         capability_client_->use_capabilities(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "Capability usage failed with error: %s", e.what());
+        current_plan_.status = PlanStatus::CAPABILITY_START_FAILED;
+
         capability_client_->free_capabilities(current_plan_);
         continue;
       }
@@ -253,11 +268,17 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "Connecting capabilities as per the plan.");
+        current_plan_.status = PlanStatus::CAPABILITY_CONNECTING;
+
         capability_client_->connect_capabilities(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "Capability connection failed with error: %s", e.what());
+        current_plan_.status = PlanStatus::CAPABILITY_CONNECT_FAILED;
+
+        capability_client_->free_capabilities(current_plan_);
+        continue;
       }
 
       RCLCPP_INFO(this->get_logger(), "Capabilities connected successfully.");
@@ -266,6 +287,8 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "Triggering the first capability in the plan.");
+        current_plan_.status = PlanStatus::RUNNING;
+
         capability_client_->trigger_first_node(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
@@ -281,6 +304,7 @@ protected:
         plan_cv_.wait(lock, [this]() { return plan_completed_; });
       }
 
+      current_plan_.status = PlanStatus::COMPLETED;
       RCLCPP_INFO(this->get_logger(), "Fabric processing completed. Waiting for next plan.");
     }
   }
@@ -302,29 +326,190 @@ protected:
     if (xml_status != tinyxml2::XMLError::XML_SUCCESS)
     {
       RCLCPP_INFO(this->get_logger(), "Parsing the plan from service request message failed with error: %s", documentChecking.ErrorName());
-      response->success = false;
+      response->plan_id = "";
     }
     RCLCPP_INFO(this->get_logger(), "Plan accepted from service request message");
 
     fabric::Plan new_plan;
     new_plan.plan = request->plan;
+    new_plan.plan_id = generate_uuid();
+    new_plan.status = PlanStatus::QUEUED;
     plan_queue_.push_back(new_plan);
 
-    response->success = true;
+    response->plan_id = new_plan.plan_id;
   }
 
+  /**
+   * @brief Callback function to cancel a fabric plan.
+   */
   void cancelPlanCallback(const std::shared_ptr<CancelFabricPlan::Request> request, std::shared_ptr<CancelFabricPlan::Response> response)
   {
     RCLCPP_INFO(this->get_logger(), "Plan canncelling requested");
+    std::string plan_id = request->plan_id;
+    std::string bond_id_to_cancel;
+
+    // search for the bond id associated with the plan id from current plan or plan queue
+    if (current_plan_.plan_id == plan_id)
+    {
+      bond_id_to_cancel = current_plan_.bond_id;
+    }
+    else
+    {
+      for (const auto& plan : plan_queue_)
+      {
+        if (plan.plan_id == plan_id)
+        {
+          bond_id_to_cancel = plan.bond_id;
+          break;
+        }
+      }
+    }
+
+    // if bond id is found, break the bond and cancel the plan
+    if (!bond_id_to_cancel.empty())
+    {
+      RCLCPP_INFO(this->get_logger(), "Cancelling plan with id: %s", plan_id.c_str());
+
+      for (auto& [bond_id, bond_client] : bond_client_cache_)
+      {
+        if (bond_id == bond_id_to_cancel)
+        {
+          bond_client->stop();
+          RCLCPP_INFO(this->get_logger(), "Bond with id : %s stopped", bond_id.c_str());
+          break;
+        }
+      }
+    }
 
     response->success = true;
   }
 
+  /**
+   * @brief Callback function to set the completion of a fabric plan.
+   */
   void setCompleteCallback(const std::shared_ptr<CompleteFabric::Request> request, std::shared_ptr<CompleteFabric::Response> response)
   {
-    RCLCPP_INFO(this->get_logger(), "Plan completed successfully");
-    plan_completed_ = true;
-    plan_cv_.notify_all();
+    // mark the plan as completed using plan id
+    RCLCPP_INFO(this->get_logger(), "Plan completion received for plan id: %s", request->plan_id.c_str());
+
+    if (current_plan_.plan_id != request->plan_id)
+    {
+      RCLCPP_WARN(this->get_logger(), "Received plan id does not match the current plan id");
+    }
+    else
+    {
+      RCLCPP_INFO(this->get_logger(), "Current plan id matches the received plan id. Proceeding to complete the plan.");
+      plan_completed_ = true;
+      plan_cv_.notify_all();
+    }
+  }
+
+  /**
+   * @brief Callback function to get the status of a fabric plan.
+   */
+  void getPlanStatusCallback(const std::shared_ptr<GetPlanStatus::Request> request, std::shared_ptr<GetPlanStatus::Response> response)
+  {
+    response->header.stamp = this->now();
+
+    // Search current plan
+    if (current_plan_.plan_id == request->plan_id)
+    {
+      response->status = status_msg(current_plan_.status);
+
+      if (current_plan_.status == PlanStatus::VALIDATION_FAILED || current_plan_.status == PlanStatus::PARSE_FAILED)
+        response->rejected_list = current_plan_.rejected_list;
+
+      return;
+    }
+
+    // Search plan queue
+    for (const auto& plan : plan_queue_)
+    {
+      if (plan.plan_id == request->plan_id)
+      {
+        response->status = status_msg(plan.status);
+
+        if (plan.status == PlanStatus::VALIDATION_FAILED || plan.status == PlanStatus::PARSE_FAILED)
+          response->rejected_list = plan.rejected_list;
+
+        return;
+      }
+    }
+
+    // Not found
+    response->status.code = fabric_msgs::msg::FabricStatus::UNKNOWN;
+    response->rejected_list.clear();
+  }
+
+  /**
+   * @brief Convert internal plan status to fabric_msgs/PlanStatus message
+   */
+  fabric_msgs::msg::FabricStatus status_msg(PlanStatus status) const
+  {
+    fabric_msgs::msg::FabricStatus status_msg;
+    switch (status)
+    {
+      case PlanStatus::UNKNOWN:
+        status_msg.code = fabric_msgs::msg::FabricStatus::UNKNOWN;
+        break;
+      case PlanStatus::QUEUED:
+        status_msg.code = fabric_msgs::msg::FabricStatus::QUEUED;
+        break;
+      case PlanStatus::PARSING:
+        status_msg.code = fabric_msgs::msg::FabricStatus::PARSING;
+        break;
+      case PlanStatus::PARSE_FAILED:
+        status_msg.code = fabric_msgs::msg::FabricStatus::PARSE_FAILED;
+        break;
+      case PlanStatus::VALIDATING:
+        status_msg.code = fabric_msgs::msg::FabricStatus::VALIDATING;
+        break;
+      case PlanStatus::VALIDATION_FAILED:
+        status_msg.code = fabric_msgs::msg::FabricStatus::VALIDATION_FAILED;
+        break;
+      case PlanStatus::BONDING:
+        status_msg.code = fabric_msgs::msg::FabricStatus::BONDING;
+        break;
+      case PlanStatus::BOND_FAILED:
+        status_msg.code = fabric_msgs::msg::FabricStatus::BOND_FAILED;
+        break;
+      case PlanStatus::CAPABILITY_STARTING:
+        status_msg.code = fabric_msgs::msg::FabricStatus::CAPABILITY_STARTING;
+        break;
+      case PlanStatus::CAPABILITY_START_FAILED:
+        status_msg.code = fabric_msgs::msg::FabricStatus::CAPABILITY_START_FAILED;
+        break;
+      case PlanStatus::CAPABILITY_CONNECTING:
+        status_msg.code = fabric_msgs::msg::FabricStatus::CAPABILITY_CONNECTING;
+        break;
+      case PlanStatus::CAPABILITY_CONNECT_FAILED:
+        status_msg.code = fabric_msgs::msg::FabricStatus::CAPABILITY_CONNECT_FAILED;
+        break;
+      case PlanStatus::RUNNING:
+        status_msg.code = fabric_msgs::msg::FabricStatus::RUNNING;
+        break;
+      case PlanStatus::COMPLETED:
+        status_msg.code = fabric_msgs::msg::FabricStatus::COMPLETED;
+        break;
+      case PlanStatus::CANCELLED:
+        status_msg.code = fabric_msgs::msg::FabricStatus::CANCELLED;
+        break;
+      default:
+        status_msg.code = fabric_msgs::msg::FabricStatus::UNKNOWN;
+        break;
+    }
+    return status_msg;
+  }
+  /**
+   * @brief Generate a UUID string for plan tracking
+   */
+  static std::string generate_uuid()
+  {
+    uuid_t uuid;
+    uuid_generate_random(uuid);
+    char uuid_str[40];
+    uuid_unparse(uuid, uuid_str);
+    return std::string(uuid_str);
   }
 
   /**
@@ -390,6 +575,9 @@ protected:
 
   /** server to get the status of the capabilities2 fabric */
   rclcpp::Service<CompleteFabric>::SharedPtr completion_server_;
+
+  /** server to get the status of a fabric plan */
+  rclcpp::Service<GetPlanStatus>::SharedPtr get_plan_status_server_;
 
   /** Thread to manage sending goal */
   std::thread process_thread;

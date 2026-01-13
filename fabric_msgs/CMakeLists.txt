@@ -20,10 +20,16 @@ set(srv_files
   "srv/SetFabricPlan.srv"
   "srv/CancelFabricPlan.srv"
   "srv/CompleteFabric.srv"
+  "srv/GetPlanStatus.srv"
+)
+
+set(msg_files
+  "msg/FabricStatus.msg"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${srv_files}
+  ${msg_files}
   DEPENDENCIES builtin_interfaces std_msgs
 )
 
