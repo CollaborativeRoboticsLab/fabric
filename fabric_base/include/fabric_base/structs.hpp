@@ -82,4 +82,10 @@ struct CapabilityInfo
   std::vector<std::string> alt_providers;
 };
 
+struct Capability
+{
+  /* data */
+};
+
+
 }  // namespace fabric

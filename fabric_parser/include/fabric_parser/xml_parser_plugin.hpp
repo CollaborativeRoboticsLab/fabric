@@ -57,8 +57,7 @@ public:
 
     if (plan_ == nullptr)
     {
-      RCLCPP_ERROR(node_->get_logger(), "No <Plan> element found in the provided plan.");
-      throw fabric::fabric_exception("XML plan parsing failed: No <Plan> element found.");
+      throw fabric::fabric_exception("No <Plan> element found.");
     }
     RCLCPP_INFO(node_->get_logger(), "<Plan> element extracted successfully. Checking required attributes availability.");
 
@@ -70,26 +69,13 @@ public:
 
     if (!syntax_valid)
     {
-      RCLCPP_ERROR(node_->get_logger(), "Plan syntax validation failed: %s", error_msg.c_str());
-
-      for (const auto& rejected_element : plan.rejected_list)
-        RCLCPP_ERROR(node_->get_logger(), "Rejected element: %s", rejected_element.c_str());
-
       throw fabric::fabric_exception("XML plan parsing failed: " + error_msg);
     }
     RCLCPP_INFO(node_->get_logger(), "Plan syntax validation successful. Proceeding to capability retrieval.");
 
     // extract connections from the plan
-    if (plan_ != nullptr)
-    {
-      extract_connections(plan_, plan);
-      RCLCPP_INFO(node_->get_logger(), "Finished parsing the plan");
-    }
-    else
-    {
-      RCLCPP_ERROR(node_->get_logger(), "No <Plan> element found in the provided plan.");
-      throw fabric::fabric_exception("XML plan parsing failed: No <Plan> element found.");
-    }
+    extract_connections(plan_, plan);
+    RCLCPP_INFO(node_->get_logger(), "Finished parsing the plan");
   }
 
 protected:

@@ -35,11 +35,9 @@ public:
    * @brief Validate the given XML plan.
    *
    * @param plan The fabric::Plan to validate.
-   * @param eval_data Additional evaluation data as std::any.
-   * 
-   * @throws fabric_exception if validation fails.
+   * @param capabilities Support data for evaluation as a vector of fabric::CapabilityInfo.
    */
-  virtual void validate(fabric::Plan& plan, std::any& eval_data) = 0;
+  virtual void validate(fabric::Plan& plan, std::vector<CapabilityInfo>& capabilities) = 0;
 
 protected:
   /**

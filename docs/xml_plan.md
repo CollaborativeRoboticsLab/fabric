@@ -1,4 +1,4 @@
-# XML Plan Parsing
+# XML Plan
 
 The fabric package relies on XML-based plans to define workflows. These plans specify the sequence of capabilities to execute, along with the associated parameters. The XML format includes tags for capabilities as events, and control flows enabling complex workflows to be structured in a modular way.
 

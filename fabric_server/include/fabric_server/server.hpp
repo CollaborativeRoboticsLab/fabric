@@ -82,26 +82,18 @@ public:
         "/fabric/set_completion", std::bind(&Fabric::setCompleteCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     /*************************************************************************
-     * Initialize Plugins
+     * Initialize Compatibility Validation Plugin
      ************************************************************************/
 
-    // if (use_dynamics_monitor_)
-    // {
-    //   this->declare_parameter("dynamics_monitor", "supervisor::DynamicsMonitor");
-    //   std::string dynamics_monitor_name = this->get_parameter("dynamics_monitor").as_string();
+    this->declare_parameter("compatibility_validation_plugin", "fabric::CompatibilityValidation");
+    std::string compatibility_validation_plugin_name = this->get_parameter("compatibility_validation_plugin").as_string();
 
-    //   RCLCPP_INFO(this->get_logger(), "Loading dynamics monitor plugin: %s", dynamics_monitor_name.c_str());
+    RCLCPP_INFO(this->get_logger(), "Loading compatibility validation plugin: %s", compatibility_validation_plugin_name.c_str());
 
-    //   dynamics_monitor_ = monitor_loader_.createSharedInstance(dynamics_monitor_name);
-    //   dynamics_monitor_->initialize(shared_from_this());
-    //   dynamics_monitor_->start();
+    compatibility_validation_plugin_ = validation_loader_.createSharedInstance(compatibility_validation_plugin_name);
+    compatibility_validation_plugin_->initialize(shared_from_this());
 
-    //   RCLCPP_INFO(this->get_logger(), "Started dynamics monitor plugin: %s", dynamics_monitor_name.c_str());
-    // }
-    // else
-    // {
-    //   RCLCPP_INFO(this->get_logger(), "Dynamics monitor plugin not loaded.");
-    // }
+    RCLCPP_INFO(this->get_logger(), "Started compatibility validation plugin: %s", compatibility_validation_plugin_name.c_str());
 
     /*************************************************************************
      * Initialize Parsing Plugins
@@ -169,7 +161,7 @@ protected:
       plan_queue_.pop_front();
       current_document_.Parse(current_plan_.plan.c_str());
 
-      // parse the plan to extract connections
+      // parse the plan to extract connections (Fabric::Plan) as per the parsing plugin
       try
       {
         RCLCPP_INFO(this->get_logger(), "Parsing the fabric plan.");
@@ -204,6 +196,18 @@ protected:
       }
 
       RCLCPP_INFO(this->get_logger(), "Capability information retrieval completed successfully.");
+
+      // validate the plan for compatibility as per the validation plugin
+      try
+      {
+        RCLCPP_INFO(this->get_logger(), "Validating the fabric plan for compatibility.");
+        compatibility_validation_plugin_->validate(current_plan_, capability_list_);
+      }
+      catch (const fabric::fabric_exception& e)
+      {
+        RCLCPP_ERROR(this->get_logger(), "Compatibility validation failed with error: %s", e.what());
+        continue;
+      }
 
       // Request bond from capabilities2 server
       try
@@ -251,7 +255,7 @@ protected:
         RCLCPP_INFO(this->get_logger(), "Connecting capabilities as per the plan.");
         capability_client_->connect_capabilities(current_plan_);
       }
-      catch (const std::exception& e)
+      catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "Capability connection failed with error: %s", e.what());
       }
@@ -365,6 +369,9 @@ protected:
 
   /** shared pointer for parsing plugin */
   std::shared_ptr<fabric::ParserBase> parsing_plugin_;
+
+  /** shared pointer for compatibility validation plugin */
+  std::shared_ptr<fabric::ValidationBase> compatibility_validation_plugin_;
 
   /** Bond id */
   std::string bond_id_;
