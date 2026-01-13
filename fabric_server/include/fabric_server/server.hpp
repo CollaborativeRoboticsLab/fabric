@@ -193,15 +193,30 @@ protected:
       RCLCPP_INFO(this->get_logger(), "Fabric plan parsing completed successfully.");
 
       // get the capabilities required for the plan
-      capability_client_->getInterfaces(capability_list_);
-      capability_client_->getSemanticInterfaces(capability_list_);
-      capability_client_->getProviders(capability_list_);
+      try
+      {
+        capability_client_->getInterfaces(capability_list_);
+        capability_client_->getSemanticInterfaces(capability_list_);
+        capability_client_->getProviders(capability_list_);
+      }
+      catch (const fabric::fabric_exception& e)
+      {
+        RCLCPP_ERROR(this->get_logger(), "Capability information retrieval failed with error: %s", e.what());
+      }
 
       RCLCPP_INFO(this->get_logger(), "Capability information retrieval completed successfully.");
 
       // Request bond from capabilities2 server
       RCLCPP_INFO(this->get_logger(), "Requesting bond from capabilities2 server.");
-      current_plan_.bond_id = capability_client_->requestBond();
+
+      try
+      {
+        current_plan_.bond_id = capability_client_->requestBond();
+      }
+      catch (const fabric::fabric_exception& e)
+      {
+        RCLCPP_ERROR(this->get_logger(), "Capability bond request failed with error: %s", e.what());
+      }
 
       // Start new bond client for the new bond id
       RCLCPP_INFO(this->get_logger(), "Establishing bond with id : %s", current_plan_.bond_id.c_str());
@@ -218,7 +233,7 @@ protected:
           }
 
       RCLCPP_INFO(this->get_logger(), "Bond established with id : %s", current_plan_.bond_id.c_str());
-      
+
       // Request use of capabilities for the plan
       RCLCPP_INFO(this->get_logger(), "Requesting use of capabilities for the plan.");
 
@@ -235,8 +250,37 @@ protected:
 
       // connect the capabilities as per the plan
       RCLCPP_INFO(this->get_logger(), "Connecting capabilities as per the plan.");
-      
-      parsing_plugin_->connect_capabilities(current_plan_);
+
+      try
+      {
+        parsing_plugin_->connect_capabilities(current_plan_);
+      }
+      catch (const std::exception& e)
+      {
+        RCLCPP_ERROR(this->get_logger(), "Capability connection failed with error: %s", e.what());
+      }
+
+      RCLCPP_INFO(this->get_logger(), "Capabilities connected successfully.");
+
+      // trigger the first capability in the plan
+      RCLCPP_INFO(this->get_logger(), "Triggering the first capability in the plan.");
+
+      try
+      {
+        capability_client_->trigger_first_node(current_plan_);
+      }
+      catch (const fabric::fabric_exception& e)
+      {
+        RCLCPP_ERROR(this->get_logger(), "Capability trigger failed with error: %s", e.what());
+      }
+
+      RCLCPP_INFO(this->get_logger(), "First capability triggered successfully.");
+
+      // wait for the plan to complete
+      {
+        std::unique_lock<std::mutex> lock(mtx_);
+        cv_.wait(lock, [this]() { return current_plan_.completed; });
+      }
 
       RCLCPP_INFO(this->get_logger(), "Fabric processing completed. Waiting for next plan.");
     }
@@ -280,7 +324,7 @@ protected:
   void setCompleteCallback(const std::shared_ptr<CompleteFabric::Request> request, std::shared_ptr<CompleteFabric::Response> response)
   {
     RCLCPP_INFO(this->get_logger(), "Plan completed successfully");
-    completed_ = true;
+    current_plan_.completed = true;
     cv_.notify_all();
   }
 

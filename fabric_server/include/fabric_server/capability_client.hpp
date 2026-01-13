@@ -71,6 +71,7 @@ public:
     node_->declare_parameter<std::string>("capability_client.services.free_capability", "/capabilities/free_capability");
     node_->declare_parameter<std::string>("capability_client.services.trigger_capability", "/capabilities/trigger_capability");
     node_->declare_parameter<std::string>("capability_client.services.configure_capability", "/capabilities/configure_capability");
+    node_->declare_parameter<std::string>("capability_client.services.connect_capability", "/capabilities/connect_capability");
 
     node_->get_parameter("capability_client.services.get_interfaces", get_interfaces_);
     node_->get_parameter("capability_client.services.get_semantic_interfaces", get_semantic_interfaces_);
@@ -80,6 +81,7 @@ public:
     node_->get_parameter("capability_client.services.free_capability", free_capability_);
     node_->get_parameter("capability_client.services.trigger_capability", trigger_capability_);
     node_->get_parameter("capability_client.services.configure_capability", configure_capability_);
+    node_->get_parameter("capability_client.services.connect_capability", connect_capability_);
 
     get_interfaces_client_ = this->create_client<GetInterfaces>(get_interfaces_);
     get_sem_interf_client_ = this->create_client<GetSemanticInterfaces>(get_semantic_interfaces_);
@@ -104,60 +106,56 @@ public:
   }
 
   /**
-   * @brief Get Interfaces available in the capabilities2 server via relavant service
+   * @brief Get the Interfaces from the capabilities2 server via related service client.
+   * @throws `fabric::fabric_exception` if the service call fails
    *
-   * @param interfaces Vector to store the retrieved interfaces
-   * @return true if successful, false otherwise
+   * @param interfaces std::vector of interfaces for which the information will be requested
+   *
    */
-  bool getInterfaces(std::vector<CapabilityInfo>& capabilities)
+  void getInterfaces(std::vector<CapabilityInfo>& capabilities)
   {
     RCLCPP_INFO(node_->get_logger(), "Requesting Interface information");
 
     auto request_interface = std::make_shared<GetInterfaces::Request>();
 
-    bool success = false;
     bool completed = false;
     std::mutex mtx;
     std::condition_variable cv;
     std::unique_lock<std::mutex> lock(mtx);
 
     // request data from the server
-    auto result_future = get_interfaces_client_->async_send_request(
-        request_interface, [this, &completed, &success, &cv, &capabilities](GetInterfacesClient::SharedFuture future) {
-          if (!future.valid())
-          {
-            success = false;
-            completed = true;
-            RCLCPP_INFO(node_->get_logger(), "Failed to get Interface information from server");
-            return;
-          }
+    auto result_future = get_interfaces_client_->async_send_request(request_interface,
+                                                                    [this, &completed, &cv, &capabilities](GetInterfacesClient::SharedFuture future) {
+                                                                      if (!future.valid())
+                                                                      {
+                                                                        throw fabric::fabric_exception("Failed to get Interface information from "
+                                                                                                       "server");
+                                                                      }
 
-          auto response = future.get();
+                                                                      auto response = future.get();
 
-          for (const auto& interface : response->interfaces)
-          {
-            CapabilityInfo info;
-            info.interface = interface;
-            info.is_semantic = false;
+                                                                      for (const auto& interface : response->interfaces)
+                                                                      {
+                                                                        CapabilityInfo info;
+                                                                        info.interface = interface;
+                                                                        info.is_semantic = false;
 
-            capabilities.push_back(info);
-          }
+                                                                        capabilities.push_back(info);
+                                                                      }
 
-          success = true;
-          completed = true;
-          cv.notify_all();
-        });
+                                                                      completed = true;
+                                                                      cv.notify_all();
+                                                                    });
 
     // wait for the response
     cv.wait(lock, [&completed]() { return completed; });
 
     RCLCPP_INFO(node_->get_logger(), "Received Interface information for %d interfaces from server", static_cast<int>(capabilities.size()));
-
-    return success;
   }
 
   /**
-   * @brief Get the Semantic Interfaces from the capabilities2 server via related service client
+   * @brief Get the Semantic Interfaces from the capabilities2 server via related service client.
+   * @throws `fabric::fabric_exception` if the service call fails
    *
    * @param interfaces std::vector of interfaces for which the semantic interfaces will be requested
    */
@@ -165,7 +163,6 @@ public:
   {
     int interface_count = capabilities.size();
 
-    bool success = false;
     std::vector<CapabilityInfo> new_capabilities;
 
     for (auto& capability : capabilities)
@@ -182,17 +179,13 @@ public:
 
       // request semantic interface from the server
       auto result_semantic_future = get_sem_interf_client_->async_send_request(
-          request_semantic, [this, &new_capabilities, &success, &completed, &cv](GetSemanticInterfacesClient::SharedFuture future) {
+          request_semantic, [this, &new_capabilities, &completed, &cv](GetSemanticInterfacesClient::SharedFuture future) {
             if (!future.valid())
             {
-              success = false;
-              completed = true;
-              RCLCPP_INFO(node_->get_logger(), "Failed to get SemanticInterface information from server");
-              return;
+              throw fabric::fabric_exception("Failed to get Semantic Interface information from server");
             }
 
             auto response = future.get();
-            semantic_interfaces = ;
 
             // add semantic interfaces to the capability info
             for (const auto& interface : response->semantic_interfaces)
@@ -205,7 +198,6 @@ public:
               RCLCPP_INFO(node_->get_logger(), "  Semantic interface: %s added", interface.c_str());
             }
 
-            success = true;
             completed = true;
             cv.notify_all();
           });
@@ -216,20 +208,17 @@ public:
 
     // append the new semantic interfaces to the original capabilities list
     capabilities.insert(capabilities.end(), new_capabilities.begin(), new_capabilities.end());
-
-    return success;
   }
 
   /**
-   * @brief Get the Provider information for the related interfaces
+   * @brief Get the Provider information for the related interfaces. T
+   * @throws `fabric::fabric_exception` if the service call fails
    *
    * @param capabilities std::vector of CapabilityInfo for which the provider information will be requested
-   * @return true if successful, false otherwise
+   *
    */
   void getProvider(std::vector<CapabilityInfo>& capabilities)
   {
-    bool success = false;
-
     for (auto& capability : capabilities)
     {
       RCLCPP_INFO(node_->get_logger(), "Requesting provider for %s", capability.interface.c_str());
@@ -249,16 +238,12 @@ public:
           request_providers, [this, &capability, &completed, &success, &cv](GetProvidersClient::SharedFuture future) {
             if (!future.valid())
             {
-              success = false;
-              completed = true;
-              RCLCPP_INFO(node_->get_logger(), "Failed to get Provider information from server");
-              return;
+              throw fabric::fabric_exception("Failed to get Provider information from server");
             }
 
             auto response = future.get();
             capability.alt_providers = response->providers;
             capability.provider = response->default_provider;
-            success = true;
             completed = true;
             cv.notify_all();
           });
@@ -268,13 +253,12 @@ public:
 
       RCLCPP_INFO(node_->get_logger(), "Received provider information for %s: default provider: %s, number of alternative providers: %d",
                   capability.interface.c_str(), capability.provider.c_str(), static_cast<int>(capability.alt_providers.size()));
-
-      return success;
     }
   }
 
   /**
-   * @brief Request the bond from the capabilities2 server
+   * @brief Request the bond from the capabilities2 server.
+   * @throws `fabric::fabric_exception` if the service call fails
    *
    */
   std::string request_bond()
@@ -295,8 +279,7 @@ public:
         establish_bond_client_->async_send_request(request_bond, [&bond_id, &completed, &cv, this](EstablishBondClient::SharedFuture future) {
           if (!future.valid())
           {
-            RCLCPP_ERROR(node_->get_logger(), "Failed to retrieve the bond id.");
-            return;
+            throw fabric::fabric_exception("Failed to establish bond with capabilities2 server");
           }
 
           auto response = future.get();
@@ -315,10 +298,10 @@ public:
 
   /**
    * @brief Request use of capability from capabilities2 server
+   * @throws fabric::fabric_exception if any capability fails to start
    *
    * @param plan Fabric plan containing the bond id and capabilities to be used
    *
-   * @throws fabric::fabric_exception if any capability fails to start
    */
   void use_capabilities(fabric::Plan& plan)
   {
@@ -335,42 +318,33 @@ public:
 
       RCLCPP_INFO(node_->get_logger(), "Starting capability %d : %s", index, connection.source.interface.c_str());
 
-      bool success = false;
       bool completed = false;
       std::mutex mtx;
       std::condition_variable cv;
       std::unique_lock<std::mutex> lock(mtx);
 
-      auto result_future =
-          use_capability_client_->async_send_request(request_use, [this, &completed, &success, &cv](UseCapabilityClient::SharedFuture future) {
-            if (!future.valid())
-            {
-              success = false;
-              completed = true;
-              return;
-            }
+      auto result_future = use_capability_client_->async_send_request(request_use, [this, &completed, &cv](UseCapabilityClient::SharedFuture future) {
+        if (!future.valid())
+        {
+          throw fabric::fabric_exception("Failed to use capability");
+        }
 
-            auto response = future.get();
-            success = true;
-            completed = true;
-            cv.notify_all();
-          });
+        auto response = future.get();
+        completed = true;
+        cv.notify_all();
+      });
 
       // wait for the response
       cv.wait(lock, [&completed]() { return completed; });
 
-      if (success)
-      {
-        RCLCPP_INFO(node_->get_logger(), "Capability %s started successfully.", connection.source.interface.c_str());
-        started_capabilities_.push_back(connection.source.interface);
-      }
-      else
-        throw fabric::fabric_exception("Failed to start capability " + connection.source.interface);
+      RCLCPP_INFO(node_->get_logger(), "Capability %s started successfully.", connection.source.interface.c_str());
+      started_capabilities_.push_back(connection.source.interface);
     }
   }
 
   /**
    * @brief Request free of all started capabilities from capabilities2 server
+   * @throws fabric::fabric_exception if any capability fails to free
    *
    * @param plan Fabric plan containing the bond id and capabilities to be freed
    *
@@ -395,7 +369,6 @@ public:
       }
 
       bool completed = false;
-      bool success = false;
       std::mutex mtx;
       std::condition_variable cv;
       std::unique_lock<std::mutex> lock(mtx);
@@ -409,20 +382,15 @@ public:
 
         // send the request
         auto result_future = free_capability_client_->async_send_request(
-            request_free, [this, &completed, &success, &cv, &capability](FreeCapabilityClient::SharedFuture future) {
+            request_free, [this, &completed, &cv, &capability](FreeCapabilityClient::SharedFuture future) {
               if (!future.valid())
               {
-                RCLCPP_ERROR(node_->get_logger(), "Failed to free capability %s", capability.c_str());
-                completed = true;
-                success = false;
-                cv.notify_all();
-                return;
+                throw fabric::fabric_exception("Failed to free capability " + capability);
               }
 
               auto response = future.get();
               RCLCPP_INFO(node_->get_logger(), "Capability %s freed successfully.", capability.c_str());
               completed = true;
-              success = true;
               cv.notify_all();
             });
 
@@ -430,8 +398,7 @@ public:
         cv.wait(lock, [&completed]() { return completed; });
 
         // track successfully freed capabilities
-        if (success)
-          freed_capabilities.push_back(capability);
+        freed_capabilities.push_back(capability);
       }
       else
       {
@@ -446,66 +413,216 @@ public:
 
   /**
    * @brief Request connection between capabilities from according to the provided plan
+   * @throws fabric::fabric_exception if any connection fails
+   * 
+   * @param plan Fabric plan containing the bond id and connections to be established
    */
-  void configure_capabilities(fabric::Plan& plan)
+  void connect_capabilities(fabric::Plan& plan)
   {
     for (const auto& [id, connection] : plan.connections)
     {
-      auto request = std::make_shared<ConnectCapability::Request>();
-
       RCLCPP_INFO(node_->get_logger(), "Configuring connection for capability named %s", connection.source.interface.c_str());
 
       if (connection.on_start.exists())
       {
+        auto request = std::make_shared<ConnectCapability::Request>();
+
         request->bond_id = plan.bond_id;
-        request->event.trigger_id = connection.trigger_id;
-        request->event.description = connection.description;
+        request->trigger_id = connection.trigger_id;
 
-        request->event.connection.type.code = CapabilityEventCode::STARTED;
+        request->connection.type.code = CapabilityEventCode::STARTED;
 
-        request->event.connection.source.capability = connection.source.interface;
-        request->event.connection.source.provider = connection.source.provider;
-        request->event.connection.source.parameters = connection.source.parameter_to_string();
+        request->connection.source.capability = connection.source.interface;
+        request->connection.source.provider = connection.source.provider;
+        request->connection.source.parameters = connection.source.parameter_to_string();
 
-        request->event.connection.target.capability = connection.on_start.interface;
-        request->event.connection.target.provider = connection.on_start.provider;
-        request->event.connection.target.parameters = connection.on_start.parameter_to_string();
+        request->connection.target.capability = connection.on_start.interface;
+        request->connection.target.provider = connection.on_start.provider;
+        request->connection.target.parameters = connection.on_start.parameter_to_string();
+
+        bool completed = false;
+        std::mutex mtx;
+        std::condition_variable cv;
+        std::unique_lock<std::mutex> lock(mtx);
+
+        // send the request
+        auto result_future =
+            conf_capability_client_->async_send_request(request, [this, &completed, &cv](ConfigureCapabilityClient::SharedFuture future) {
+              if (!future.valid())
+              {
+                throw fabric::fabric_exception("Failed to configure capability connection on STARTED event");
+              }
+
+              auto response = future.get();
+
+              RCLCPP_INFO(node_->get_logger(), "Capability connection on STARTED event configured successfully.");
+              completed = true;
+              cv.notify_all();
+            });
+
+        // wait for the response
+        cv.wait(lock, [&completed]() { return completed; });
+      }
+
+      if (connection.on_stop.exists())
+      {
+        auto request = std::make_shared<ConnectCapability::Request>();
+
+        request->bond_id = plan.bond_id;
+        request->trigger_id = connection.trigger_id;
+
+        request->connection.type.code = CapabilityEventCode::STOPPED;
+
+        request->connection.source.capability = connection.source.interface;
+        request->connection.source.provider = connection.source.provider;
+        request->connection.source.parameters = connection.source.parameter_to_string();
+
+        request->connection.target.capability = connection.on_stop.interface;
+        request->connection.target.provider = connection.on_stop.provider;
+        request->connection.target.parameters = connection.on_stop.parameter_to_string();
+
+        bool completed = false;
+        std::mutex mtx;
+        std::condition_variable cv;
+        std::unique_lock<std::mutex> lock(mtx);
+
+        // send the request
+        auto result_future =
+            conf_capability_client_->async_send_request(request, [this, &completed, &cv](ConfigureCapabilityClient::SharedFuture future) {
+              if (!future.valid())
+              {
+                throw fabric::fabric_exception("Failed to configure capability connection on STOPPED event");
+              }
+
+              auto response = future.get();
+
+              RCLCPP_INFO(node_->get_logger(), "Capability connection on STOPPED event configured successfully.");
+              completed = true;
+              cv.notify_all();
+            });
+
+        // wait for the response
+        cv.wait(lock, [&completed]() { return completed; });
+      }
+
+      if (connection.on_success.exists())
+      {
+        auto request = std::make_shared<ConnectCapability::Request>();
+
+        request->bond_id = plan.bond_id;
+        request->trigger_id = connection.trigger_id;
+
+        request->connection.type.code = CapabilityEventCode::SUCCEEDED;
+
+        request->connection.source.capability = connection.source.interface;
+        request->connection.source.provider = connection.source.provider;
+        request->connection.source.parameters = connection.source.parameter_to_string();
+
+        request->connection.target.capability = connection.on_success.interface;
+        request->connection.target.provider = connection.on_success.provider;
+        request->connection.target.parameters = connection.on_success.parameter_to_string();
+
+        bool completed = false;
+        std::mutex mtx;
+        std::condition_variable cv;
+        std::unique_lock<std::mutex> lock(mtx);
+
+        // send the request
+        auto result_future =
+            conf_capability_client_->async_send_request(request, [this, &completed, &cv](ConfigureCapabilityClient::SharedFuture future) {
+              if (!future.valid())
+              {
+                throw fabric::fabric_exception("Failed to configure capability connection on SUCCEEDED event");
+              }
+
+              auto response = future.get();
+
+              RCLCPP_INFO(node_->get_logger(), "Capability connection on SUCCEEDED event configured successfully.");
+              completed = true;
+              cv.notify_all();
+            });
+
+        // wait for the response
+        cv.wait(lock, [&completed]() { return completed; });
+      }
+
+      if (connection.on_failure.exists())
+      {
+        auto request = std::make_shared<ConnectCapability::Request>();
+
+        request->bond_id = plan.bond_id;
+        request->trigger_id = connection.trigger_id;
+
+        request->connection.type.code = CapabilityEventCode::FAILED;
+
+        request->connection.source.capability = connection.source.interface;
+        request->connection.source.provider = connection.source.provider;
+        request->connection.source.parameters = connection.source.parameter_to_string();
+
+        request->connection.target.capability = connection.on_failure.interface;
+        request->connection.target.provider = connection.on_failure.provider;
+        request->connection.target.parameters = connection.on_failure.parameter_to_string();
+
+        bool completed = false;
+        std::mutex mtx;
+        std::condition_variable cv;
+        std::unique_lock<std::mutex> lock(mtx);
+
+        // send the request
+        auto result_future =
+            conf_capability_client_->async_send_request(request, [this, &completed, &cv](ConfigureCapabilityClient::SharedFuture future) {
+              if (!future.valid())
+              {
+                throw fabric::fabric_exception("Failed to configure capability connection on FAILED event");
+              }
+
+              auto response = future.get();
+
+              RCLCPP_INFO(node_->get_logger(), "Capability connection on FAILED event configured successfully.");
+              completed = true;
+              cv.notify_all();
+            });
+
+        // wait for the response
+        cv.wait(lock, [&completed]() { return completed; });
       }
     }
+  }
 
-    std::string source_capability = capabilities[completed_configurations_].source.runner;
+  /**
+   * @brief Trigger the first node
+   * @throws fabric::fabric_exception if the first capability fails to trigger
+   * 
+   * @param plan Fabric plan containing the bond id and connections to be triggered
+   */
+  void trigger_first_node(fabric::Plan& plan)
+  {
+    auto request_trigger = std::make_shared<TriggerCapability::Request>();
+
+    bool completed = false;
+    std::mutex mtx;
+    std::condition_variable cv;
+    std::unique_lock<std::mutex> lock(mtx);
+
+    request_trigger->bond_id = plan.bond_id;
+    request_trigger->capability = plan.connections[0].source.interface;
+    request_trigger->parameters = plan.connections[0].source.parameter_to_string();
 
     // send the request
-    auto result_future =
-        conf_capability_client_->async_send_request(request, [this, source_capability](ConfigureCapabilityClient::SharedFuture future) {
-          if (!future.valid())
-          {
-            result_msg->success = false;
-            result_msg->message = "Failed to configure capability :" + source_capability + ". Server execution cancelled";
-            event_->error(result_msg->message);
-            goal_handle_->abort(result_msg);
-            return;
-          }
+    auto result_future = trig_capability_client_->async_send_request(request_trigger, [this](TriggerCapabilityClient::SharedFuture future) {
+      if (!future.valid())
+      {
+        throw fabric::fabric_exception("Failed to trigger the first capability.");
+      }
 
-          completed_configurations_++;
+      auto response = future.get();
+      completed = true;
+      cv.notify_all();
+      RCLCPP_INFO(node_->get_logger(), "First capability triggered successfully.");
+    });
 
-          auto response = future.get();
-
-          event_->info(std::to_string(completed_configurations_) + "/" + std::to_string(expected_configurations_) +
-                       " : Successfully configured capability : " + source_capability);
-
-          // Check if all expected calls are completed before calling verify_plan
-          if (completed_configurations_ == expected_configurations_)
-          {
-            event_->info("All requested capabilities have been configured. Triggering the first capability");
-
-            trigger_first_node();
-          }
-          else
-          {
-            configure_capabilities(connection_map);
-          }
-        });
+    // wait for the response
+    cv.wait(lock, [&completed]() { return completed; });
   }
 
 protected:
@@ -539,6 +656,7 @@ protected:
   std::string free_capability_;
   std::string trigger_capability_;
   std::string configure_capability_;
+  std::string connect_capability_;
 
   /**
    * @brief Heart beat bond with capabilities server

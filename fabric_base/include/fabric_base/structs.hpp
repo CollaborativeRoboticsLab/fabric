@@ -62,6 +62,7 @@ struct Plan
   std::string plan;
   std::map<int, connection> connections;
   std::vector<std::string> rejected_list;
+  bool completed;
 };
 
 struct CapabilityInfo
