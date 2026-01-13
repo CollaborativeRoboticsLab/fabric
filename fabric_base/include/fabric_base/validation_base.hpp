@@ -4,6 +4,9 @@
 #include <vector>
 #include <tinyxml2.h>
 #include <rclcpp/rclcpp.hpp>
+#include <fabric_base/structs.hpp>
+#include <fabric_base/xml_helper.hpp>
+
 
 namespace fabric
 {
@@ -22,7 +25,6 @@ public:
    * @brief Initialize the validation plugin with the given ROS2 node.
    *
    * @param node Shared pointer to the ROS2 node.
-   * @return true if initialization was successful, false otherwise.
    */
   virtual void initialize(const rclcpp::Node::SharedPtr& node)
   {
@@ -34,9 +36,10 @@ public:
    *
    * @param plan The fabric::Plan to validate.
    * @param eval_data Additional evaluation data as std::any.
-   * @return true if the plan is valid, false otherwise.
+   * 
+   * @throws fabric_exception if validation fails.
    */
-  virtual bool validate(fabric::Plan, std::any eval_data) = 0;
+  virtual void validate(fabric::Plan& plan, std::any& eval_data) = 0;
 
 protected:
   /**

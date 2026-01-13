@@ -14,6 +14,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(fabric_base REQUIRED)
 
 include_directories(
   include
@@ -26,6 +27,7 @@ add_library(${PROJECT_NAME}
 ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   pluginlib
+  fabric_base
 )
 
 pluginlib_export_plugin_description_file(fabric plugins.xml)

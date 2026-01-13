@@ -30,6 +30,7 @@ ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   pluginlib
   TinyXML2
+  fabric_base
 )
 
 pluginlib_export_plugin_description_file(fabric plugins.xml)

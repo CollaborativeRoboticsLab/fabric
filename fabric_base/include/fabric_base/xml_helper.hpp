@@ -51,7 +51,7 @@ tinyxml2::XMLElement* extract_plan(tinyxml2::XMLDocument& document)
  *
  * @return `true` if element is not nullptr and conversion successful, `false` if element is nullptr
  */
-bool convert_to_string(tinyxml2::XMLElement* element, std::string& parameters)
+inline bool convert_to_string(tinyxml2::XMLElement* element, std::string& parameters)
 {
   if (element)
   {

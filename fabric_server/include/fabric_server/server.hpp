@@ -7,7 +7,6 @@
 
 #include <tinyxml2.h>
 #include <rclcpp/rclcpp.hpp>
-#include <rclcpp_action/rclcpp_action.hpp>
 #include <pluginlib/class_loader.hpp>
 
 #include <fabric_base/xml_helper.hpp>
@@ -20,7 +19,6 @@
 
 #include <fabric_msgs/srv/set_fabric_plan.hpp>
 #include <fabric_msgs/srv/cancel_fabric_plan.hpp>
-#include <fabric_msgs/srv/get_fabric_status.hpp>
 #include <fabric_msgs/srv/complete_fabric.hpp>
 
 namespace fabric
@@ -33,7 +31,6 @@ namespace fabric
 class Fabric : public rclcpp::Node
 {
 public:
-  using GetFabricStatus = fabric_msgs::srv::GetFabricStatus;
   using SetFabricPlan = fabric_msgs::srv::SetFabricPlan;
   using CancelFabricPlan = fabric_msgs::srv::CancelFabricPlan;
   using CompleteFabric = fabric_msgs::srv::CompleteFabric;
@@ -88,23 +85,23 @@ public:
      * Initialize Plugins
      ************************************************************************/
 
-    if (use_dynamics_monitor_)
-    {
-      this->declare_parameter("dynamics_monitor", "supervisor::DynamicsMonitor");
-      std::string dynamics_monitor_name = this->get_parameter("dynamics_monitor").as_string();
+    // if (use_dynamics_monitor_)
+    // {
+    //   this->declare_parameter("dynamics_monitor", "supervisor::DynamicsMonitor");
+    //   std::string dynamics_monitor_name = this->get_parameter("dynamics_monitor").as_string();
 
-      RCLCPP_INFO(this->get_logger(), "Loading dynamics monitor plugin: %s", dynamics_monitor_name.c_str());
+    //   RCLCPP_INFO(this->get_logger(), "Loading dynamics monitor plugin: %s", dynamics_monitor_name.c_str());
 
-      dynamics_monitor_ = monitor_loader_.createSharedInstance(dynamics_monitor_name);
-      dynamics_monitor_->initialize(shared_from_this());
-      dynamics_monitor_->start();
+    //   dynamics_monitor_ = monitor_loader_.createSharedInstance(dynamics_monitor_name);
+    //   dynamics_monitor_->initialize(shared_from_this());
+    //   dynamics_monitor_->start();
 
-      RCLCPP_INFO(this->get_logger(), "Started dynamics monitor plugin: %s", dynamics_monitor_name.c_str());
-    }
-    else
-    {
-      RCLCPP_INFO(this->get_logger(), "Dynamics monitor plugin not loaded.");
-    }
+    //   RCLCPP_INFO(this->get_logger(), "Started dynamics monitor plugin: %s", dynamics_monitor_name.c_str());
+    // }
+    // else
+    // {
+    //   RCLCPP_INFO(this->get_logger(), "Dynamics monitor plugin not loaded.");
+    // }
 
     /*************************************************************************
      * Initialize Parsing Plugins
@@ -135,7 +132,7 @@ public:
     // check if the file loading failed
     if (xml_status != tinyxml2::XMLError::XML_SUCCESS)
     {
-      RCLCPP_ERROR(this->get_logger(), "Error loading plan: %s, Error: %s", plan_file_path_.c_str(), document.ErrorName());
+      RCLCPP_ERROR(this->get_logger(), "Error loading plan: %s, Error: %s", plan_file_path_.c_str(), default_document.ErrorName());
       rclcpp::shutdown();
     }
     RCLCPP_INFO(this->get_logger(), "Plan loaded from : %s", plan_file_path_.c_str());
@@ -160,7 +157,7 @@ protected:
    */
   void process()
   {
-    while (plan_queue.size() > 0)
+    while (plan_queue_.size() > 0)
     {
       // reset internal data structures
       reset();
@@ -175,6 +172,7 @@ protected:
       // parse the plan to extract connections
       try
       {
+        RCLCPP_INFO(this->get_logger(), "Parsing the fabric plan.");
         parsing_plugin_->parse(current_document_, current_plan_);
       }
       catch (const fabric::fabric_exception& e)
@@ -195,6 +193,7 @@ protected:
       // get the capabilities required for the plan
       try
       {
+        RCLCPP_INFO(this->get_logger(), "Getting capabilities required for the plan.");
         capability_client_->getInterfaces(capability_list_);
         capability_client_->getSemanticInterfaces(capability_list_);
         capability_client_->getProviders(capability_list_);
@@ -207,11 +206,10 @@ protected:
       RCLCPP_INFO(this->get_logger(), "Capability information retrieval completed successfully.");
 
       // Request bond from capabilities2 server
-      RCLCPP_INFO(this->get_logger(), "Requesting bond from capabilities2 server.");
-
       try
       {
-        current_plan_.bond_id = capability_client_->requestBond();
+        RCLCPP_INFO(this->get_logger(), "Requesting bond from capabilities2 server.");
+        current_plan_.bond_id = capability_client_->request_bond();
       }
       catch (const fabric::fabric_exception& e)
       {
@@ -235,10 +233,9 @@ protected:
       RCLCPP_INFO(this->get_logger(), "Bond established with id : %s", current_plan_.bond_id.c_str());
 
       // Request use of capabilities for the plan
-      RCLCPP_INFO(this->get_logger(), "Requesting use of capabilities for the plan.");
-
       try
       {
+        RCLCPP_INFO(this->get_logger(), "Requesting use of capabilities for the plan.");
         capability_client_->use_capabilities(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
@@ -249,11 +246,10 @@ protected:
       }
 
       // connect the capabilities as per the plan
-      RCLCPP_INFO(this->get_logger(), "Connecting capabilities as per the plan.");
-
       try
       {
-        parsing_plugin_->connect_capabilities(current_plan_);
+        RCLCPP_INFO(this->get_logger(), "Connecting capabilities as per the plan.");
+        capability_client_->connect_capabilities(current_plan_);
       }
       catch (const std::exception& e)
       {
@@ -263,10 +259,9 @@ protected:
       RCLCPP_INFO(this->get_logger(), "Capabilities connected successfully.");
 
       // trigger the first capability in the plan
-      RCLCPP_INFO(this->get_logger(), "Triggering the first capability in the plan.");
-
       try
       {
+        RCLCPP_INFO(this->get_logger(), "Triggering the first capability in the plan.");
         capability_client_->trigger_first_node(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
@@ -278,8 +273,8 @@ protected:
 
       // wait for the plan to complete
       {
-        std::unique_lock<std::mutex> lock(mtx_);
-        cv_.wait(lock, [this]() { return current_plan_.completed; });
+        std::unique_lock<std::mutex> lock(plan_mutex_);
+        plan_cv_.wait(lock, [this]() { return plan_completed_; });
       }
 
       RCLCPP_INFO(this->get_logger(), "Fabric processing completed. Waiting for next plan.");
@@ -324,8 +319,8 @@ protected:
   void setCompleteCallback(const std::shared_ptr<CompleteFabric::Request> request, std::shared_ptr<CompleteFabric::Response> response)
   {
     RCLCPP_INFO(this->get_logger(), "Plan completed successfully");
-    current_plan_.completed = true;
-    cv_.notify_all();
+    plan_completed_ = true;
+    plan_cv_.notify_all();
   }
 
   /**
@@ -352,6 +347,11 @@ protected:
 
   /** XML Element to hold the current plan */
   tinyxml2::XMLElement* current_plan_element_;
+
+  /** Current plan related synchronization */
+  bool plan_completed_;
+  std::mutex plan_mutex_;
+  std::condition_variable plan_cv_;
 
   /** Capability client to interact with capability server */
   std::shared_ptr<CapabilityClient> capability_client_;

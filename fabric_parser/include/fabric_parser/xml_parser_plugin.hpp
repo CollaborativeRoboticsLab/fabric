@@ -164,7 +164,7 @@ protected:
     // check for parallel connections without success connections to identify number of connections
     for (const auto& connection : plan.connections)
     {
-      if (connection.second.target_on_success.interface == "")
+      if (connection.second.on_success.interface == "")
         input_count += 1;
     }
 
@@ -180,8 +180,8 @@ protected:
 
     // set the target_on_success for the new connection
     for (auto& connection : plan.connections)
-      if (connection.second.target_on_success.interface == "")
-        connection.second.target_on_success = plan.connections[connection_id].source;
+      if (connection.second.on_success.interface == "")
+        connection.second.on_success = plan.connections[connection_id].source;
 
     // increment the index for the next parallel all connection
     runner_index += 1;
@@ -204,7 +204,7 @@ protected:
 
     // check for parallel connections without success connections to identify number of connections
     for (const auto& connection : plan.connections)
-      if (connection.second.target_on_success.interface == "")
+      if (connection.second.on_success.interface == "")
         input_count += 1;
 
     fabric::connection node;
@@ -217,10 +217,10 @@ protected:
     plan.connections[connection_id].description = description;
     plan.connections[connection_id].trigger_id = runner_index;
 
-    // set the target_on_success for the new connection
+    // set the on_success for the new connection
     for (auto& connection : plan.connections)
-      if (connection.second.target_on_success.interface == "")
-        connection.second.target_on_success = plan.connections[connection_id].source;
+      if (connection.second.on_success.interface == "")
+        connection.second.on_success = plan.connections[connection_id].source;
 
     // increment the index for the next parallel any connection
     runner_index += 1;
@@ -267,7 +267,7 @@ protected:
    * @param description the name of the control tag
    */
   int extract_connections(tinyxml2::XMLElement* element, fabric::Plan& plan, int connection_id = 0,
-                          fabric::event connection_type = fabric::event::ON_SUCCESS, std::string description = "")
+                          fabric::event connection_type = fabric::event::ON_SUCCESS, std::string conn_description = "")
   {
     int predecessor_id;
     int last_conn_id = connection_id;
@@ -311,7 +311,7 @@ protected:
           last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::event::ON_START, description);
 
           // add a system connection for parallel_any to proceed when at least one parallel runner is completed
-          last_conn_id = add_parallel_any(plan, last_conn_id + 1, "parallel_any_for_collecting_outputs");
+          last_conn_id = add_parallel_any(plan, last_conn_id + 1, "parallel_any_for_muxing_outputs");
         }
       }
       else if (typetag == "parallel_all")
@@ -322,7 +322,7 @@ protected:
           last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::event::ON_START, description);
 
           // add a system connection for parallel_all to proceed when all parallel runners are completed
-          last_conn_id = add_parallel_all(plan, last_conn_id + 1, "parallel_all_for_collecting_outputs");
+          last_conn_id = add_parallel_all(plan, last_conn_id + 1, "parallel_all_for_muxing_outputs");
         }
       }
       else if (typetag == "recovery")
@@ -333,14 +333,14 @@ protected:
           last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::event::ON_FAILURE, description);
 
           // add a system connection for recovery to proceed when the original runner or at least one recovery runner is completed
-          last_conn_id = add_parallel_any(plan, last_conn_id + 1, "parallel_any_for_collecting_recovery");
+          last_conn_id = add_parallel_any(plan, last_conn_id + 1, "parallel_any_for_muxing_recovery");
         }
       }
 
       if (hasSiblings)
       {
         // continue extracting connections from the next sibling element
-        last_conn_id = extract_connections(element->NextSiblingElement(), plan, last_conn_id + 1, connection_type, description);
+        last_conn_id = extract_connections(element->NextSiblingElement(), plan, last_conn_id + 1, connection_type, conn_description);
       }
 
       return last_conn_id;
@@ -368,7 +368,7 @@ protected:
       predecessor_id = connection_id - 1;
 
       plan.connections[connection_id] = connection;
-      plan.connections[connection_id].description = description;
+      plan.connections[connection_id].description = conn_description;
 
       // match the trigger id with the runner index
       plan.connections[connection_id].trigger_id = runner_index;

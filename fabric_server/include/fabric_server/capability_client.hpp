@@ -51,7 +51,10 @@ public:
   using ConnectCapabilityClient = rclcpp::Client<ConnectCapability>;
   using TriggerCapabilityClient = rclcpp::Client<TriggerCapability>;
 
-  CapabilityClient() = default;
+  CapabilityClient() {
+
+  };
+
   virtual ~CapabilityClient() = default;
 
   /**
@@ -70,7 +73,6 @@ public:
     node_->declare_parameter<std::string>("capability_client.services.use_capability", "/capabilities/use_capability");
     node_->declare_parameter<std::string>("capability_client.services.free_capability", "/capabilities/free_capability");
     node_->declare_parameter<std::string>("capability_client.services.trigger_capability", "/capabilities/trigger_capability");
-    node_->declare_parameter<std::string>("capability_client.services.configure_capability", "/capabilities/configure_capability");
     node_->declare_parameter<std::string>("capability_client.services.connect_capability", "/capabilities/connect_capability");
 
     node_->get_parameter("capability_client.services.get_interfaces", get_interfaces_);
@@ -80,27 +82,26 @@ public:
     node_->get_parameter("capability_client.services.use_capability", use_capability_);
     node_->get_parameter("capability_client.services.free_capability", free_capability_);
     node_->get_parameter("capability_client.services.trigger_capability", trigger_capability_);
-    node_->get_parameter("capability_client.services.configure_capability", configure_capability_);
     node_->get_parameter("capability_client.services.connect_capability", connect_capability_);
 
-    get_interfaces_client_ = this->create_client<GetInterfaces>(get_interfaces_);
-    get_sem_interf_client_ = this->create_client<GetSemanticInterfaces>(get_semantic_interfaces_);
-    get_providers_client_ = this->create_client<GetProviders>(get_providers_);
-    establish_bond_client_ = this->create_client<EstablishBond>(establish_bond_);
-    use_capability_client_ = this->create_client<UseCapability>(use_capability_);
-    free_capability_client_ = this->create_client<FreeCapability>(free_capability_);
-    trig_capability_client_ = this->create_client<TriggerCapability>(trigger_capability_);
-    connect_capability_client_ = this->create_client<ConnectCapability>(connect_capability_);
+    get_interfaces_client_ = node_->create_client<GetInterfaces>(get_interfaces_);
+    get_sem_interf_client_ = node_->create_client<GetSemanticInterfaces>(get_semantic_interfaces_);
+    get_providers_client_ = node_->create_client<GetProviders>(get_providers_);
+    establish_bond_client_ = node_->create_client<EstablishBond>(establish_bond_);
+    use_capability_client_ = node_->create_client<UseCapability>(use_capability_);
+    free_capability_client_ = node_->create_client<FreeCapability>(free_capability_);
+    trig_capability_client_ = node_->create_client<TriggerCapability>(trigger_capability_);
+    connect_capability_client_ = node_->create_client<ConnectCapability>(connect_capability_);
 
     // Wait for services to become available
-    check_service(!get_interfaces_client_->wait_for_service(std::chrono::seconds(1)), get_interfaces_);
-    check_service(!get_sem_interf_client_->wait_for_service(std::chrono::seconds(1)), get_semantic_interfaces_);
-    check_service(!get_providers_client_->wait_for_service(std::chrono::seconds(1)), get_providers_);
-    check_service(!establish_bond_client_->wait_for_service(std::chrono::seconds(1)), establish_bond_);
-    check_service(!use_capability_client_->wait_for_service(std::chrono::seconds(1)), use_capability_);
-    check_service(!free_capability_client_->wait_for_service(std::chrono::seconds(1)), free_capability_);
-    check_service(!trig_capability_client_->wait_for_service(std::chrono::seconds(1)), trigger_capability_);
-    check_service(!conf_capability_client_->wait_for_service(std::chrono::seconds(1)), configure_capability_);
+    wait_for_service(!get_interfaces_client_->wait_for_service(std::chrono::seconds(1)), get_interfaces_);
+    wait_for_service(!get_sem_interf_client_->wait_for_service(std::chrono::seconds(1)), get_semantic_interfaces_);
+    wait_for_service(!get_providers_client_->wait_for_service(std::chrono::seconds(1)), get_providers_);
+    wait_for_service(!establish_bond_client_->wait_for_service(std::chrono::seconds(1)), establish_bond_);
+    wait_for_service(!use_capability_client_->wait_for_service(std::chrono::seconds(1)), use_capability_);
+    wait_for_service(!free_capability_client_->wait_for_service(std::chrono::seconds(1)), free_capability_);
+    wait_for_service(!trig_capability_client_->wait_for_service(std::chrono::seconds(1)), trigger_capability_);
+    wait_for_service(!connect_capability_client_->wait_for_service(std::chrono::seconds(1)), connect_capability_);
 
     RCLCPP_INFO(node_->get_logger(), "Capability client initialized.");
   }
@@ -217,7 +218,7 @@ public:
    * @param capabilities std::vector of CapabilityInfo for which the provider information will be requested
    *
    */
-  void getProvider(std::vector<CapabilityInfo>& capabilities)
+  void getProviders(std::vector<CapabilityInfo>& capabilities)
   {
     for (auto& capability : capabilities)
     {
@@ -234,8 +235,8 @@ public:
       std::condition_variable cv;
       std::unique_lock<std::mutex> lock(mtx);
 
-      auto result_providers_future = get_providers_client_->async_send_request(
-          request_providers, [this, &capability, &completed, &success, &cv](GetProvidersClient::SharedFuture future) {
+      auto result_providers_future =
+          get_providers_client_->async_send_request(request_providers, [this, &capability, &completed, &cv](GetProvidersClient::SharedFuture future) {
             if (!future.valid())
             {
               throw fabric::fabric_exception("Failed to get Provider information from server");
@@ -284,7 +285,7 @@ public:
 
           auto response = future.get();
           bond_id = response->bond_id;
-          RCLCPP_INFO(node_->get_logger(), "Received the bond id : %s", bond_id_.c_str());
+          RCLCPP_INFO(node_->get_logger(), "Received the bond id : %s", bond_id.c_str());
 
           completed = true;
           cv.notify_all();
@@ -414,7 +415,7 @@ public:
   /**
    * @brief Request connection between capabilities from according to the provided plan
    * @throws fabric::fabric_exception if any connection fails
-   * 
+   *
    * @param plan Fabric plan containing the bond id and connections to be established
    */
   void connect_capabilities(fabric::Plan& plan)
@@ -447,7 +448,7 @@ public:
 
         // send the request
         auto result_future =
-            conf_capability_client_->async_send_request(request, [this, &completed, &cv](ConfigureCapabilityClient::SharedFuture future) {
+            connect_capability_client_->async_send_request(request, [this, &completed, &cv](ConnectCapabilityClient::SharedFuture future) {
               if (!future.valid())
               {
                 throw fabric::fabric_exception("Failed to configure capability connection on STARTED event");
@@ -488,7 +489,7 @@ public:
 
         // send the request
         auto result_future =
-            conf_capability_client_->async_send_request(request, [this, &completed, &cv](ConfigureCapabilityClient::SharedFuture future) {
+            connect_capability_client_->async_send_request(request, [this, &completed, &cv](ConnectCapabilityClient::SharedFuture future) {
               if (!future.valid())
               {
                 throw fabric::fabric_exception("Failed to configure capability connection on STOPPED event");
@@ -529,7 +530,7 @@ public:
 
         // send the request
         auto result_future =
-            conf_capability_client_->async_send_request(request, [this, &completed, &cv](ConfigureCapabilityClient::SharedFuture future) {
+            connect_capability_client_->async_send_request(request, [this, &completed, &cv](ConnectCapabilityClient::SharedFuture future) {
               if (!future.valid())
               {
                 throw fabric::fabric_exception("Failed to configure capability connection on SUCCEEDED event");
@@ -570,7 +571,7 @@ public:
 
         // send the request
         auto result_future =
-            conf_capability_client_->async_send_request(request, [this, &completed, &cv](ConfigureCapabilityClient::SharedFuture future) {
+            connect_capability_client_->async_send_request(request, [this, &completed, &cv](ConnectCapabilityClient::SharedFuture future) {
               if (!future.valid())
               {
                 throw fabric::fabric_exception("Failed to configure capability connection on FAILED event");
@@ -592,7 +593,7 @@ public:
   /**
    * @brief Trigger the first node
    * @throws fabric::fabric_exception if the first capability fails to trigger
-   * 
+   *
    * @param plan Fabric plan containing the bond id and connections to be triggered
    */
   void trigger_first_node(fabric::Plan& plan)
@@ -609,17 +610,18 @@ public:
     request_trigger->parameters = plan.connections[0].source.parameter_to_string();
 
     // send the request
-    auto result_future = trig_capability_client_->async_send_request(request_trigger, [this](TriggerCapabilityClient::SharedFuture future) {
-      if (!future.valid())
-      {
-        throw fabric::fabric_exception("Failed to trigger the first capability.");
-      }
+    auto result_future =
+        trig_capability_client_->async_send_request(request_trigger, [this, &completed, &cv](TriggerCapabilityClient::SharedFuture future) {
+          if (!future.valid())
+          {
+            throw fabric::fabric_exception("Failed to trigger the first capability.");
+          }
 
-      auto response = future.get();
-      completed = true;
-      cv.notify_all();
-      RCLCPP_INFO(node_->get_logger(), "First capability triggered successfully.");
-    });
+          auto response = future.get();
+          completed = true;
+          cv.notify_all();
+          RCLCPP_INFO(node_->get_logger(), "First capability triggered successfully.");
+        });
 
     // wait for the response
     cv.wait(lock, [&completed]() { return completed; });

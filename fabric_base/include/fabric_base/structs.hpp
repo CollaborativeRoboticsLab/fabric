@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 #include <tinyxml2.h>
-#include <fabric_base/xml_helper.hpp>
 
 namespace fabric
 {
@@ -29,15 +28,26 @@ struct node
   std::string provider = "";
   tinyxml2::XMLElement* parameters = nullptr;
 
-  bool exists()
+  bool exists() const
   {
     return (interface != "" && provider != "" && parameters != nullptr);
   }
 
-  std::string parameter_to_string()
+  std::string parameter_to_string() const
   {
     std::string parameter_string;
-    convert_to_string(parameters, parameter_string);
+
+    if (parameters)
+    {
+      tinyxml2::XMLPrinter printer;
+      parameters->Accept(&printer);
+      parameter_string = printer.CStr();
+    }
+    else
+    {
+      parameter_string = "";
+    }
+
     return parameter_string;
   }
 };
@@ -62,7 +72,6 @@ struct Plan
   std::string plan;
   std::map<int, connection> connections;
   std::vector<std::string> rejected_list;
-  bool completed;
 };
 
 struct CapabilityInfo
