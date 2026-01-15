@@ -4,9 +4,9 @@
 #include <vector>
 #include <tinyxml2.h>
 #include <rclcpp/rclcpp.hpp>
-#include <fabric_base/structs.hpp>
-#include <fabric_base/xml_helper.hpp>
-
+#include <fabric_base/utils/structs.hpp>
+#include <fabric_base/utils/xml_helper.hpp>
+#include <fabric_base/utils/exception.hpp>
 
 namespace fabric
 {

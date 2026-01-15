@@ -10,10 +10,10 @@
 #include <rclcpp/rclcpp.hpp>
 #include <pluginlib/class_loader.hpp>
 
-#include <fabric_base/xml_helper.hpp>
+#include <fabric_base/utils/xml_helper.hpp>
+#include <fabric_base/utils/structs.hpp>
 #include <fabric_base/validation_base.hpp>
 #include <fabric_base/parser_base.hpp>
-#include <fabric_base/structs.hpp>
 
 #include <fabric_server/capability_client.hpp>
 #include <fabric_server/bond_client.hpp>

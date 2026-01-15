@@ -5,7 +5,6 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <fabric_base/parser_base.hpp>
-#include <fabric_base/xml_helper.hpp>
 
 namespace fabric
 {
