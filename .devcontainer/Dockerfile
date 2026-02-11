@@ -40,6 +40,8 @@ WORKDIR /home/$USERNAME/colcon_ws/src
 RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2.git -b develop
 # RUN git clone https://github.com/CollaborativeRoboticsLab/prompt_tools.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/event_logger.git
-# RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2_runner_nav2.git
-# RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2_runner_fabric
-# RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2_runner_prompt.git
+# RUN git clone https://github.com/CollaborativeRoboticsLab/perception.git
+# RUN git clone https://github.com/CollaborativeRoboticsLab/nav2_capabilities.git
+# RUN git clone https://github.com/CollaborativeRoboticsLab/fabric_capabilities.git
+# RUN git clone https://github.com/CollaborativeRoboticsLab/prompt_capabilities.git
+# RUN git clone https://github.com/CollaborativeRoboticsLab/perception_capabilities.git

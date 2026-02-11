@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Plan>
     <Control type="sequential">
-        <Runner interface="capabilities2_runner_capabilities/CapabilityGetRunner" provider="capabilities2_runner_capabilities/CapabilityGetRunner"/>
-        <Runner interface="capabilities2_runner_prompt/PromptCapabilityRunner" provider="capabilities2_runner_prompt/PromptCapabilityRunner" />
+        <Runner interface="capabilities2_capabilities/CapabilityGetRunner" provider="capabilities2_capabilities/CapabilityGetRunner"/>
+        <Runner interface="prompt_capabilities/PromptCapabilityRunner" provider="prompt_capabilities/PromptCapabilityRunner" />
     </Control>
 </Plan>
