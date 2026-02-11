@@ -45,3 +45,4 @@ RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2.git -b d
 # RUN git clone https://github.com/CollaborativeRoboticsLab/fabric_capabilities.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/prompt_capabilities.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/perception_capabilities.git
+# RUN git clone https://github.com/CollaborativeRoboticsLab/pytorch_vendor.git
