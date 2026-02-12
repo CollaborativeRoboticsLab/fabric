@@ -6,9 +6,9 @@
 #include <bondcpp/bond.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-#include <fabric_base/structs.hpp>
-#include <fabric_base/exception.hpp>
-#include <fabric_base/xml_helper.hpp>
+#include <fabric_base/utils/structs.hpp>
+#include <fabric_base/utils/exception.hpp>
+#include <fabric_base/utils/xml_helper.hpp>
 
 #include <capabilities2_msgs/srv/establish_bond.hpp>
 #include <capabilities2_msgs/srv/get_interfaces.hpp>
