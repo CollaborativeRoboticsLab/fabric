@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(fabric_parser)
+project(fabric_parser_xml)
 
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
@@ -15,6 +15,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(fabric_base REQUIRED)
+find_package(capabilities2_events REQUIRED)
 find_package(tinyxml2_vendor REQUIRED)
 find_package(TinyXML2 REQUIRED)  # provided by tinyxml2 upstream, or tinyxml2_vendor
 
@@ -31,6 +32,7 @@ ament_target_dependencies(${PROJECT_NAME}
   pluginlib
   TinyXML2
   fabric_base
+  capabilities2_events
 )
 
 pluginlib_export_plugin_description_file(fabric plugins.xml)

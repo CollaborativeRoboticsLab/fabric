@@ -123,22 +123,16 @@ public:
     capability_client_->initialize(this->shared_from_this());
 
     /*************************************************************************
-     * Load default plan from file
+     * Load Starter plan from file
      ************************************************************************/
-    tinyxml2::XMLDocument default_document;
-    tinyxml2::XMLError xml_status = default_document.LoadFile(plan_file_path_.c_str());
-
-    // check if the file loading failed
-    if (xml_status != tinyxml2::XMLError::XML_SUCCESS)
+    fabric::Plan starter_plan;
+    if (!parsing_plugin_->load_file(plan_file_path_, starter_plan))
     {
-      RCLCPP_ERROR(this->get_logger(), "Error loading plan: %s, Error: %s", plan_file_path_.c_str(), default_document.ErrorName());
-      rclcpp::shutdown();
+      RCLCPP_ERROR(this->get_logger(), "Failed to load default plan from file: %s", plan_file_path_.c_str());
+      throw fabric::fabric_exception("Failed to load default plan");
     }
-    RCLCPP_INFO(this->get_logger(), "Plan loaded from : %s", plan_file_path_.c_str());
 
-    fabric::Plan default_plan;
-    convert_to_string(default_document, default_plan.plan);
-    plan_queue_.push_back(default_plan);
+    plan_queue_.push_back(starter_plan);
 
     RCLCPP_INFO(this->get_logger(), "Fabric node initialized");
 
@@ -166,7 +160,6 @@ protected:
       // get the next plan and parse it into a XML document
       current_plan_ = plan_queue_.front();
       plan_queue_.pop_front();
-      current_document_.Parse(current_plan_.plan.c_str());
 
       // parse the plan to extract connections (Fabric::Plan) as per the parsing plugin
       try
@@ -174,7 +167,7 @@ protected:
         RCLCPP_INFO(this->get_logger(), "Parsing the fabric plan.");
         current_plan_.status = PlanStatus::PARSING;
 
-        parsing_plugin_->parse(current_document_, current_plan_);
+        parsing_plugin_->parse(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
@@ -316,26 +309,21 @@ protected:
   {
     RCLCPP_INFO(this->get_logger(), "Received the request with a plan");
 
-    // XML Document to check the validity of the plan
-    tinyxml2::XMLDocument documentChecking;
-
-    // try to parse the std::string plan from fabric_msgs/Plan to the to a XMLDocument file
-    tinyxml2::XMLError xml_status = documentChecking.Parse(request->plan.c_str());
-
-    // check if the file parsing failed
-    if (xml_status != tinyxml2::XMLError::XML_SUCCESS)
-    {
-      RCLCPP_INFO(this->get_logger(), "Parsing the plan from service request message failed with error: %s", documentChecking.ErrorName());
-      response->plan_id = "";
-    }
-    RCLCPP_INFO(this->get_logger(), "Plan accepted from service request message");
-
     fabric::Plan new_plan;
     new_plan.plan = request->plan;
     new_plan.plan_id = generate_uuid();
     new_plan.status = PlanStatus::QUEUED;
-    plan_queue_.push_back(new_plan);
 
+    if (!parsing_plugin_->check_compatibility(new_plan))
+    {
+      RCLCPP_ERROR(this->get_logger(), "Plan received via service request not compatible with the loaded parser.");
+      response->plan_id = "";
+      response->error = "Plan is not compatible with the loaded parser.";
+      return;
+    }
+    RCLCPP_INFO(this->get_logger(), "Plan accepted from service request message");
+
+    plan_queue_.push_back(new_plan);
     response->plan_id = new_plan.plan_id;
   }
 
@@ -519,8 +507,6 @@ protected:
   void reset()
   {
     current_plan_ = fabric::Plan();
-    current_document_.Clear();
-    current_plan_element_ = nullptr;
     capability_list_.clear();
     bond_id_.clear();
   }
@@ -530,12 +516,6 @@ protected:
 
   /** Current plan being processed */
   fabric::Plan current_plan_;
-
-  /** XML Document to hold the current plan */
-  tinyxml2::XMLDocument current_document_;
-
-  /** XML Element to hold the current plan */
-  tinyxml2::XMLElement* current_plan_element_;
 
   /** Current plan related synchronization */
   bool plan_completed_;

@@ -5,7 +5,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <fabric_base/parser_base.hpp>
-#include <fabric_base/xml_helper.hpp>
+#include <capabilities2_events/event_parameters.hpp>
 
 namespace fabric
 {
@@ -34,31 +34,82 @@ public:
   }
 
   /**
+   * @brief load a file into an XML document
+   *
+   * @param document The path to the XML file to be loaded
+   * @return true if the file was loaded successfully, false otherwise
+   */
+  bool load_file(const std::string& file_path, fabric::Plan& plan) override
+  {
+    tinyxml2::XMLError xml_status = default_document.LoadFile(file_path.c_str());
+
+    // check if the file loading failed
+    if (xml_status != tinyxml2::XMLError::XML_SUCCESS)
+    {
+      RCLCPP_ERROR(node_->get_logger(), "Error loading plan: %s, Error: %s", file_path.c_str(), default_document.ErrorName());
+      return false;
+    }
+
+    RCLCPP_INFO(node_->get_logger(), "Plan loaded from : %s", file_path.c_str());
+
+    convert_to_string(default_document, plan.plan);
+    RCLCPP_INFO(node_->get_logger(), "Plan converted to string. Content are: \n\n %s", plan.plan.c_str());
+
+    return true;
+  }
+
+  /**
+   * @brief Check the compatibility of the given plan with the given parser.
+   *
+   * @param plan The plan to check for compatibility.
+   * @return true if the plan is compatible, false otherwise.
+   */
+  bool check_compatibility(const fabric::Plan& plan) override
+  {
+    // XML Document to check the validity of the plan
+    tinyxml2::XMLDocument documentChecking;
+
+    // try to parse the std::string plan from fabric_msgs/Plan to the to a XMLDocument file
+    tinyxml2::XMLError xml_status = documentChecking.Parse(plan.plan.c_str());
+
+    // check if the file parsing failed
+    if (xml_status != tinyxml2::XMLError::XML_SUCCESS)
+    {
+      RCLCPP_ERROR(node_->get_logger(), "Parsing the plan from service request message failed with error: %s", documentChecking.ErrorName());
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * @brief Parse the given XML plan.
    *
    * @param document The XMLDocument representing the plan.
    * @param plan The parsed plan.
    */
-  void parse(tinyxml2::XMLDocument& document, fabric::Plan& plan) override
+  void parse(fabric::Plan& plan) override
   {
+    // parse the fabric::plan into a XML document
+    current_document_.Parse(plan.plan.c_str());
+
     // Add a completion runner to the plan
     RCLCPP_INFO(node_->get_logger(), "Adding completion runner to the plan");
-    add_completion_runner(document);
+    add_completion_runner(current_document_);
 
     // Debug: print the modified plan
     std::string modified_plan;
-    convert_to_string(document, modified_plan);
+    convert_to_string(current_document_, modified_plan);
     RCLCPP_DEBUG(node_->get_logger(), "Plan after adding closing event :\n\n %s", modified_plan.c_str());
 
     RCLCPP_INFO(node_->get_logger(), "Completion runner added successfully. Extracting the plan element.");
 
     // extract the plan element
-    plan_ = extract_plan(document);
+    plan_ = extract_plan(current_document_);
 
     if (plan_ == nullptr)
-    {
       throw fabric::fabric_exception("No <Plan> element found.");
-    }
+
     RCLCPP_INFO(node_->get_logger(), "<Plan> element extracted successfully. Checking required attributes availability.");
 
     // check the syntax of the plan to make sure it contains valid XML elements and required attributes
@@ -75,10 +126,172 @@ public:
 
     // extract connections from the plan
     extract_connections(plan_, plan);
+
     RCLCPP_INFO(node_->get_logger(), "Finished parsing the plan");
   }
 
 protected:
+  /**
+   * @brief convert XMLDocument to std::string
+   *
+   * @param document element to be converted
+   *
+   * @return std::string converted document
+   */
+  void convert_to_string(tinyxml2::XMLDocument& document_xml, std::string& document_string)
+  {
+    tinyxml2::XMLPrinter printer;
+    document_xml.Print(&printer);
+    document_string = printer.CStr();
+  }
+
+  /**
+   * @brief search a string in a vector of strings
+   *
+   * @param list vector of strings to be searched
+   * @param value string to be searched in the vector
+   *
+   * @return `true` if value is found in list and `false` otherwise
+   */
+  bool search(std::vector<std::string> list, std::string value)
+  {
+    return (std::find(list.begin(), list.end(), value) != list.end());
+  }
+
+  /**
+   * @brief Extract the <Plan> element from the XML document
+   *
+   * This function checks if the root element of the provided XML document is <Plan>.
+   * If so, it returns the first child element of <Plan>. Otherwise, it indicates failure.
+   *
+   * @param document The XMLDocument to extract the plan from
+   * @return tinyxml2::XMLElement* Pointer to the first child of <Plan> if successful, nullptr otherwise
+   */
+  tinyxml2::XMLElement* extract_plan(tinyxml2::XMLDocument& document)
+  {
+    std::string plan_tag(document.FirstChildElement()->Name());
+
+    if (plan_tag == "Plan")
+      return document.FirstChildElement("Plan")->FirstChildElement();
+    else
+      return nullptr;
+  }
+
+  /**
+   * @brief convert XMLElement to std::string
+   *
+   * @param element XMLElement element to be converted
+   * @param paramters parameter to hold std::string
+   *
+   * @return `true` if element is not nullptr and conversion successful, `false` if element is nullptr
+   */
+  inline bool convert_to_string(tinyxml2::XMLElement* element, std::string& parameters)
+  {
+    if (element)
+    {
+      tinyxml2::XMLPrinter printer;
+      element->Accept(&printer);
+      parameters = printer.CStr();
+      return true;
+    }
+    else
+    {
+      parameters = "";
+      return false;
+    }
+  }
+
+  /**
+   * @brief check the plan to make sure all control and runner XML elements are valid with
+   * minimal required attributes. The function uses recursive approach to go through the xml plan
+   *
+   * @param element XML Element to be evaluated
+   * @param control_list list of valid control tags
+   * @param rejected list containing invalid tags
+   * @param error output string for error messages
+   *
+   * @return `true` if element valid and supported and `false` otherwise
+   */
+  bool check_syntax(tinyxml2::XMLElement* element, std::vector<std::string>& control_list, std::vector<std::string>& rejected, std::string& error)
+  {
+    const char* type = nullptr;
+    const char* interface = nullptr;
+    const char* provider = nullptr;
+
+    std::string elementTag(element->Name());
+
+    std::string parameter_string;
+    convert_to_string(element, parameter_string);
+
+    bool returnValue = true;
+
+    std::string typetag = "";
+    std::string interfacetag = "";
+    std::string providertag = "";
+
+    bool hasChildren = !element->NoChildren();
+    bool hasSiblings = (element->NextSiblingElement() != nullptr);
+
+    if (elementTag == "Control")
+    {
+      element->QueryStringAttribute("type", &type);
+
+      if (type)
+      {
+        typetag = type;
+
+        if (!search(control_list, typetag))
+        {
+          error = "Control tag '" + typetag + "' not available in the valid list";
+          rejected.push_back(parameter_string);
+          return false;
+        }
+      }
+      else
+      {
+        error = "Control tag missing 'type' attribute: " + parameter_string;
+        rejected.push_back(parameter_string);
+        return false;
+      }
+
+      if (hasChildren)
+        returnValue &= check_syntax(element->FirstChildElement(), control_list, rejected, error);
+
+      if (hasSiblings)
+        returnValue &= check_syntax(element->NextSiblingElement(), control_list, rejected, error);
+    }
+    else if (elementTag == "Runner")
+    {
+      element->QueryStringAttribute("interface", &interface);
+      element->QueryStringAttribute("provider", &provider);
+
+      if (not interface)
+      {
+        error = "Runner tag missing 'interface' attribute: " + parameter_string;
+        rejected.push_back(parameter_string);
+        return false;
+      }
+
+      if (not provider)
+      {
+        error = "Runner tag missing 'provider' attribute: " + parameter_string;
+        rejected.push_back(parameter_string);
+        return false;
+      }
+
+      if (hasSiblings)
+        returnValue &= check_syntax(element->NextSiblingElement(), control_list, rejected, error);
+    }
+    else
+    {
+      error = "XML element is not valid :" + parameter_string;
+      rejected.push_back(parameter_string);
+      return false;
+    }
+
+    return returnValue;
+  }
+
   /**
    * @brief add a completion runner to the plan
    * This function adds a new <Control> element with type "sequential" and a <Runner> element for the completion runner
@@ -105,34 +318,9 @@ protected:
 
     // Create and append the new <Runner> element
     tinyxml2::XMLElement* newRunner = document.NewElement("Runner");
-    newRunner->SetAttribute("interface", "capabilities2_runner_fabric/FabricCompletionRunner");
-    newRunner->SetAttribute("provider", "capabilities2_runner_fabric/FabricCompletionRunner");
+    newRunner->SetAttribute("interface", "fabric_capabilities/FabricCompletionRunner");
+    newRunner->SetAttribute("provider", "fabric_capabilities/FabricCompletionRunner");
     outerControl->InsertEndChild(newRunner);
-  }
-
-  /**
-   * @brief Build a system runner document
-   *
-   * This function initializes the system XML document and adds a <Runner> element with the specified attributes.
-   *
-   * @param interface The interface of the runner
-   * @param provider The provider of the runner
-   * @param input_count The number of inputs for the runner
-   * @param id The ID of the runner
-   */
-  tinyxml2::XMLElement* system_runner_xml(const std::string& interface, const std::string& provider, int input_count = 0, int id = 0)
-  {
-    // Create the <Runner .../> element
-    tinyxml2::XMLElement* runner = system_doc.NewElement("Runner");
-    runner->SetAttribute("interface", interface.c_str());
-    runner->SetAttribute("provider", provider.c_str());
-    runner->SetAttribute("input_count", input_count);
-    runner->SetAttribute("id", id);
-
-    system_doc.InsertEndChild(runner);
-
-    // Return the created <Runner> element
-    return runner;
   }
 
   /**
@@ -147,18 +335,18 @@ protected:
   {
     int input_count = 0;
 
-    // check for parallel connections without success connections to identify number of connections
+    // Since we are adding a parallel all connection, we need to identify the number of parallel runners
+    // that need to be multiplexed, which is equivalent to the number of success connections without a
+    // target on_success interface in the current plan
     for (const auto& connection : plan.connections)
-    {
       if (connection.second.on_success.interface == "")
         input_count += 1;
-    }
 
     fabric::connection node;
-
-    node.source.interface = "capabilities2_runner_system/InputMultiplexAllRunner";
-    node.source.provider = "capabilities2_runner_system/InputMultiplexAllRunner";
-    node.source.parameters = this->system_runner_xml(node.source.interface, node.source.provider, input_count, runner_index);
+    node.source.interface = "capabilities2_runner/InputMultiplexRunner";
+    node.source.provider = "capabilities2_runner/InputMultiplexRunner";
+    node.source.parameters.set_value("input_count", input_count, capabilities2_events::OptionType::INT);
+    node.source.parameters.set_value("id", runner_index, capabilities2_events::OptionType::INT);
 
     plan.connections[connection_id] = node;
     plan.connections[connection_id].description = description;
@@ -186,18 +374,16 @@ protected:
    */
   int add_parallel_any(fabric::Plan& plan, int connection_id = 0, std::string description = "")
   {
-    int input_count = 0;
+    // Since we are adding a parallel_any connection, we only need to wait for a single success
+    // trigger to succeed, so we can set the input count to 1 for the multiplex runner
+    int input_count = 1;
 
-    // check for parallel connections without success connections to identify number of connections
-    for (const auto& connection : plan.connections)
-      if (connection.second.on_success.interface == "")
-        input_count += 1;
-
+    // create a system runner for parallel any with the identified number of inputs
     fabric::connection node;
-
-    node.source.interface = "capabilities2_runner_system/InputMultiplexAnyRunner";
-    node.source.provider = "capabilities2_runner_system/InputMultiplexAnyRunner";
-    node.source.parameters = this->system_runner_xml(node.source.interface, node.source.provider, input_count, runner_index);
+    node.source.interface = "capabilities2_runner/InputMultiplexRunner";
+    node.source.provider = "capabilities2_runner/InputMultiplexRunner";
+    node.source.parameters.set_value("input_count", input_count, capabilities2_events::OptionType::INT);
+    node.source.parameters.set_value("id", runner_index, capabilities2_events::OptionType::INT);
 
     plan.connections[connection_id] = node;
     plan.connections[connection_id].description = description;
@@ -227,20 +413,72 @@ protected:
   void check_and_update_runner_id(fabric::connection& predecessor, fabric::connection& successor)
   {
     // check if predecessor is a system runner and has parameters
-    if (predecessor.source.interface.find("capabilities2_runner_system/InputMultiplexAnyRunner") != std::string::npos ||
-        predecessor.source.interface.find("capabilities2_runner_system/InputMultiplexAllRunner") != std::string::npos)
+    if (predecessor.source.interface.find("capabilities2_runner/InputMultiplexRunner") != std::string::npos)
     {
       // If the predecessor is a system runner, we need to update the successor's parameters with the predecessor's id
-      if (predecessor.source.parameters)
+      if (predecessor.source.parameters.has_value("id"))
       {
         // Get the id attribute from the predecessor system runner
-        const char* id = nullptr;
-        id = predecessor.source.parameters->Attribute("id");
+        int id = 0;
+        id = std::any_cast<int>(predecessor.source.parameters.get_value("id"));
 
         // Set the id attribute for the successor system runner
-        successor.source.parameters->SetAttribute("id", id);
+        successor.source.parameters.set_value("id", id, capabilities2_events::OptionType::INT);
       }
     }
+  }
+
+  /**
+   * @brief convert tinyxml2::XMLElement attributes to EventParameters
+   *
+   * @param element tinyxml2::XMLElement element to be converted
+   *
+   * @return capabilities2_events::EventParameters converted parameters
+   */
+  capabilities2_events::EventParameters convert_xml_to_event_parameters(tinyxml2::XMLElement* element)
+  {
+    capabilities2_events::EventParameters parameters;
+
+    // Iterate through the attributes of the XML element and add them to the EventParameters
+    const tinyxml2::XMLAttribute* attr = element->FirstAttribute();
+
+    while (attr)
+    {
+      // key will always be a string.
+      const char* key = attr->Name();
+
+      // value can be a string, int, double or bool. We will try to convert it to the appropriate type.
+      // Use query to test the type of the attribute value and add it to the EventParameters
+      int int_value;
+      double double_value;
+      bool bool_value;
+      const char* string_value;
+
+      if (element->QueryIntAttribute(key, &int_value) == tinyxml2::XML_SUCCESS)
+      {
+        // If the attribute value can be converted to an int, add it to the EventParameters
+        parameters.set_value(std::string(key), int_value, capabilities2_events::OptionType::INT);
+      }
+      else if (element->QueryDoubleAttribute(key, &double_value) == tinyxml2::XML_SUCCESS)
+      {
+        // If the attribute value can be converted to a double, add it to the EventParameters
+        parameters.set_value(std::string(key), double_value, capabilities2_events::OptionType::DOUBLE);
+      }
+      else if (element->QueryBoolAttribute(key, &bool_value) == tinyxml2::XML_SUCCESS)
+      {
+        // If the attribute value can be converted to a bool, add it to the EventParameters
+        parameters.set_value(std::string(key), bool_value, capabilities2_events::OptionType::BOOL);
+      }
+      else if (element->QueryStringAttribute(key, &string_value) == tinyxml2::XML_SUCCESS)
+      {
+        // If the attribute value can be converted to a string, add it to the EventParameters
+        parameters.set_value(std::string(key), std::string(string_value), capabilities2_events::OptionType::STRING);
+      }
+
+      attr = attr->Next();
+    }
+
+    return parameters;
   }
 
   /**
@@ -346,10 +584,10 @@ protected:
 
       connection.source.interface = interfacetag;
       connection.source.provider = providertag;
-      connection.source.parameters = element;
+      connection.source.parameters = convert_xml_to_event_parameters(element);
 
       // set runner id unique identifier
-      connection.source.parameters->SetAttribute("id", runner_index);
+      connection.source.parameters.set_value("id", runner_index, capabilities2_events::OptionType::INT);
 
       predecessor_id = connection_id - 1;
 
@@ -414,5 +652,15 @@ protected:
    * @brief Pointer to the plan element in the XML document
    */
   tinyxml2::XMLElement* plan_ = nullptr;
+
+  /**
+   * @brief Default XML document for loading from file
+   */
+  tinyxml2::XMLDocument default_document;
+
+  /**
+   * @brief XML Document to hold the current plan
+   */
+  tinyxml2::XMLDocument current_document_;
 };
 }  // namespace fabric

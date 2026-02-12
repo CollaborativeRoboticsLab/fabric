@@ -13,8 +13,7 @@ find_package(pluginlib REQUIRED)
 find_package(fabric_msgs REQUIRED)
 find_package(fabric_base REQUIRED)
 find_package(capabilities2_msgs REQUIRED)
-find_package(tinyxml2_vendor REQUIRED)
-find_package(TinyXML2 REQUIRED)  # provided by tinyxml2 upstream, or tinyxml2_vendor
+find_package(capabilities2_events REQUIRED)
 find_package(bondcpp REQUIRED)
 
 find_package(PkgConfig)
@@ -40,7 +39,7 @@ ament_target_dependencies(${PROJECT_NAME}
   fabric_msgs
   fabric_base
   capabilities2_msgs
-  TinyXML2
+  capabilities2_events
   UUID
 )
 
@@ -65,7 +64,7 @@ ament_target_dependencies(${PROJECT_NAME}_comp
   fabric_msgs
   fabric_base
   capabilities2_msgs
-  TinyXML2
+  capabilities2_events
   UUID
 )
 

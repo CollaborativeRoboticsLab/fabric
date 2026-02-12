@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>fabric_behavioural_kg</name>
+  <name>fabric_parser_xml</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="kalanaratnayake95@gmail.com">ubuntu</maintainer>
@@ -11,7 +11,9 @@
 
   <depend>rclcpp</depend>
   <depend>pluginlib</depend>
-  <depend>fabric_msgs</depend>
+  <depend>fabric_base</depend>
+  <depend>capabilities2_events</depend>
+  <depend>tinyxml2_vendor</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

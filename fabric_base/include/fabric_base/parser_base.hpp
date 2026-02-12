@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 #include <vector>
-#include <tinyxml2.h>
 #include <rclcpp/rclcpp.hpp>
 #include <fabric_base/structs.hpp>
 #include <fabric_base/xml_helper.hpp>
@@ -12,7 +11,7 @@ namespace fabric
 /**
  * @brief Abstract base class for XML plan parsing plugins.
  *
- * Implementations should provide a parse() method that extracts information from the XML 
+ * Implementations should provide a parse() method that extracts information from the XML
  * plan and return a fabric::Plan object.
  */
 class ParserBase
@@ -32,12 +31,28 @@ public:
   }
 
   /**
+   * @brief load a file into an XML document
+   *
+   * @param document The path to the XML file to be loaded
+   * @return true if the file was loaded successfully, false otherwise
+   */
+  virtual bool load_file(const std::string& file_path, fabric::Plan& plan) = 0;
+
+  /**
    * @brief Parse the given XML plan.
    *
    * @param document The XMLDocument representing the plan.
    * @param plan The parsed plan.
    */
-  virtual void parse(tinyxml2::XMLDocument& document, fabric::Plan& plan) = 0;
+  virtual void parse(fabric::Plan& plan) = 0;
+
+  /**
+   * @brief Check the compatibility of the given plan with the given parser.
+   *
+   * @param plan The plan to check for compatibility.
+   * @return true if the plan is compatible, false otherwise.
+   */
+  virtual bool check_compatibility(const fabric::Plan& plan) = 0;
 
 protected:
   /**

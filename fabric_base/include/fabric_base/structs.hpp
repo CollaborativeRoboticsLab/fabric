@@ -3,7 +3,7 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <tinyxml2.h>
+#include <capabilities2_events/event_parameters.hpp>
 
 namespace fabric
 {
@@ -26,29 +26,11 @@ struct node
 {
   std::string interface = "";
   std::string provider = "";
-  tinyxml2::XMLElement* parameters = nullptr;
+  capabilities2_events::EventParameters parameters;
 
   bool exists() const
   {
-    return (interface != "" && provider != "" && parameters != nullptr);
-  }
-
-  std::string parameter_to_string() const
-  {
-    std::string parameter_string;
-
-    if (parameters)
-    {
-      tinyxml2::XMLPrinter printer;
-      parameters->Accept(&printer);
-      parameter_string = printer.CStr();
-    }
-    else
-    {
-      parameter_string = "";
-    }
-
-    return parameter_string;
+    return (interface != "" && provider != "" && !parameters.is_empty());
   }
 };
 
@@ -101,11 +83,5 @@ struct CapabilityInfo
   bool is_semantic;
   std::vector<std::string> alt_providers;
 };
-
-struct Capability
-{
-  /* data */
-};
-
 
 }  // namespace fabric

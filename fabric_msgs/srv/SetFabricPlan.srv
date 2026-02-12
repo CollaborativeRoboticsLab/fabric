@@ -6,3 +6,6 @@ std_msgs/Header header
 # if plan_id is set it mean plan got accepted. 
 # if empty (""), it got rejected.
 string plan_id
+
+# error description for rejection
+string error
