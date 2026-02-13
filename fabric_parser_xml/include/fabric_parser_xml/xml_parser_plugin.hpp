@@ -429,9 +429,10 @@ protected:
   }
 
   /**
-   * @brief convert tinyxml2::XMLElement attributes to EventParameters
+   * @brief convert tinyxml2::XMLElement attributes to EventParameters. Treats the original attributes as string 
+   * and let the runners that they are related to handle the conversion from string to correct data type
    *
-   * @param element tinyxml2::XMLElement element to be converted
+   * @param element tinyxml2::XMLElement element to be converted.
    *
    * @return capabilities2_events::EventParameters converted parameters
    */
@@ -446,34 +447,11 @@ protected:
     {
       // key will always be a string.
       const char* key = attr->Name();
+      const char* value = attr->Value();
 
-      // value can be a string, int, double or bool. We will try to convert it to the appropriate type.
-      // Use query to test the type of the attribute value and add it to the EventParameters
-      int int_value;
-      double double_value;
-      bool bool_value;
-      const char* string_value;
-
-      if (element->QueryIntAttribute(key, &int_value) == tinyxml2::XML_SUCCESS)
-      {
-        // If the attribute value can be converted to an int, add it to the EventParameters
-        parameters.set_value(std::string(key), int_value, capabilities2_events::OptionType::INT);
-      }
-      else if (element->QueryDoubleAttribute(key, &double_value) == tinyxml2::XML_SUCCESS)
-      {
-        // If the attribute value can be converted to a double, add it to the EventParameters
-        parameters.set_value(std::string(key), double_value, capabilities2_events::OptionType::DOUBLE);
-      }
-      else if (element->QueryBoolAttribute(key, &bool_value) == tinyxml2::XML_SUCCESS)
-      {
-        // If the attribute value can be converted to a bool, add it to the EventParameters
-        parameters.set_value(std::string(key), bool_value, capabilities2_events::OptionType::BOOL);
-      }
-      else if (element->QueryStringAttribute(key, &string_value) == tinyxml2::XML_SUCCESS)
-      {
-        // If the attribute value can be converted to a string, add it to the EventParameters
-        parameters.set_value(std::string(key), std::string(string_value), capabilities2_events::OptionType::STRING);
-      }
+      // treat the original attributes as string and let the runners that they are related to handle the conversion from
+      // string to correct data type
+      parameters.set_value(std::string(key), std::string(value), capabilities2_events::OptionType::STRING);
 
       attr = attr->Next();
     }
