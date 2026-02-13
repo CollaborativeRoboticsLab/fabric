@@ -25,7 +25,7 @@ Currently the system support 4 types of Control fuctions
 - [Internal Data Structures](./docs/structs.md)
 - [ROS2 Interface](./docs/api.md)
 - [Fabric Status system](./docs/status.md)
-- [Examples and Testing](./docs/examples.md)
+- [Examples and Testing](./fabric//docs/examples.md)
 
 ## Setting the Fabric
 
