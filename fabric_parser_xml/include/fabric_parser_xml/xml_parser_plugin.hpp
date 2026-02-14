@@ -419,8 +419,7 @@ protected:
       if (predecessor.source.parameters.has_value("id"))
       {
         // Get the id attribute from the predecessor system runner
-        int id = 0;
-        id = std::any_cast<int>(predecessor.source.parameters.get_value("id"));
+        int id = std::any_cast<int>(predecessor.source.parameters.get_value("id", 0, capabilities2_events::OptionType::INT));
 
         // Set the id attribute for the successor system runner
         successor.source.parameters.set_value("id", id, capabilities2_events::OptionType::INT);
@@ -451,7 +450,7 @@ protected:
 
       // treat the original attributes as string and let the runners that they are related to handle the conversion from
       // string to correct data type
-      parameters.set_value(std::string(key), std::string(value), capabilities2_events::OptionType::STRING);
+      parameters.set_value(std::string(key), std::string(value), capabilities2_events::OptionType::UNCONVERTED);
 
       attr = attr->Next();
     }
