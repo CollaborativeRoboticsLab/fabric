@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Plan>
     <Control type="sequential" >
-        <Runner interface="capabilities2_runner_capabilities/CapabilityGetRunner" provider="capabilities2_runner_capabilities/CapabilityGetRunner"/>
-        <Runner interface="capabilities2_runner_prompt/PromptCapabilityRunner" provider="capabilities2_runner_prompt/PromptCapabilityRunner" />
-        <Runner interface="capabilities2_runner_nav2/OccupancyGridRunner" provider="capabilities2_runner_nav2/OccupancyGridRunner"/>
-        <Runner interface="capabilities2_runner_prompt/PromptOccupancyRunner" provider="capabilities2_runner_prompt/PromptOccupancyRunner" />
-        <Runner interface="capabilities2_runner_nav2/RobotPoseRunner" provider="capabilities2_runner_nav2/RobotPoseRunner" map="map" odom="odom" robot="base_link"/>
-        <Runner interface="capabilities2_runner_prompt/PromptPoseRunner" provider="capabilities2_runner_prompt/PromptPoseRunner" />
-        <Runner interface="capabilities2_runner_prompt/PromptPlanRunner" provider="capabilities2_runner_prompt/PromptPlanRunner" replan="false" task="move to (2.0, -0.5) position" />
-        <Runner interface="capabilities2_runner_fabric/FabricSetPlanRunner" provider="capabilities2_runner_fabric/FabricSetPlanRunner"/>
+        <Runner interface="capabilities2_runner/GetCapabilitySpecsRunner" provider="capabilities2_runner/GetCapabilitySpecsRunner"/>
+        <Runner interface="prompt_capabilities/PromptCapabilityRunner" provider="prompt_capabilities/PromptCapabilityRunner" />
+        <Runner interface="nav2_capabilities/RobotPoseRunner" provider="nav2_capabilities/RobotPoseRunner" map="map" odom="odom" robot="base_link"/>
+        <Runner interface="prompt_capabilities/PromptPoseRunner" provider="prompt_capabilities/PromptPoseRunner" />
+        <Runner interface="prompt_capabilities/PromptPlanRunner" provider="prompt_capabilities/PromptPlanRunner" replan="false" task="move to (2.0, -0.5) position" />
+        <Runner interface="fabric_capabilities/FabricSetPlanRunner" provider="fabric_capabilities/FabricSetPlanRunner"/>
     </Control>
 </Plan>

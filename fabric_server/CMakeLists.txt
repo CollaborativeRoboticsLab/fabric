@@ -90,4 +90,5 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
+ament_export_libraries(${PROJECT_NAME}_comp)
 ament_package()

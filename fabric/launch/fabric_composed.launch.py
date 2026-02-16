@@ -29,16 +29,9 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', 'info'],
         composable_node_descriptions=[
             ComposableNode(
-                package='fabric',
+                package='fabric_server',
                 plugin='Fabric',
-                name='fabric',
-                output='screen'
-            ),
-            ComposableNode(
-                package='fabric',
-                plugin='FabricClient',
-                name='fabric_client',
-                parameters=[fabric_config],
+                name='fabric_server',
                 output='screen'
             )
         ]

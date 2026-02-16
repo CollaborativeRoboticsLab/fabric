@@ -1,4 +1,4 @@
-fabric_client:
+/**:
   ros__parameters:
     # plan_file_path: "install/fabric/share/fabric/plans/default.xml"
     plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_1.xml"   # 1 point navigation example
@@ -14,4 +14,7 @@ fabric_client:
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_3.xml"   # PromptPoseRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_4.xml"   # PromptPlanRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_5.xml"   # PromptPlanRunner Example
+
+    compatibility_validation_plugin: fabric::CompatibilityValidation
+    parsing_plugin : fabric::XMLParser
 

@@ -18,23 +18,14 @@ def generate_launch_description():
     fabric_config = os.path.join(get_package_share_directory('fabric'), 'config', 'fabric.yaml')
 
     fabric = Node(
-            package='fabric',
+            package='fabric_server',
             namespace='',
-            executable='fabric',
-            name='fabric',
-            output='screen'
+            executable='fabric_server',
+            name='fabric_server',
+            output='screen',
+            parameters=[fabric_config]
         )
     
-    fabric_client = Node(
-            package='fabric',
-            namespace='',
-            executable='fabric_client',
-            name='fabric_client',
-            parameters=[fabric_config],
-            output='screen'
-        )
-
     return LaunchDescription([
-        fabric,
-        fabric_client
+        fabric
     ])

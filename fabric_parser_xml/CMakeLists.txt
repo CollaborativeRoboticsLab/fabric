@@ -23,7 +23,7 @@ include_directories(
   include
 )
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/parser.cpp
 )
 
@@ -35,10 +35,11 @@ ament_target_dependencies(${PROJECT_NAME}
   capabilities2_events
 )
 
-pluginlib_export_plugin_description_file(fabric plugins.xml)
+pluginlib_export_plugin_description_file(fabric_base plugins.xml)
 
 
 install(TARGETS ${PROJECT_NAME}
+  EXPORT ${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin

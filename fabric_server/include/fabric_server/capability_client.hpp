@@ -103,7 +103,7 @@ public:
     wait_for_service(!trig_capability_client_->wait_for_service(std::chrono::seconds(1)), trigger_capability_);
     wait_for_service(!connect_capability_client_->wait_for_service(std::chrono::seconds(1)), connect_capability_);
 
-    RCLCPP_INFO(node_->get_logger(), "Capability client initialized.");
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] initialized.");
   }
 
   /**
@@ -115,7 +115,7 @@ public:
    */
   void getInterfaces(std::vector<CapabilityInfo>& capabilities)
   {
-    RCLCPP_INFO(node_->get_logger(), "Requesting Interface information");
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting Interface information");
 
     auto request_interface = std::make_shared<GetInterfaces::Request>();
 
@@ -151,7 +151,7 @@ public:
     // wait for the response
     cv.wait(lock, [&completed]() { return completed; });
 
-    RCLCPP_INFO(node_->get_logger(), "Received Interface information for %d interfaces from server", static_cast<int>(capabilities.size()));
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] received %d interfaces from server", static_cast<int>(capabilities.size()));
   }
 
   /**
@@ -168,7 +168,7 @@ public:
 
     for (auto& capability : capabilities)
     {
-      RCLCPP_INFO(node_->get_logger(), "Checking if interface %s has semantic interfaces", capability.interface.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] checking %s for semantic interfaces", capability.interface.c_str());
 
       auto request_semantic = std::make_shared<GetSemanticInterfaces::Request>();
       request_semantic->interface = capability.interface;
@@ -196,7 +196,7 @@ public:
               info.is_semantic = true;
 
               new_capabilities.push_back(info);
-              RCLCPP_INFO(node_->get_logger(), "  Semantic interface: %s added", interface.c_str());
+              RCLCPP_INFO(node_->get_logger(), "[Capability client]  Semantic interface: %s added", interface.c_str());
             }
 
             completed = true;
@@ -222,7 +222,7 @@ public:
   {
     for (auto& capability : capabilities)
     {
-      RCLCPP_INFO(node_->get_logger(), "Requesting provider for %s", capability.interface.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting provider for %s", capability.interface.c_str());
 
       auto request_providers = std::make_shared<GetProviders::Request>();
 
@@ -252,7 +252,7 @@ public:
       // wait for the response
       cv.wait(lock, [&completed]() { return completed; });
 
-      RCLCPP_INFO(node_->get_logger(), "Received provider information for %s: default provider: %s, number of alternative providers: %d",
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] received for %s, default provider: %s, number of alternative providers: %d",
                   capability.interface.c_str(), capability.provider.c_str(), static_cast<int>(capability.alt_providers.size()));
     }
   }
@@ -264,7 +264,7 @@ public:
    */
   std::string request_bond()
   {
-    RCLCPP_INFO(node_->get_logger(), "Requesting bond id");
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting bond id");
 
     // create bond establishing server request
     auto request_bond = std::make_shared<EstablishBond::Request>();
@@ -285,7 +285,7 @@ public:
 
           auto response = future.get();
           bond_id = response->bond_id;
-          RCLCPP_INFO(node_->get_logger(), "Received the bond id : %s", bond_id.c_str());
+          RCLCPP_INFO(node_->get_logger(), "[Capability client] received bond id : %s", bond_id.c_str());
 
           completed = true;
           cv.notify_all();
@@ -317,7 +317,7 @@ public:
       request_use->preferred_provider = connection.source.provider;
       request_use->bond_id = plan.bond_id;
 
-      RCLCPP_INFO(node_->get_logger(), "Starting capability %d : %s", index, connection.source.interface.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] starting capability %d : %s", index, connection.source.interface.c_str());
 
       bool completed = false;
       std::mutex mtx;
@@ -338,7 +338,7 @@ public:
       // wait for the response
       cv.wait(lock, [&completed]() { return completed; });
 
-      RCLCPP_INFO(node_->get_logger(), "Capability %s started successfully.", connection.source.interface.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] capability %s started successfully.", connection.source.interface.c_str());
       started_capabilities_.push_back(connection.source.interface);
     }
   }
@@ -390,7 +390,7 @@ public:
               }
 
               auto response = future.get();
-              RCLCPP_INFO(node_->get_logger(), "Capability %s freed successfully.", capability.c_str());
+              RCLCPP_INFO(node_->get_logger(), "[Capability client] capability %s freed successfully.", capability.c_str());
               completed = true;
               cv.notify_all();
             });
@@ -403,7 +403,7 @@ public:
       }
       else
       {
-        RCLCPP_WARN(node_->get_logger(), "Capability %s was not started as part of the plan, skipping free request.", capability.c_str());
+        RCLCPP_WARN(node_->get_logger(), "[Capability client] capability %s was not started as part of the plan, skipping free request.", capability.c_str());
       }
     }
 
@@ -444,7 +444,7 @@ public:
 
           auto response = future.get();
 
-          RCLCPP_INFO(node_->get_logger(), "Capability connection on STARTED event configured successfully.");
+          RCLCPP_INFO(node_->get_logger(), "[Capability client] capability connection on STARTED event configured successfully.");
           completed = true;
           cv.notify_all();
         });
@@ -463,7 +463,7 @@ public:
   {
     for (const auto& [id, connection] : plan.connections)
     {
-      RCLCPP_INFO(node_->get_logger(), "Configuring connection for capability named %s", connection.source.interface.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] configuring connection for %s", connection.source.interface.c_str());
 
       if (connection.on_start.exists())
       {
@@ -485,7 +485,7 @@ public:
         connect_capability(plan.bond_id, connection, CapabilityEventCode::FAILED);
       }
 
-      RCLCPP_INFO(node_->get_logger(), "Connection for capability named %s configured successfully", connection.source.interface.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s configured successfully", connection.source.interface.c_str());
     }
   }
 
@@ -519,7 +519,7 @@ public:
           auto response = future.get();
           completed = true;
           cv.notify_all();
-          RCLCPP_INFO(node_->get_logger(), "First capability triggered successfully.");
+          RCLCPP_INFO(node_->get_logger(), "[Capability client] first capability triggered successfully.");
         });
 
     // wait for the response
@@ -534,11 +534,11 @@ protected:
   {
     while (wait_for_logic)
     {
-      RCLCPP_INFO(node_->get_logger(), "%s is not available", service_name.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] %s is not available", service_name.c_str());
       rclcpp::shutdown();
       return;
     }
-    RCLCPP_INFO(node_->get_logger(), "%s connected", service_name.c_str());
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] %s connected", service_name.c_str());
   }
 
   /**

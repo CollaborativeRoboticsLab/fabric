@@ -26,7 +26,7 @@ Start the nav2 stack along with the simulation robot or physical robot.
 
 ```bash
 source install/setup.bash
-ros2 launch capabilities2_server server.launch.py
+ros2 launch capabilities2_server capabilities2_server.launch.py
 ```
 
 ### Start the Fabric
@@ -35,14 +35,3 @@ ros2 launch capabilities2_server server.launch.py
 source install/setup.bash
 ros2 launch fabric fabric.launch.py
 ```
-
-### Start the logging (Optional)
-
-for on-device/terminal logging
-
-```bash
-source install/setup.bash
-ros2 launch event_logger listener.launch.py
-```
-
-or for visualization use [CollaborativeRoboticsLab/event_logger_ui](https://github.com/CollaborativeRoboticsLab/event_logger_ui)

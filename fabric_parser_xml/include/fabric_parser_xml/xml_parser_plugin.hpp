@@ -1,4 +1,6 @@
 #pragma once
+#include <cerrno>
+#include <cstdlib>
 #include <string>
 #include <vector>
 #include <tinyxml2.h>
@@ -46,7 +48,7 @@ public:
     // check if the file loading failed
     if (xml_status != tinyxml2::XMLError::XML_SUCCESS)
     {
-      RCLCPP_ERROR(node_->get_logger(), "Error loading plan: %s, Error: %s", file_path.c_str(), default_document.ErrorName());
+      RCLCPP_ERROR(node_->get_logger(), "[xml_parser] Error loading plan: %s, Error: %s", file_path.c_str(), default_document.ErrorName());
       return false;
     }
 
@@ -94,15 +96,15 @@ public:
     current_document_.Parse(plan.plan.c_str());
 
     // Add a completion runner to the plan
-    RCLCPP_INFO(node_->get_logger(), "Adding completion runner to the plan");
+    RCLCPP_INFO(node_->get_logger(), "[xml_parser] Adding completion runner to the plan");
     add_completion_runner(current_document_);
 
     // Debug: print the modified plan
     std::string modified_plan;
     convert_to_string(current_document_, modified_plan);
-    RCLCPP_DEBUG(node_->get_logger(), "Plan after adding closing event :\n\n %s", modified_plan.c_str());
+    RCLCPP_DEBUG(node_->get_logger(), "[xml_parser] Plan after adding closing event :\n\n %s", modified_plan.c_str());
 
-    RCLCPP_INFO(node_->get_logger(), "Completion runner added successfully. Extracting the plan element.");
+    RCLCPP_INFO(node_->get_logger(), "[xml_parser] Completion runner added. Extracting the plan element.");
 
     // extract the plan element
     plan_ = extract_plan(current_document_);
@@ -110,7 +112,7 @@ public:
     if (plan_ == nullptr)
       throw fabric::fabric_exception("No <Plan> element found.");
 
-    RCLCPP_INFO(node_->get_logger(), "<Plan> element extracted successfully. Checking required attributes availability.");
+    RCLCPP_INFO(node_->get_logger(), "[xml_parser] <Plan> element extracted successfully.");
 
     // check the syntax of the plan to make sure it contains valid XML elements and required attributes
     std::string error_msg;
@@ -122,7 +124,7 @@ public:
     {
       throw fabric::fabric_exception("XML plan parsing failed: " + error_msg);
     }
-    RCLCPP_INFO(node_->get_logger(), "Plan syntax validation successful. Proceeding to capability retrieval.");
+    RCLCPP_INFO(node_->get_logger(), "[xml_parser] Plan syntax validation successful");
 
     // extract connections from the plan
     extract_connections(plan_, plan);
@@ -321,6 +323,8 @@ protected:
     newRunner->SetAttribute("interface", "fabric_capabilities/FabricCompletionRunner");
     newRunner->SetAttribute("provider", "fabric_capabilities/FabricCompletionRunner");
     outerControl->InsertEndChild(newRunner);
+
+    RCLCPP_INFO(node_->get_logger(), "[xml_parser] CompletionRunner added to the plan");
   }
 
   /**
@@ -360,6 +364,8 @@ protected:
     // increment the index for the next parallel all connection
     runner_index += 1;
 
+    RCLCPP_INFO(node_->get_logger(), "[xml_parser] ParallelAll connection added to the plan with %d inputs, id %d", input_count, connection_id);
+
     // return the next connection id
     return connection_id;
   }
@@ -397,6 +403,8 @@ protected:
     // increment the index for the next parallel any connection
     runner_index += 1;
 
+    RCLCPP_INFO(node_->get_logger(), "[xml_parser] ParallelAny connection added to the plan with id %d", connection_id);
+
     // return the next connection id
     return connection_id;
   }
@@ -419,16 +427,18 @@ protected:
       if (predecessor.source.parameters.has_value("id"))
       {
         // Get the id attribute from the predecessor system runner
-        int id = std::any_cast<int>(predecessor.source.parameters.get_value("id", 0, capabilities2_events::OptionType::INT));
+        int id = std::any_cast<int>(predecessor.source.parameters.get_value("id", 0));
 
         // Set the id attribute for the successor system runner
         successor.source.parameters.set_value("id", id, capabilities2_events::OptionType::INT);
+
+        RCLCPP_INFO(node_->get_logger(), "[xml_parser] Updated successor runner id to %d", id);
       }
     }
   }
 
   /**
-   * @brief convert tinyxml2::XMLElement attributes to EventParameters. Treats the original attributes as string 
+   * @brief convert tinyxml2::XMLElement attributes to EventParameters. Treats the original attributes as string
    * and let the runners that they are related to handle the conversion from string to correct data type
    *
    * @param element tinyxml2::XMLElement element to be converted.
@@ -445,12 +455,61 @@ protected:
     while (attr)
     {
       // key will always be a string.
-      const char* key = attr->Name();
-      const char* value = attr->Value();
+      std::string key = attr->Name();
+      std::string string_value = attr->Value();
 
-      // treat the original attributes as string and let the runners that they are related to handle the conversion from
-      // string to correct data type
-      parameters.set_value(std::string(key), std::string(value), capabilities2_events::OptionType::UNCONVERTED);
+      // skip the interface attribute as it is already used for the connection's source interface
+      if (key == "interface")
+      {
+        attr = attr->Next();
+        continue;
+      }
+
+      // skip the provider attribute as it is already used for the connection's source provider
+      if (key == "provider")
+      {
+        attr = attr->Next();
+        continue;
+      }
+
+      // Treat booleans strictly as literal true/false (avoid misclassifying numeric strings like "0.5").
+      if (string_value == "true" || string_value == "false")
+      {
+        const bool bool_value = (string_value == "true");
+        RCLCPP_INFO(node_->get_logger(), "[xml_parser] Extracted attribute: %s = %s (bool)", key.c_str(), bool_value ? "true" : "false");
+        parameters.set_value(key, bool_value, capabilities2_events::OptionType::BOOL);
+      }
+      else
+      {
+        // Prefer int when the value is an integer; otherwise parse as double if fully consumable.
+        char* int_end = nullptr;
+        errno = 0;
+        const long int_value_long = std::strtol(string_value.c_str(), &int_end, 10);
+
+        if (int_end != nullptr && *int_end == '\0' && errno == 0)
+        {
+          const int int_value = static_cast<int>(int_value_long);
+          RCLCPP_INFO(node_->get_logger(), "[xml_parser] Extracted attribute: %s = %d (int)", key.c_str(), int_value);
+          parameters.set_value(key, int_value, capabilities2_events::OptionType::INT);
+        }
+        else
+        {
+          char* double_end = nullptr;
+          errno = 0;
+          const double double_value = std::strtod(string_value.c_str(), &double_end);
+
+          if (double_end != nullptr && *double_end == '\0' && errno == 0)
+          {
+            RCLCPP_INFO(node_->get_logger(), "[xml_parser] Extracted attribute: %s = %f (double)", key.c_str(), double_value);
+            parameters.set_value(key, double_value, capabilities2_events::OptionType::DOUBLE);
+          }
+          else
+          {
+            RCLCPP_INFO(node_->get_logger(), "[xml_parser] Extracted attribute: %s = %s (string)", key.c_str(), string_value.c_str());
+            parameters.set_value(key, string_value, capabilities2_events::OptionType::STRING);
+          }
+        }
+      }
 
       attr = attr->Next();
     }
@@ -463,9 +522,6 @@ protected:
    *
    * @param element XML Element to be evaluated
    * @param connections std::map containing extracted connections
-   * @param connection_id numerical id of the connection
-   * @param connection_type the type of connection
-   * @param description the name of the control tag
    */
   int extract_connections(tinyxml2::XMLElement* element, fabric::Plan& plan, int connection_id = 0,
                           fabric::event connection_type = fabric::event::ON_SUCCESS, std::string conn_description = "")
@@ -556,6 +612,9 @@ protected:
 
       if (provider)
         providertag = provider;
+
+      RCLCPP_INFO(node_->get_logger(), "[xml_parser] Creating fabric connection: interface = %s, provider = %s", interfacetag.c_str(),
+                  providertag.c_str());
 
       fabric::connection connection;
 

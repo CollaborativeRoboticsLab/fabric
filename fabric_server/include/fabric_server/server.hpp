@@ -45,7 +45,9 @@ public:
    * @param options Node options for the Fabric node
    */
   Fabric(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
-    : Node("Fabric", options), validation_loader_("fabric_base", "fabric::ValidationBase"), parsing_loader_("fabric_base", "fabric::ParserBase")
+    : Node("Fabric", options)
+    , validation_loader_("fabric_base", "fabric::ValidationBase")
+    , parsing_loader_("fabric_base", "fabric::ParserBase")
   {
     try
     {
@@ -95,12 +97,12 @@ public:
     this->declare_parameter("compatibility_validation_plugin", "fabric::CompatibilityValidation");
     std::string compatibility_validation_plugin_name = this->get_parameter("compatibility_validation_plugin").as_string();
 
-    RCLCPP_INFO(this->get_logger(), "Loading compatibility validation plugin: %s", compatibility_validation_plugin_name.c_str());
+    RCLCPP_INFO(this->get_logger(), "[server] Loading compatibility validation plugin: %s", compatibility_validation_plugin_name.c_str());
 
     compatibility_validation_plugin_ = validation_loader_.createSharedInstance(compatibility_validation_plugin_name);
     compatibility_validation_plugin_->initialize(shared_from_this());
 
-    RCLCPP_INFO(this->get_logger(), "Started compatibility validation plugin: %s", compatibility_validation_plugin_name.c_str());
+    RCLCPP_INFO(this->get_logger(), "[server] Initialized compatibility validation plugin: %s", compatibility_validation_plugin_name.c_str());
 
     /*************************************************************************
      * Initialize Parsing Plugins
@@ -109,12 +111,12 @@ public:
     this->declare_parameter("parsing_plugin", "fabric::XMLParser");
     std::string parsing_plugin_name = this->get_parameter("parsing_plugin").as_string();
 
-    RCLCPP_INFO(this->get_logger(), "Loading parsing plugin: %s", parsing_plugin_name.c_str());
+    RCLCPP_INFO(this->get_logger(), "[server] Loading parsing plugin: %s", parsing_plugin_name.c_str());
 
     parsing_plugin_ = parsing_loader_.createSharedInstance(parsing_plugin_name);
     parsing_plugin_->initialize(shared_from_this());
 
-    RCLCPP_INFO(this->get_logger(), "Started parsing plugin: %s", parsing_plugin_name.c_str());
+    RCLCPP_INFO(this->get_logger(), "[server] Initialized parsing plugin: %s", parsing_plugin_name.c_str());
 
     /*************************************************************************
      * Initialize internal components
@@ -128,13 +130,13 @@ public:
     fabric::Plan starter_plan;
     if (!parsing_plugin_->load_file(plan_file_path_, starter_plan))
     {
-      RCLCPP_ERROR(this->get_logger(), "Failed to load default plan from file: %s", plan_file_path_.c_str());
+      RCLCPP_ERROR(this->get_logger(), "[server] Failed to load default plan from file: %s", plan_file_path_.c_str());
       throw fabric::fabric_exception("Failed to load default plan");
     }
 
     plan_queue_.push_back(starter_plan);
 
-    RCLCPP_INFO(this->get_logger(), "Fabric node initialized");
+    RCLCPP_INFO(this->get_logger(), "[server] Fabric node initialized");
 
     /*************************************************************************
      * Initialize process thread
@@ -155,7 +157,7 @@ protected:
       // reset internal data structures
       reset();
 
-      RCLCPP_INFO(this->get_logger(), "A new Fabric plan processing starting");
+      RCLCPP_INFO(this->get_logger(), "[server] A new Fabric plan processing starting");
 
       // get the next plan and parse it into a XML document
       current_plan_ = plan_queue_.front();
@@ -164,23 +166,23 @@ protected:
       // parse the plan to extract connections (Fabric::Plan) as per the parsing plugin
       try
       {
-        RCLCPP_INFO(this->get_logger(), "Parsing the fabric plan.");
+        RCLCPP_INFO(this->get_logger(), "[server] Parsing the fabric plan.");
         current_plan_.status = PlanStatus::PARSING;
 
         parsing_plugin_->parse(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
-        RCLCPP_ERROR(this->get_logger(), "Fabric plan parsing failed with error: %s", e.what());
+        RCLCPP_ERROR(this->get_logger(), "[server] Fabric plan parsing failed with error: %s", e.what());
         current_plan_.status = PlanStatus::PARSE_FAILED;
         continue;
       }
-      RCLCPP_INFO(this->get_logger(), "Fabric plan parsing completed successfully.");
+      RCLCPP_INFO(this->get_logger(), "[server] Fabric plan parsing completed successfully.");
 
       // get the capabilities required for the plan
       try
       {
-        RCLCPP_INFO(this->get_logger(), "Getting capabilities required for the plan.");
+        RCLCPP_INFO(this->get_logger(), "[server] Getting capabilities required for the plan.");
         current_plan_.status = PlanStatus::VALIDATING;
         capability_client_->getInterfaces(capability_list_);
         capability_client_->getSemanticInterfaces(capability_list_);
@@ -188,23 +190,23 @@ protected:
       }
       catch (const fabric::fabric_exception& e)
       {
-        RCLCPP_ERROR(this->get_logger(), "Capability information retrieval failed with error: %s", e.what());
+        RCLCPP_ERROR(this->get_logger(), "[server] Capability information retrieval failed with error: %s", e.what());
         current_plan_.status = PlanStatus::VALIDATION_FAILED;
         continue;
       }
 
-      RCLCPP_INFO(this->get_logger(), "Capability information retrieval completed successfully.");
+      RCLCPP_INFO(this->get_logger(), "[server] Capability information retrieval completed successfully.");
 
       // validate the plan for compatibility as per the validation plugin
       try
       {
-        RCLCPP_INFO(this->get_logger(), "Validating the fabric plan for compatibility.");
+        RCLCPP_INFO(this->get_logger(), "[server] Validating the fabric plan for compatibility.");
 
         compatibility_validation_plugin_->validate(current_plan_, capability_list_);
       }
       catch (const fabric::fabric_exception& e)
       {
-        RCLCPP_ERROR(this->get_logger(), "Compatibility validation failed with error: %s", e.what());
+        RCLCPP_ERROR(this->get_logger(), "[server] Compatibility validation failed with error: %s", e.what());
         current_plan_.status = PlanStatus::VALIDATION_FAILED;
         continue;
       }
@@ -212,20 +214,20 @@ protected:
       // Request bond from capabilities2 server
       try
       {
-        RCLCPP_INFO(this->get_logger(), "Requesting bond from capabilities2 server.");
+        RCLCPP_INFO(this->get_logger(), "[server] Requesting bond from capabilities2 server.");
         current_plan_.status = PlanStatus::BONDING;
 
         current_plan_.bond_id = capability_client_->request_bond();
       }
       catch (const fabric::fabric_exception& e)
       {
-        RCLCPP_ERROR(this->get_logger(), "Capability bond request failed with error: %s", e.what());
+        RCLCPP_ERROR(this->get_logger(), "[server] Capability bond request failed with error: %s", e.what());
         current_plan_.status = PlanStatus::BOND_FAILED;
         continue;
       }
 
       // Start new bond client for the new bond id
-      RCLCPP_INFO(this->get_logger(), "Establishing bond with id : %s", current_plan_.bond_id.c_str());
+      RCLCPP_INFO(this->get_logger(), "[server] Establishing bond with id : %s", current_plan_.bond_id.c_str());
       bond_client_cache_[current_plan_.bond_id] = std::make_unique<BondClient>(shared_from_this(), current_plan_.bond_id);
       bond_client_cache_[current_plan_.bond_id]->start();
 
@@ -235,22 +237,22 @@ protected:
           if (old_bond_id != current_plan_.bond_id)
           {
             bond_client->stop();
-            RCLCPP_INFO(this->get_logger(), "Stopping and removing old bond with id : %s", old_bond_id.c_str());
+            RCLCPP_INFO(this->get_logger(), "[server] Stopping and removing old bond with id : %s", old_bond_id.c_str());
           }
 
-      RCLCPP_INFO(this->get_logger(), "Bond established with id : %s", current_plan_.bond_id.c_str());
+      RCLCPP_INFO(this->get_logger(), "[server] Bond established with id : %s", current_plan_.bond_id.c_str());
 
       // Request use of capabilities for the plan
       try
       {
-        RCLCPP_INFO(this->get_logger(), "Requesting use of capabilities for the plan.");
+        RCLCPP_INFO(this->get_logger(), "[server] Requesting use of capabilities for the plan.");
         current_plan_.status = PlanStatus::CAPABILITY_STARTING;
 
         capability_client_->use_capabilities(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
-        RCLCPP_ERROR(this->get_logger(), "Capability usage failed with error: %s", e.what());
+        RCLCPP_ERROR(this->get_logger(), "[server] Capability usage failed with error: %s", e.what());
         current_plan_.status = PlanStatus::CAPABILITY_START_FAILED;
 
         capability_client_->free_capabilities(current_plan_);
@@ -260,36 +262,36 @@ protected:
       // connect the capabilities as per the plan
       try
       {
-        RCLCPP_INFO(this->get_logger(), "Connecting capabilities as per the plan.");
+        RCLCPP_INFO(this->get_logger(), "[server] Connecting capabilities as per the plan.");
         current_plan_.status = PlanStatus::CAPABILITY_CONNECTING;
 
         capability_client_->connect_capabilities(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
-        RCLCPP_ERROR(this->get_logger(), "Capability connection failed with error: %s", e.what());
+        RCLCPP_ERROR(this->get_logger(), "[server] Capability connection failed with error: %s", e.what());
         current_plan_.status = PlanStatus::CAPABILITY_CONNECT_FAILED;
 
         capability_client_->free_capabilities(current_plan_);
         continue;
       }
 
-      RCLCPP_INFO(this->get_logger(), "Capabilities connected successfully.");
+      RCLCPP_INFO(this->get_logger(), "[server] Capabilities connected successfully.");
 
       // trigger the first capability in the plan
       try
       {
-        RCLCPP_INFO(this->get_logger(), "Triggering the first capability in the plan.");
+        RCLCPP_INFO(this->get_logger(), "[server] Triggering the first capability in the plan.");
         current_plan_.status = PlanStatus::RUNNING;
 
         capability_client_->trigger_first_node(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
-        RCLCPP_ERROR(this->get_logger(), "Capability trigger failed with error: %s", e.what());
+        RCLCPP_ERROR(this->get_logger(), "[server] Capability trigger failed with error: %s", e.what());
       }
 
-      RCLCPP_INFO(this->get_logger(), "First capability triggered successfully.");
+      RCLCPP_INFO(this->get_logger(), "[server] First capability triggered successfully.");
 
       // wait for the plan to complete
       {
@@ -298,7 +300,7 @@ protected:
       }
 
       current_plan_.status = PlanStatus::COMPLETED;
-      RCLCPP_INFO(this->get_logger(), "Fabric processing completed. Waiting for next plan.");
+      RCLCPP_INFO(this->get_logger(), "[server] Fabric processing completed. Waiting for next plan.");
     }
   }
 
@@ -307,7 +309,7 @@ protected:
    */
   void setPlanCallback(const std::shared_ptr<SetFabricPlan::Request> request, std::shared_ptr<SetFabricPlan::Response> response)
   {
-    RCLCPP_INFO(this->get_logger(), "Received the request with a plan");
+    RCLCPP_INFO(this->get_logger(), "[server] Received the request with a plan");
 
     fabric::Plan new_plan;
     new_plan.plan = request->plan;
@@ -316,12 +318,12 @@ protected:
 
     if (!parsing_plugin_->check_compatibility(new_plan))
     {
-      RCLCPP_ERROR(this->get_logger(), "Plan received via service request not compatible with the loaded parser.");
+      RCLCPP_ERROR(this->get_logger(), "[server] Plan received via service request not compatible with the loaded parser.");
       response->plan_id = "";
-      response->error = "Plan is not compatible with the loaded parser.";
+      response->error = "[server] Plan is not compatible with the loaded parser.";
       return;
     }
-    RCLCPP_INFO(this->get_logger(), "Plan accepted from service request message");
+    RCLCPP_INFO(this->get_logger(), "[server] Plan accepted from service request message");
 
     plan_queue_.push_back(new_plan);
     response->plan_id = new_plan.plan_id;
@@ -332,7 +334,7 @@ protected:
    */
   void cancelPlanCallback(const std::shared_ptr<CancelFabricPlan::Request> request, std::shared_ptr<CancelFabricPlan::Response> response)
   {
-    RCLCPP_INFO(this->get_logger(), "Plan canncelling requested");
+    RCLCPP_INFO(this->get_logger(), "[server] Plan canncelling requested");
     std::string plan_id = request->plan_id;
     std::string bond_id_to_cancel;
 
@@ -356,14 +358,14 @@ protected:
     // if bond id is found, break the bond and cancel the plan
     if (!bond_id_to_cancel.empty())
     {
-      RCLCPP_INFO(this->get_logger(), "Cancelling plan with id: %s", plan_id.c_str());
+      RCLCPP_INFO(this->get_logger(), "[server] Cancelling plan with id: %s", plan_id.c_str());
 
       for (auto& [bond_id, bond_client] : bond_client_cache_)
       {
         if (bond_id == bond_id_to_cancel)
         {
           bond_client->stop();
-          RCLCPP_INFO(this->get_logger(), "Bond with id : %s stopped", bond_id.c_str());
+          RCLCPP_INFO(this->get_logger(), "[server] Bond with id : %s stopped", bond_id.c_str());
           break;
         }
       }
@@ -378,15 +380,15 @@ protected:
   void setCompleteCallback(const std::shared_ptr<CompleteFabric::Request> request, std::shared_ptr<CompleteFabric::Response> response)
   {
     // mark the plan as completed using plan id
-    RCLCPP_INFO(this->get_logger(), "Plan completion received for plan id: %s", request->plan_id.c_str());
+    RCLCPP_INFO(this->get_logger(), "[server] Plan completion received for plan id: %s", request->plan_id.c_str());
 
     if (current_plan_.plan_id != request->plan_id)
     {
-      RCLCPP_WARN(this->get_logger(), "Received plan id does not match the current plan id");
+      RCLCPP_WARN(this->get_logger(), "[server] Received plan id does not match the current plan id");
     }
     else
     {
-      RCLCPP_INFO(this->get_logger(), "Current plan id matches the received plan id. Proceeding to complete the plan.");
+      RCLCPP_INFO(this->get_logger(), "[server] Current plan id matches the received plan id. Proceeding to complete the plan.");
       plan_completed_ = true;
       plan_cv_.notify_all();
     }
