@@ -42,8 +42,8 @@ RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 WORKDIR /home/$USERNAME/colcon_ws/src 
 
 RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2.git -b refactor/events/v1
-# RUN git clone https://github.com/CollaborativeRoboticsLab/prompt_tools.git
-# RUN git clone --recurse-submodules https://github.com/CollaborativeRoboticsLab/prompt_capabilities.git
+# RUN git clone --recurse-submodules https://github.com/CollaborativeRoboticsLab/prompt_tools.git
+# RUN git clone https://github.com/CollaborativeRoboticsLab/prompt_capabilities.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/perception.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/perception_capabilities.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/nav2_capabilities.git
