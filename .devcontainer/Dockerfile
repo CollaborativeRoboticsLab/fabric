@@ -21,6 +21,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     ros-${ROS_DISTRO}-navigation2 \
     ros-${ROS_DISTRO}-geometry-msgs \
     ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
+    libportaudio2 \
+    portaudio19-dev \
+    ros-${ROS_DISTRO}-vision-opencv \
     && rm -rf /var/lib/apt/lists/*
     
 RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
@@ -40,7 +43,7 @@ WORKDIR /home/$USERNAME/colcon_ws/src
 
 RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2.git -b refactor/events/v1
 # RUN git clone https://github.com/CollaborativeRoboticsLab/prompt_tools.git
-# RUN git clone https://github.com/CollaborativeRoboticsLab/prompt_capabilities.git
+# RUN git clone --recurse-submodules https://github.com/CollaborativeRoboticsLab/prompt_capabilities.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/perception.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/perception_capabilities.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/nav2_capabilities.git
