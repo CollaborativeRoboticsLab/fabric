@@ -644,16 +644,19 @@ protected:
         {
           // Set the target_on_success for the predecessor connection
           plan.connections[predecessor_id].on_success = plan.connections[connection_id].source;
+          RCLCPP_INFO(node_->get_logger(), "[xml_parser] Set on_success for connection id %d to interface %s", predecessor_id, plan.connections[predecessor_id].on_success.interface.c_str());
         }
         else if (connection_type == fabric::event::ON_START)
         {
           // Set the target_on_start for the predecessor connection
           plan.connections[predecessor_id].on_start = plan.connections[connection_id].source;
+          RCLCPP_INFO(node_->get_logger(), "[xml_parser] Set on_start for connection id %d to interface %s", predecessor_id, plan.connections[predecessor_id].on_start.interface.c_str());
         }
         else if (connection_type == fabric::event::ON_FAILURE)
         {
           // Set the target_on_failure for the predecessor connection
           plan.connections[predecessor_id].on_failure = plan.connections[connection_id].source;
+          RCLCPP_INFO(node_->get_logger(), "[xml_parser] Set on_failure for connection id %d to interface %s", predecessor_id, plan.connections[predecessor_id].on_failure.interface.c_str());
         }
       }
 

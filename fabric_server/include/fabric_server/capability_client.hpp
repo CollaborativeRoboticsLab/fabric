@@ -412,22 +412,22 @@ public:
       started_capabilities_.erase(std::remove(started_capabilities_.begin(), started_capabilities_.end(), capability), started_capabilities_.end());
   }
 
-  void connect_capability(const std::string& bond_id, const fabric::connection& connection, uint8_t code)
+  void connect_capability(const std::string& bond_id, const int &trigger_id, uint8_t code, const fabric::node& source, const fabric::node& target)
   {
     auto request = std::make_shared<ConnectCapability::Request>();
 
     request->bond_id = bond_id;
-    request->trigger_id = connection.trigger_id;
+    request->trigger_id = std::to_string(trigger_id);
 
     request->connection.type.code = code;
 
-    request->connection.source = connection.source.parameters.toMsg();
-    request->connection.source.capability = connection.source.interface;
-    request->connection.source.provider = connection.source.provider;
+    request->connection.source = source.parameters.toMsg();
+    request->connection.source.capability = source.interface;
+    request->connection.source.provider = source.provider;
 
-    request->connection.target = connection.on_start.parameters.toMsg();
-    request->connection.target.capability = connection.on_start.interface;
-    request->connection.target.provider = connection.on_start.provider;
+    request->connection.target = target.parameters.toMsg();
+    request->connection.target.capability = target.interface;
+    request->connection.target.provider = target.provider;
 
     bool completed = false;
     std::mutex mtx;
@@ -439,12 +439,12 @@ public:
         connect_capability_client_->async_send_request(request, [this, &completed, &cv](ConnectCapabilityClient::SharedFuture future) {
           if (!future.valid())
           {
-            throw fabric::fabric_exception("Failed to configure capability connection on STARTED event");
+            throw fabric::fabric_exception("Failed to configure capability connection event");
           }
 
           auto response = future.get();
 
-          RCLCPP_INFO(node_->get_logger(), "[Capability client] capability connection on STARTED event configured successfully.");
+          RCLCPP_INFO(node_->get_logger(), "[Capability client] capability connection event configured successfully.");
           completed = true;
           cv.notify_all();
         });
@@ -467,22 +467,26 @@ public:
 
       if (connection.on_start.exists())
       {
-        connect_capability(plan.bond_id, connection, CapabilityEventCode::STARTED);
+        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s on_start configuration requested", connection.source.interface.c_str());
+        connect_capability(plan.bond_id, connection.trigger_id, CapabilityEventCode::STARTED, connection.source, connection.on_start);
       }
 
       if (connection.on_stop.exists())
       {
-        connect_capability(plan.bond_id, connection, CapabilityEventCode::STOPPED);
+        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s on_stop configuration requested", connection.source.interface.c_str()); 
+        connect_capability(plan.bond_id, connection.trigger_id, CapabilityEventCode::STOPPED, connection.source, connection.on_stop);
       }
 
       if (connection.on_success.exists())
       {
-        connect_capability(plan.bond_id, connection, CapabilityEventCode::SUCCEEDED);
+        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s on_success configuration requested", connection.source.interface.c_str());
+        connect_capability(plan.bond_id, connection.trigger_id, CapabilityEventCode::SUCCEEDED, connection.source, connection.on_success);
       }
 
       if (connection.on_failure.exists())
       {
-        connect_capability(plan.bond_id, connection, CapabilityEventCode::FAILED);
+        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s on_failure configuration requested", connection.source.interface.c_str());
+        connect_capability(plan.bond_id, connection.trigger_id, CapabilityEventCode::FAILED, connection.source, connection.on_failure);
       }
 
       RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s configured successfully", connection.source.interface.c_str());
