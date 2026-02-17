@@ -418,18 +418,18 @@ public:
     auto request = std::make_shared<ConnectCapability::Request>();
 
     request->bond_id = bond_id;
-    request->instance_id = std::to_string(source.instance_id);
-    request->target_instance_id = std::to_string(target.instance_id);
 
     request->connection.type.code = code;
 
     request->connection.source = source.parameters.toMsg();
     request->connection.source.capability = source.interface;
     request->connection.source.provider = source.provider;
+    request->connection.source.instance_id = std::to_string(source.instance_id);
 
     request->connection.target = target.parameters.toMsg();
     request->connection.target.capability = target.interface;
     request->connection.target.provider = target.provider;
+    request->connection.target.instance_id = std::to_string(target.instance_id);
 
     bool completed = false;
     std::mutex mtx;
@@ -514,7 +514,7 @@ public:
     std::unique_lock<std::mutex> lock(mtx);
 
     request_trigger->bond_id = plan.bond_id;
-    request_trigger->instance_id = std::to_string(plan.connections[0].source.instance_id);
+    request_trigger->capability.instance_id = std::to_string(plan.connections[0].source.instance_id);
     request_trigger->capability.capability = plan.connections[0].source.interface;
     request_trigger->capability.parameters = plan.connections[0].source.parameters.toMsg().parameters;
 
