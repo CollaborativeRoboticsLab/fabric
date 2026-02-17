@@ -133,7 +133,9 @@ public:
       RCLCPP_ERROR(this->get_logger(), "[server] Failed to load default plan from file: %s", plan_file_path_.c_str());
       throw fabric::fabric_exception("Failed to load default plan");
     }
-
+    starter_plan.plan_id = generate_uuid();
+    starter_plan.status = PlanStatus::QUEUED;
+    
     plan_queue_.push_back(starter_plan);
 
     RCLCPP_INFO(this->get_logger(), "[server] Fabric node initialized");
@@ -511,6 +513,7 @@ protected:
     current_plan_ = fabric::Plan();
     capability_list_.clear();
     bond_id_.clear();
+    plan_completed_ = false;
   }
 
   /** Vector of plans */

@@ -14,9 +14,8 @@
 | &nbsp; Example &nbsp; | Description |
 | ---     | ---         |
 | [Example 1](./../fabric/docs/prompt_example1.md) | Implements requesting for robot's capabilities and prompting them to the LLM |
-| [Example 2](./../fabric/docs/prompt_example2.md) | Implements listening for robot's occupancy grid and prompting them to the LLM |
-| [Example 3](./../fabric/docs/prompt_example3.md) | Implements listening for robot's pose and prompting them to the LLM 
-| [Example 4](./../fabric/docs/prompt_example4.md) | Implements prompting the LLM for a plan for a new task and setting it to Fabric |
+| [Example 2](./../fabric/docs/prompt_example2.md) | Implements listening for robot's pose and prompting them to the LLM 
+| [Example 3](./../fabric/docs/prompt_example3.md) | Implements prompting the LLM for a plan for a new task and setting it to Fabric |
 
 ## Navigation
 

@@ -18,8 +18,14 @@ public:
     node_ = node;
 
     //get the bond topic from parameter server
-    node_->declare_parameter<std::string>("capability_client.bond_topic", "/capabilities/bond");
-    node_->get_parameter("capability_client.bond_topic", topic_);
+    std::string bond_topic_param = "capability_client.bond_topic";
+    std::string bond_topic_value = "/capabilities/bond";
+
+    if (!node_->has_parameter(bond_topic_param))
+      node_->declare_parameter<std::string>(bond_topic_param, bond_topic_value);
+
+    if (!node_->get_parameter(bond_topic_param, topic_) || topic_.empty())
+      topic_ = bond_topic_value;
   }
 
   /**

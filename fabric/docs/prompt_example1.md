@@ -2,7 +2,7 @@
 
 ### Dependencies
 
-This example uses prompt tools stack. Follow instructions from [Prompt Tools Dependency Installation](https://github.com/CollaborativeRoboticsLab/capabilities2/blob/develop/docs/prompt_tools_setup.md) to setup Prompt tools stack.
+This example uses prompt tools stack. Follow instructions from [CollaborativeRoboticsLab/prompt_tools](https://github.com/CollaborativeRoboticsLab/prompt_tools) to setup Prompt tools stack.
 
 ### Plan selection
 
@@ -16,9 +16,10 @@ In the workspace root run,
 colcon build
 ```
 
-### Start the Prompt Tools stack
+### Start the Prompt Tools stack with 
 
 ```bash
+export OPENAI_API_KEY=
 source install/setup.bash
 ros2 launch prompt_bridge prompt_bridge.launch.py
 ```
@@ -27,7 +28,7 @@ ros2 launch prompt_bridge prompt_bridge.launch.py
 
 ```bash
 source install/setup.bash
-ros2 launch capabilities2_server server.launch.py
+ros2 launch capabilities2_server capabilities2_server.launch.py
 ```
 
 ### Start the Fabric
@@ -36,14 +37,3 @@ ros2 launch capabilities2_server server.launch.py
 source install/setup.bash
 ros2 launch fabric fabric.launch.py
 ```
-
-### Start the logging (Optional)
-
-for on-device/terminal logging
-
-```bash
-source install/setup.bash
-ros2 launch event_logger listener.launch.py
-```
-
-or for visualization use [CollaborativeRoboticsLab/event_logger_ui](https://github.com/CollaborativeRoboticsLab/event_logger_ui)

@@ -97,7 +97,7 @@ public:
 
     // Add a completion runner to the plan
     RCLCPP_INFO(node_->get_logger(), "[xml_parser] Adding completion runner to the plan");
-    add_completion_runner(current_document_);
+    add_completion_runner(current_document_, plan.plan_id);
 
     // Debug: print the modified plan
     std::string modified_plan;
@@ -300,8 +300,9 @@ protected:
    * to the existing <Plan> element in the XML document.
    *
    * @param document XML document to which the completion runner will be added
+   * @param plan_id ID of the plan to be associated with the completion runner
    */
-  void add_completion_runner(tinyxml2::XMLDocument& document)
+  void add_completion_runner(tinyxml2::XMLDocument& document, const std::string& plan_id)
   {
     // Get the root <Plan> element
     tinyxml2::XMLElement* plan = document.FirstChildElement("Plan");
@@ -322,6 +323,7 @@ protected:
     tinyxml2::XMLElement* newRunner = document.NewElement("Runner");
     newRunner->SetAttribute("interface", "fabric_capabilities/FabricCompletionRunner");
     newRunner->SetAttribute("provider", "fabric_capabilities/FabricCompletionRunner");
+    newRunner->SetAttribute("plan_id", plan_id.c_str());
     outerControl->InsertEndChild(newRunner);
 
     RCLCPP_INFO(node_->get_logger(), "[xml_parser] CompletionRunner added to the plan");

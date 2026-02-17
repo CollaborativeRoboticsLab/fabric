@@ -31,7 +31,7 @@ struct node
 
   bool exists() const
   {
-    return (interface != "" && provider != "" && !parameters.is_empty());
+    return (!interface.empty() && !provider.empty());
   }
 };
 
