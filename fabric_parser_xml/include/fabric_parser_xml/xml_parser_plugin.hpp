@@ -349,12 +349,12 @@ protected:
     fabric::connection node;
     node.source.interface = "capabilities2_runner/InputMultiplexRunner";
     node.source.provider = "capabilities2_runner/InputMultiplexRunner";
+    node.source.instance_id = runner_index;
     node.source.parameters.set_value("input_count", input_count, capabilities2_events::OptionType::INT);
     node.source.parameters.set_value("id", runner_index, capabilities2_events::OptionType::INT);
 
     plan.connections[connection_id] = node;
     plan.connections[connection_id].description = description;
-    plan.connections[connection_id].trigger_id = runner_index;
 
     // set the target_on_success for the new connection
     for (auto& connection : plan.connections)
@@ -388,12 +388,12 @@ protected:
     fabric::connection node;
     node.source.interface = "capabilities2_runner/InputMultiplexRunner";
     node.source.provider = "capabilities2_runner/InputMultiplexRunner";
+    node.source.instance_id = runner_index;
     node.source.parameters.set_value("input_count", input_count, capabilities2_events::OptionType::INT);
     node.source.parameters.set_value("id", runner_index, capabilities2_events::OptionType::INT);
 
     plan.connections[connection_id] = node;
     plan.connections[connection_id].description = description;
-    plan.connections[connection_id].trigger_id = runner_index;
 
     // set the on_success for the new connection
     for (auto& connection : plan.connections)
@@ -621,6 +621,7 @@ protected:
       connection.source.interface = interfacetag;
       connection.source.provider = providertag;
       connection.source.parameters = convert_xml_to_event_parameters(element);
+      connection.source.instance_id = runner_index;
 
       // set runner id unique identifier
       connection.source.parameters.set_value("id", runner_index, capabilities2_events::OptionType::INT);
@@ -629,9 +630,6 @@ protected:
 
       plan.connections[connection_id] = connection;
       plan.connections[connection_id].description = conn_description;
-
-      // match the trigger id with the runner index
-      plan.connections[connection_id].trigger_id = runner_index;
 
       runner_index += 1;
 

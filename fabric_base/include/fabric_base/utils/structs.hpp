@@ -27,6 +27,7 @@ struct node
   std::string interface = "";
   std::string provider = "";
   capabilities2_events::EventParameters parameters;
+  int instance_id = -1;
 
   bool exists() const
   {
@@ -45,7 +46,6 @@ struct connection
   node on_success;
   node on_failure;
   std::string description;
-  int trigger_id = -1;
 };
 
 enum class PlanStatus {

@@ -151,7 +151,7 @@ public:
     // wait for the response
     cv.wait(lock, [&completed]() { return completed; });
 
-    RCLCPP_INFO(node_->get_logger(), "[Capability client] received %d interfaces from server", static_cast<int>(capabilities.size()));
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] received %d interfaces from server\n", static_cast<int>(capabilities.size()));
   }
 
   /**
@@ -196,7 +196,7 @@ public:
               info.is_semantic = true;
 
               new_capabilities.push_back(info);
-              RCLCPP_INFO(node_->get_logger(), "[Capability client]  Semantic interface: %s added", interface.c_str());
+              RCLCPP_INFO(node_->get_logger(), "[Capability client]  Semantic interface: %s added\n", interface.c_str());
             }
 
             completed = true;
@@ -252,7 +252,7 @@ public:
       // wait for the response
       cv.wait(lock, [&completed]() { return completed; });
 
-      RCLCPP_INFO(node_->get_logger(), "[Capability client] received for %s, default provider: %s, number of alternative providers: %d",
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] received for %s, default provider: %s, number of alternative providers: %d\n",
                   capability.interface.c_str(), capability.provider.c_str(), static_cast<int>(capability.alt_providers.size()));
     }
   }
@@ -285,7 +285,7 @@ public:
 
           auto response = future.get();
           bond_id = response->bond_id;
-          RCLCPP_INFO(node_->get_logger(), "[Capability client] received bond id : %s", bond_id.c_str());
+          RCLCPP_INFO(node_->get_logger(), "[Capability client] received bond id : %s\n", bond_id.c_str());
 
           completed = true;
           cv.notify_all();
@@ -338,7 +338,7 @@ public:
       // wait for the response
       cv.wait(lock, [&completed]() { return completed; });
 
-      RCLCPP_INFO(node_->get_logger(), "[Capability client] capability %s started successfully.", connection.source.interface.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] capability %s started successfully.\n", connection.source.interface.c_str());
       started_capabilities_.push_back(connection.source.interface);
     }
   }
@@ -390,7 +390,7 @@ public:
               }
 
               auto response = future.get();
-              RCLCPP_INFO(node_->get_logger(), "[Capability client] capability %s freed successfully.", capability.c_str());
+              RCLCPP_INFO(node_->get_logger(), "[Capability client] capability %s freed successfully.\n", capability.c_str());
               completed = true;
               cv.notify_all();
             });
@@ -403,7 +403,8 @@ public:
       }
       else
       {
-        RCLCPP_WARN(node_->get_logger(), "[Capability client] capability %s was not started as part of the plan, skipping free request.", capability.c_str());
+        RCLCPP_WARN(node_->get_logger(), "[Capability client] capability %s was not started as part of the plan, skipping free request.",
+                    capability.c_str());
       }
     }
 
@@ -412,12 +413,13 @@ public:
       started_capabilities_.erase(std::remove(started_capabilities_.begin(), started_capabilities_.end(), capability), started_capabilities_.end());
   }
 
-  void connect_capability(const std::string& bond_id, const int &trigger_id, uint8_t code, const fabric::node& source, const fabric::node& target)
+  void connect_capability(const std::string& bond_id, uint8_t code, const fabric::node& source, const fabric::node& target)
   {
     auto request = std::make_shared<ConnectCapability::Request>();
 
     request->bond_id = bond_id;
-    request->trigger_id = std::to_string(trigger_id);
+    request->instance_id = std::to_string(source.instance_id);
+    request->child_instance_id = std::to_string(target.instance_id);
 
     request->connection.type.code = code;
 
@@ -444,7 +446,7 @@ public:
 
           auto response = future.get();
 
-          RCLCPP_INFO(node_->get_logger(), "[Capability client] capability connection event configured successfully.");
+          RCLCPP_INFO(node_->get_logger(), "[Capability client] capability connection event configured successfully.\n");
           completed = true;
           cv.notify_all();
         });
@@ -463,33 +465,36 @@ public:
   {
     for (const auto& [id, connection] : plan.connections)
     {
-      RCLCPP_INFO(node_->get_logger(), "[Capability client] configuring connection for %s", connection.source.interface.c_str());
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] configuring connection for %s/%d", connection.source.interface.c_str(),
+                  connection.source.instance_id);
 
       if (connection.on_start.exists())
       {
-        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s on_start configuration requested", connection.source.interface.c_str());
-        connect_capability(plan.bond_id, connection.trigger_id, CapabilityEventCode::STARTED, connection.source, connection.on_start);
+        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection to %s/%d on_start configuration requested",
+                    connection.on_start.interface.c_str(), connection.on_start.instance_id);
+        connect_capability(plan.bond_id, CapabilityEventCode::STARTED, connection.source, connection.on_start);
       }
 
       if (connection.on_stop.exists())
       {
-        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s on_stop configuration requested", connection.source.interface.c_str()); 
-        connect_capability(plan.bond_id, connection.trigger_id, CapabilityEventCode::STOPPED, connection.source, connection.on_stop);
+        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection to %s/%d on_stop configuration requested",
+                    connection.on_stop.interface.c_str(), connection.on_stop.instance_id);
+        connect_capability(plan.bond_id, CapabilityEventCode::STOPPED, connection.source, connection.on_stop);
       }
 
       if (connection.on_success.exists())
       {
-        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s on_success configuration requested", connection.source.interface.c_str());
-        connect_capability(plan.bond_id, connection.trigger_id, CapabilityEventCode::SUCCEEDED, connection.source, connection.on_success);
+        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection to %s/%d on_success configuration requested",
+                    connection.on_success.interface.c_str(), connection.on_success.instance_id);
+        connect_capability(plan.bond_id, CapabilityEventCode::SUCCEEDED, connection.source, connection.on_success);
       }
 
       if (connection.on_failure.exists())
       {
-        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s on_failure configuration requested", connection.source.interface.c_str());
-        connect_capability(plan.bond_id, connection.trigger_id, CapabilityEventCode::FAILED, connection.source, connection.on_failure);
+        RCLCPP_INFO(node_->get_logger(), "[Capability client] connection to %s/%d on_failure configuration requested",
+                    connection.on_failure.interface.c_str(), connection.on_failure.instance_id);
+        connect_capability(plan.bond_id, CapabilityEventCode::FAILED, connection.source, connection.on_failure);
       }
-
-      RCLCPP_INFO(node_->get_logger(), "[Capability client] connection for %s configured successfully", connection.source.interface.c_str());
     }
   }
 
@@ -509,6 +514,7 @@ public:
     std::unique_lock<std::mutex> lock(mtx);
 
     request_trigger->bond_id = plan.bond_id;
+    request_trigger->instance_id = std::to_string(plan.connections[0].source.instance_id);
     request_trigger->capability.capability = plan.connections[0].source.interface;
     request_trigger->capability.parameters = plan.connections[0].source.parameters.toMsg().parameters;
 
