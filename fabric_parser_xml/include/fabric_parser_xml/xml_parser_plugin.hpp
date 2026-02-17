@@ -351,7 +351,6 @@ protected:
     node.source.provider = "capabilities2_runner/InputMultiplexRunner";
     node.source.instance_id = runner_index;
     node.source.parameters.set_value("input_count", input_count, capabilities2_events::OptionType::INT);
-    node.source.parameters.set_value("id", runner_index, capabilities2_events::OptionType::INT);
 
     plan.connections[connection_id] = node;
     plan.connections[connection_id].description = description;
@@ -390,7 +389,6 @@ protected:
     node.source.provider = "capabilities2_runner/InputMultiplexRunner";
     node.source.instance_id = runner_index;
     node.source.parameters.set_value("input_count", input_count, capabilities2_events::OptionType::INT);
-    node.source.parameters.set_value("id", runner_index, capabilities2_events::OptionType::INT);
 
     plan.connections[connection_id] = node;
     plan.connections[connection_id].description = description;
@@ -418,24 +416,24 @@ protected:
    * @param predecessor The predecessor node_t containing the source runner
    * @param successor The successor node_t to be updated
    */
-  void check_and_update_runner_id(fabric::connection& predecessor, fabric::connection& successor)
-  {
-    // check if predecessor is a system runner and has parameters
-    if (predecessor.source.interface.find("capabilities2_runner/InputMultiplexRunner") != std::string::npos)
-    {
-      // If the predecessor is a system runner, we need to update the successor's parameters with the predecessor's id
-      if (predecessor.source.parameters.has_value("id"))
-      {
-        // Get the id attribute from the predecessor system runner
-        int id = std::any_cast<int>(predecessor.source.parameters.get_value("id", 0));
+  // void check_and_update_runner_id(fabric::connection& predecessor, fabric::connection& successor)
+  // {
+  //   // check if predecessor is a system runner and has parameters
+  //   if (predecessor.source.interface.find("capabilities2_runner/InputMultiplexRunner") != std::string::npos)
+  //   {
+  //     // If the predecessor is a system runner, we need to update the successor's parameters with the predecessor's id
+  //     if (predecessor.source.parameters.has_value("id"))
+  //     {
+  //       // Get the id attribute from the predecessor system runner
+  //       int id = std::any_cast<int>(predecessor.source.parameters.get_value("id", 0));
 
-        // Set the id attribute for the successor system runner
-        successor.source.parameters.set_value("id", id, capabilities2_events::OptionType::INT);
+  //       // Set the id attribute for the successor system runner
+  //       successor.source.parameters.set_value("id", id, capabilities2_events::OptionType::INT);
 
-        RCLCPP_INFO(node_->get_logger(), "[xml_parser] Updated successor runner id to %d", id);
-      }
-    }
-  }
+  //       RCLCPP_INFO(node_->get_logger(), "[xml_parser] Updated successor runner id to %d", id);
+  //     }
+  //   }
+  // }
 
   /**
    * @brief convert tinyxml2::XMLElement attributes to EventParameters. Treats the original attributes as string
@@ -623,9 +621,6 @@ protected:
       connection.source.parameters = convert_xml_to_event_parameters(element);
       connection.source.instance_id = runner_index;
 
-      // set runner id unique identifier
-      connection.source.parameters.set_value("id", runner_index, capabilities2_events::OptionType::INT);
-
       predecessor_id = connection_id - 1;
 
       plan.connections[connection_id] = connection;
@@ -642,19 +637,23 @@ protected:
         {
           // Set the target_on_success for the predecessor connection
           plan.connections[predecessor_id].on_success = plan.connections[connection_id].source;
-          RCLCPP_INFO(node_->get_logger(), "[xml_parser] Set on_success for connection id %d to interface %s", predecessor_id, plan.connections[predecessor_id].on_success.interface.c_str());
+
+          RCLCPP_INFO(node_->get_logger(), "[xml_parser] set on_success for id %d to interface %s", predecessor_id,
+                      plan.connections[predecessor_id].on_success.interface.c_str());
         }
         else if (connection_type == fabric::event::ON_START)
         {
           // Set the target_on_start for the predecessor connection
           plan.connections[predecessor_id].on_start = plan.connections[connection_id].source;
-          RCLCPP_INFO(node_->get_logger(), "[xml_parser] Set on_start for connection id %d to interface %s", predecessor_id, plan.connections[predecessor_id].on_start.interface.c_str());
+          RCLCPP_INFO(node_->get_logger(), "[xml_parser] set on_start for id %d to interface %s", predecessor_id,
+                      plan.connections[predecessor_id].on_start.interface.c_str());
         }
         else if (connection_type == fabric::event::ON_FAILURE)
         {
           // Set the target_on_failure for the predecessor connection
           plan.connections[predecessor_id].on_failure = plan.connections[connection_id].source;
-          RCLCPP_INFO(node_->get_logger(), "[xml_parser] Set on_failure for connection id %d to interface %s", predecessor_id, plan.connections[predecessor_id].on_failure.interface.c_str());
+          RCLCPP_INFO(node_->get_logger(), "[xml_parser] set on_failure for id %d to interface %s", predecessor_id,
+                      plan.connections[predecessor_id].on_failure.interface.c_str());
         }
       }
 

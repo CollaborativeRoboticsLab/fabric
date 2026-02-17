@@ -419,7 +419,7 @@ public:
 
     request->bond_id = bond_id;
     request->instance_id = std::to_string(source.instance_id);
-    request->child_instance_id = std::to_string(target.instance_id);
+    request->target_instance_id = std::to_string(target.instance_id);
 
     request->connection.type.code = code;
 
