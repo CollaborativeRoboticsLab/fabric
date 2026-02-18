@@ -16,13 +16,3 @@
 | [Example 1](./../fabric/docs/prompt_example1.md) | Implements requesting for robot's capabilities and prompting them to the LLM |
 | [Example 2](./../fabric/docs/prompt_example2.md) | Implements listening for robot's pose and prompting them to the LLM 
 | [Example 3](./../fabric/docs/prompt_example3.md) | Implements prompting the LLM for a plan for a new task and setting it to Fabric |
-
-## Navigation
-
-| &nbsp; Example &nbsp; | Description |
-| ---     | ---         |
-| [Example 1](./../fabric/docs/generative_example1.md) | Implements the execution plan generation to acheive one point to another. |
-| [Example 2](./../fabric/docs/generative_example2.md) | Implements the execution plan generation to acheive waypoint navigation. |
-| [Example 3](./../fabric/docs/generative_example3.md) | Implements the execution plan generation to acheive waypoint navigation with  one unreachable point having recovery point. |
-| [Example 4](./../fabric/docs/generative_example4.md) | Implements the execution plan generation to acheive waypoint navigation with two unreachable points having recovery points. |
-| [Example 5](./../fabric/docs/generative_example5.md) | Implements the execution plan generation to acheive waypoint navigation with two unreachable points having two recovery points. Two reachable points also have two recovery points. |
