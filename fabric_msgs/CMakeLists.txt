@@ -15,20 +15,21 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 
-set(action_files
-  "action/Plan.action"
-)
 
 set(srv_files
-  "srv/GetFabricStatus.srv"
   "srv/SetFabricPlan.srv"
   "srv/CancelFabricPlan.srv"
   "srv/CompleteFabric.srv"
+  "srv/GetPlanStatus.srv"
+)
+
+set(msg_files
+  "msg/FabricStatus.msg"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  ${action_files}
   ${srv_files}
+  ${msg_files}
   DEPENDENCIES builtin_interfaces std_msgs
 )
 

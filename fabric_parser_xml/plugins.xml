@@ -1,0 +1,7 @@
+<library path="fabric_parser_xml">
+  <class type="fabric::XMLParser" base_class_type="fabric::ParserBase">
+    <description>
+      Parses the XML plan into a fabric::Plan object.
+    </description>
+  </class>
+</library>

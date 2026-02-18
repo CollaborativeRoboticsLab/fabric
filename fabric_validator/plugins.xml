@@ -1,0 +1,7 @@
+<library path="fabric_validator">
+  <class type="fabric::CompatibilityValidation" base_class_type="fabric::ValidationBase">
+    <description>
+      Validates the XML plan for syntax errors.
+    </description>
+  </class>
+</library>

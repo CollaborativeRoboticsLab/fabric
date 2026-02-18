@@ -1,0 +1,6 @@
+std_msgs/Header header
+string plan_id
+---
+std_msgs/Header header
+FabricStatus status
+string[] rejected_list

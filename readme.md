@@ -10,10 +10,22 @@ Currently the system support 4 types of Control fuctions
 
 ## Features
 
-- Implements a Finite State Machine based on the XML execution plan
+- Implements a Partially Incomplete Finite State Machine based on the XML execution plan
 - Validates the XML plan for compatibility with robot.
 - Parses XML-based plans and identifies connections between capabilities.
-- Informs capabilities2 framework regarding the capability connections and orchestrate a FSM
+- Informs capabilities2 framework regarding the capability connections and orchestrate a FSM.
+
+## Read more about,
+
+- [XML Plan strucutre](./docs/xml_plan.md)
+- [Parser Plugins](./docs/parser_plugins.md)
+- [Validation Plugins](./docs/validation_plugins.md)
+- [Capability Client](./docs/capability_client.md)
+- [Bond Client](./docs/bond_client.md)
+- [Internal Data Structures](./docs/structs.md)
+- [ROS2 Interface](./docs/api.md)
+- [Fabric Status system](./docs/status.md)
+- [Examples and Testing](./docs/examples.md)
 
 ## Setting the Fabric
 
@@ -55,9 +67,3 @@ Finally start the capabilities2 server. Run the following on a new terminal
 source install/setup.bash
 ros2 launch fabric fabric.launch.py
 ```
-
-## More information
-
-- [XML Plan parsing](./docs/xml-plan=parsing.md)
-- [API information](./docs/api.md)
-- [Examples and Testing](./docs/examples.md)
