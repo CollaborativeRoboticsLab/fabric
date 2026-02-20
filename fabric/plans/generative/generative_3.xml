@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Plan>
+    <Control type="sequential" >
+        <Runner interface="capabilities2_runner/GetCapabilitySpecsRunner" provider="capabilities2_runner/GetCapabilitySpecsRunner"/>
+        <Runner interface="prompt_capabilities/PromptCapabilityRunner" provider="prompt_capabilities/PromptCapabilityRunner" flush="false"  uuid="prompt-test-uuid"/>
+        <Runner interface="nav2_capabilities/RobotPoseRunner" provider="nav2_capabilities/RobotPoseRunner" map="map" odom="odom" robot="base_link"/>
+        <Runner interface="prompt_capabilities/PromptPoseRunner" provider="prompt_capabilities/PromptPoseRunner" flush="false" uuid="prompt-test-uuid"/>
+        <Runner interface="prompt_capabilities/PromptPlanRunner" provider="prompt_capabilities/PromptPlanRunner" replan="false" flush="true" uuid="prompt-test-uuid" task="move to (2.0, -0.5), (1.0, 3.0), (-2.0, 0.0), (0.0, -2.0) in order. If (1.0, 3.0) cannot be reached, move to (0.0, 2.0)" />
+        <Runner interface="fabric_capabilities/FabricSetPlanRunner" provider="fabric_capabilities/FabricSetPlanRunner"/>
+    </Control>
+</Plan>
