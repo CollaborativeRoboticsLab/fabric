@@ -23,10 +23,12 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
     ros-${ROS_DISTRO}-rmw-fastrtps-cpp \
     ros-${ROS_DISTRO}-vision-opencv \
+    ros-${ROS_DISTRO}-cv-bridge \
     libportaudio2 \
     portaudio19-dev \
+    python3-pyaudio \
     && rm -rf /var/lib/apt/lists/*
-    
+
 RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
