@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libportaudio2 \
     portaudio19-dev \
     python3-pyaudio \
+    alsa-utils \
     && rm -rf /var/lib/apt/lists/*
 
 RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
