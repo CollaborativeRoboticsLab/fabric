@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Plan>
+    <Control type="sequential" >
+        <Runner interface="capabilities2_runner/PromptTextRunner" provider="capabilities2_runner/PromptTextRunner" flush="false"  uuid="prompt-test-uuid" text="World information: Point A is coordinates (2.0, -0.5), Point B is coordinates (3.0, 1.0)"/>
+        <Runner interface="capabilities2_runner/GetCapabilitySpecsRunner" provider="capabilities2_runner/GetCapabilitySpecsRunner"/>
+        <Runner interface="prompt_capabilities/PromptCapabilityRunner" provider="prompt_capabilities/PromptCapabilityRunner" flush="false"  uuid="prompt-test-uuid"/>
+        <Runner interface="nav2_capabilities/RobotPoseRunner" provider="nav2_capabilities/RobotPoseRunner" map="map" odom="odom" robot="base_link"/>
+        <Runner interface="prompt_capabilities/PromptPoseRunner" provider="prompt_capabilities/PromptPoseRunner" flush="false" uuid="prompt-test-uuid"/>
+        <Runner interface="prompt_capabilities/PromptPlanRunner" provider="prompt_capabilities/PromptPlanRunner" replan="false" flush="true" uuid="prompt-test-uuid" task="Go to point A, If there is a person nearby, ask for name. 
+        Come back to the origin and tell the name. If there is no person nearby, go to the point B." />
+        <Runner interface="fabric_capabilities/FabricSetPlanRunner" provider="fabric_capabilities/FabricSetPlanRunner"/>
+    </Control>
+</Plan>
