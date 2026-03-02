@@ -3,9 +3,14 @@
   "dockerFile": "Dockerfile",
   "remoteUser": "ubuntu",
   "containerEnv": {
-    "DISPLAY": "${localEnv:DISPLAY}",
-    "ROS_DOMAIN_ID": "10",
-    "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp"
+    "DISPLAY": "${localEnv:DISPLAY}",    
+    "RMW_IMPLEMENTATION": "rmw_fastrtps_cpp",
+    // "ROS_DISCOVERY_SERVER": "10.0.0.192:11811",
+    "ROS_DISCOVERY_SERVER": "127.0.0.1:11811",
+    "ROS_DOMAIN_ID": "0",
+    "ROS_SUPER_CLIENT": "1",
+    "NO_AT_BRIDGE": "1"
+    // "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp"
   },
   "runArgs": [
     "--privileged",
