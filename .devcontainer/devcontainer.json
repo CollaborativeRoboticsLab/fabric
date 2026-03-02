@@ -4,12 +4,8 @@
   "remoteUser": "ubuntu",
   "containerEnv": {
     "DISPLAY": "${localEnv:DISPLAY}",
-    "RMW_IMPLEMENTATION": "rmw_fastrtps_cpp",
-    "ROS_DISCOVERY_SERVER": "10.42.0.1:11811",
     "ROS_DOMAIN_ID": "10",
-    "ROS_SUPER_CLIENT": "1",
-    "NO_AT_BRIDGE": "1"
-    // "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp"
+    "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp"
   },
   "runArgs": [
     "--privileged",
