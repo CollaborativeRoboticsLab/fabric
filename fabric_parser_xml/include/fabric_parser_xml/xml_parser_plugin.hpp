@@ -55,7 +55,6 @@ public:
     RCLCPP_INFO(node_->get_logger(), "Plan loaded from : %s", file_path.c_str());
 
     convert_to_string(default_document, plan.plan);
-    RCLCPP_INFO(node_->get_logger(), "Plan converted to string. Content are: \n\n %s", plan.plan.c_str());
 
     return true;
   }
@@ -92,6 +91,8 @@ public:
    */
   void parse(fabric::Plan& plan) override
   {
+    RCLCPP_INFO(node_->get_logger(), "Plan being parsed: \n\n %s", plan.plan.c_str());
+
     // parse the fabric::plan into a XML document
     current_document_.Parse(plan.plan.c_str());
 

@@ -7,13 +7,13 @@
     # plan_file_path: "install/fabric/share/fabric/plans/navigation/navigation_4.xml"   # 5 point navigation with 4 point inaccessible (4 recoveries) example
     # plan_file_path: "install/fabric/share/fabric/plans/prompt/prompt_1.xml"           # PromptCapabilityRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/prompt/prompt_2.xml"           # PromptPoseRunner Example
-    plan_file_path: "install/fabric/share/fabric/plans/prompt/prompt_3.xml"           # PromptPlanRunner Example
+    # plan_file_path: "install/fabric/share/fabric/plans/prompt/prompt_3.xml"           # PromptPlanRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_1.xml"   # Generative Example 1 - Single point navigation
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_2.xml"   # PromptOccupancyRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_3.xml"   # PromptPoseRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_4.xml"   # PromptPlanRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_5.xml"   # PromptPlanRunner Example
-    # plan_file_path: "install/fabric/share/fabric/plans/perception/perception_1.xml"   # PromptPlanRunner Example
+    plan_file_path: "install/fabric/share/fabric/plans/perception/perception_1.xml"   # PromptPlanRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/perception/perception_2.xml"   # PromptPlanRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/perception/perception_3.xml"   # PromptPlanRunner Example
 
