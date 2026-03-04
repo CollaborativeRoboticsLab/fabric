@@ -1,4 +1,4 @@
-FROM ros:humble
+FROM ros:jazzy
 
 # Add vscode user with same UID and GID as your host system
 # (modified from https://code.visualstudio.com/remote/advancedcontainers/add-nonroot-user#_creating-a-nonroot-user)
@@ -28,7 +28,11 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     portaudio19-dev \
     python3-pyaudio \
     alsa-utils \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /etc/turtlebot4
+RUN wget https://raw.githubusercontent.com/turtlebot/turtlebot4_setup/galactic/conf/cyclonedds_pc.xml
 
 RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
@@ -41,6 +45,7 @@ RUN rosdep update
 
 # Source the ROS setup file
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
+RUN echo "export CYCLONEDDS_URI=/etc/turtlebot4/cyclonedds_pc.xml" >> ~/.bashrc
 
 # make sure folders exist
 WORKDIR /home/$USERNAME/colcon_ws/src 
@@ -53,9 +58,9 @@ RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2.git -b d
 # RUN git clone https://github.com/CollaborativeRoboticsLab/nav2_capabilities.git
 # RUN git clone https://github.com/CollaborativeRoboticsLab/fabric_capabilities.git
 
-git clone --recurse-submodules https://github.com/CollaborativeRoboticsLab/prompt_tools.git
-git clone https://github.com/CollaborativeRoboticsLab/prompt_capabilities.git
-git clone https://github.com/CollaborativeRoboticsLab/perception.git
-git clone https://github.com/CollaborativeRoboticsLab/perception_capabilities.git
-git clone https://github.com/CollaborativeRoboticsLab/nav2_capabilities.git
-git clone https://github.com/CollaborativeRoboticsLab/fabric_capabilities.git
+# git clone --recurse-submodules https://github.com/CollaborativeRoboticsLab/prompt_tools.git
+# git clone https://github.com/CollaborativeRoboticsLab/prompt_capabilities.git
+# git clone https://github.com/CollaborativeRoboticsLab/perception.git
+# git clone https://github.com/CollaborativeRoboticsLab/perception_capabilities.git
+# git clone https://github.com/CollaborativeRoboticsLab/nav2_capabilities.git
+# git clone https://github.com/CollaborativeRoboticsLab/fabric_capabilities.git

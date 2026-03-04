@@ -1,0 +1,36 @@
+{
+  "name": "Fabric humble devcontainer",
+  "dockerFile": "Dockerfile",
+  "remoteUser": "ubuntu",
+  "containerEnv": {
+    "DISPLAY": "${localEnv:DISPLAY}",    
+    // "RMW_IMPLEMENTATION": "rmw_fastrtps_cpp",
+    // "ROS_DISCOVERY_SERVER": "192.168.185.3:11811",
+    // "ROS_SUPER_CLIENT": "1",
+    // "NO_AT_BRIDGE": "1"
+    "ROS_DOMAIN_ID": "10",
+    "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp"
+  },
+  "runArgs": [
+    "--privileged",
+    "--network=host"
+  ],
+  "workspaceMount": "source=${localWorkspaceFolder},target=/home/ubuntu/colcon_ws/src/${localWorkspaceFolderBasename},type=bind",
+  "workspaceFolder": "/home/ubuntu/colcon_ws",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/ubuntu/.bash_history,type=bind",
+    "source=/dev,target=/dev,type=bind"
+  ],
+  "customizations": { 
+    "vscode": {
+        "extensions": [
+            "ms-vscode.cpptools",
+            "ms-vscode.cmake-tools"
+          ]
+    },
+    "settings": {
+        "terminal.integrated.shell.*": "/bin/bash"
+    }
+  }     
+
+}
