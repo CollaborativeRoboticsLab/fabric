@@ -69,7 +69,7 @@ ament_target_dependencies(${PROJECT_NAME}_comp
 )
 
 rclcpp_components_register_node(${PROJECT_NAME}_comp
-  PLUGIN "Fabric"
+  PLUGIN "fabric_server::FabricServer"
   EXECUTABLE fabric_component
 )
 
