@@ -56,3 +56,7 @@ RUN git clone https://github.com/CollaborativeRoboticsLab/capabilities2.git -b d
 # git clone https://github.com/CollaborativeRoboticsLab/perception_capabilities.git
 # git clone https://github.com/CollaborativeRoboticsLab/nav2_capabilities.git
 # git clone https://github.com/CollaborativeRoboticsLab/fabric_capabilities.git
+
+# "ros2 launch turtlebot4_navigation slam.launch.py"
+# "ros2 launch turtlebot4_navigation nav2.launch.py"
+# "ros2 launch turtlebot4_viz view_navigation.launch.py"

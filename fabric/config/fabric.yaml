@@ -13,9 +13,9 @@
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_3.xml"   # PromptPoseRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_4.xml"   # PromptPlanRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/generative/generative_5.xml"   # PromptPlanRunner Example
-    plan_file_path: "install/fabric/share/fabric/plans/perception/perception_1.xml"   # PromptPlanRunner Example
+    # plan_file_path: "install/fabric/share/fabric/plans/perception/perception_1.xml"   # PromptPlanRunner Example
     # plan_file_path: "install/fabric/share/fabric/plans/perception/perception_2.xml"   # PromptPlanRunner Example
-    # plan_file_path: "install/fabric/share/fabric/plans/perception/perception_3.xml"   # PromptPlanRunner Example
+    plan_file_path: "install/fabric/share/fabric/plans/perception/perception_3.xml"   # PromptPlanRunner Example
 
     compatibility_validation_plugin: fabric::CompatibilityValidation
     parsing_plugin : fabric::XMLParser
