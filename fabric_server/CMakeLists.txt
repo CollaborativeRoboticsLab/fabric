@@ -90,5 +90,17 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY plans
+  DESTINATION share/${PROJECT_NAME}
+)
+
 ament_export_libraries(${PROJECT_NAME}_comp)
 ament_package()

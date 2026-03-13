@@ -10,7 +10,7 @@ def generate_launch_description():
 
     # load config file
     capability_config = os.path.join(get_package_share_directory('capabilities2_server'), 'config', 'capabilities.yaml')
-    fabric_config = os.path.join(get_package_share_directory('fabric'), 'config', 'fabric.yaml')
+    fabric_config = os.path.join(get_package_share_directory('fabric_server'), 'config', 'fabric.yaml')
     prompt_config = os.path.join(get_package_share_directory('prompt_bridge'), 'config', 'prompt_bridge.yaml')
 
     # create bridge composition

@@ -1,0 +1,8 @@
+/**:
+  ros__parameters:      
+    compatibility_validation_plugin: fabric::CompatibilityValidation
+    parsing_plugin : fabric::XMLParser
+    capability_client:
+      bond_topic: "/capabilities/bond"
+      service_wait_timeout_sec: -1
+

@@ -25,7 +25,6 @@ Currently the system support 4 types of Control fuctions
 - [Internal Data Structures](./docs/structs.md)
 - [ROS2 Interface](./docs/api.md)
 - [Fabric Status system](./docs/status.md)
-- [Examples and Testing](./docs/examples.md)
 
 ## Setting the Fabric
 
@@ -65,7 +64,7 @@ Finally start the fabric server. Run the following on a new terminal
 
 ```bash
 source install/setup.bash
-ros2 launch fabric fabric.launch.py
+ros2 launch fabric_server fabric.launch.py
 ```
 
 ## Composed launch
@@ -82,7 +81,7 @@ This launch file starts Fabric Server and [Capabilities2 Server](https://github.
 
 ```bash
 source install/setup.bash
-ros2 launch fabric nongenerative.launch.py
+ros2 launch fabric_server nongenerative.launch.py
 ```
 
 ### Generative launch
@@ -92,7 +91,7 @@ This launch file starts Fabric Server, [Capabilities2 Server](https://github.com
 ```bash
 export OPENAI_API_KEY=
 source install/setup.bash
-ros2 launch fabric generative.launch.py
+ros2 launch fabric_server generative.launch.py
 ```
 
 ### Generative launch with perception
@@ -102,5 +101,5 @@ This launch file starts Fabric Server, [Capabilities2 Server](https://github.com
 ```bash
 export OPENAI_API_KEY=
 source install/setup.bash
-ros2 launch fabric generative_perception.launch.py
+ros2 launch fabric_server generative_perception.launch.py
 ```
