@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <mutex>
 #include <condition_variable>
 
@@ -66,6 +67,10 @@ public:
   {
     node_ = node;
 
+    if (!node_->has_parameter("capability_client.service_wait_timeout_sec"))
+      node_->declare_parameter<int>("capability_client.service_wait_timeout_sec", -1);
+    service_wait_timeout_sec_ = node_->get_parameter("capability_client.service_wait_timeout_sec").as_int();
+
     node_->declare_parameter<std::string>("capability_client.services.get_interfaces", "/capabilities/get_interfaces");
     node_->declare_parameter<std::string>("capability_client.services.get_semantic_interfaces", "/capabilities/get_semantic_interfaces");
     node_->declare_parameter<std::string>("capability_client.services.get_providers", "/capabilities/get_providers");
@@ -94,14 +99,14 @@ public:
     connect_capability_client_ = node_->create_client<ConnectCapability>(connect_capability_);
 
     // Wait for services to become available
-    wait_for_service(!get_interfaces_client_->wait_for_service(std::chrono::seconds(1)), get_interfaces_);
-    wait_for_service(!get_sem_interf_client_->wait_for_service(std::chrono::seconds(1)), get_semantic_interfaces_);
-    wait_for_service(!get_providers_client_->wait_for_service(std::chrono::seconds(1)), get_providers_);
-    wait_for_service(!establish_bond_client_->wait_for_service(std::chrono::seconds(1)), establish_bond_);
-    wait_for_service(!use_capability_client_->wait_for_service(std::chrono::seconds(1)), use_capability_);
-    wait_for_service(!free_capability_client_->wait_for_service(std::chrono::seconds(1)), free_capability_);
-    wait_for_service(!trig_capability_client_->wait_for_service(std::chrono::seconds(1)), trigger_capability_);
-    wait_for_service(!connect_capability_client_->wait_for_service(std::chrono::seconds(1)), connect_capability_);
+    wait_for_service(get_interfaces_client_, get_interfaces_);
+    wait_for_service(get_sem_interf_client_, get_semantic_interfaces_);
+    wait_for_service(get_providers_client_, get_providers_);
+    wait_for_service(establish_bond_client_, establish_bond_);
+    wait_for_service(use_capability_client_, use_capability_);
+    wait_for_service(free_capability_client_, free_capability_);
+    wait_for_service(trig_capability_client_, trigger_capability_);
+    wait_for_service(connect_capability_client_, connect_capability_);
 
     RCLCPP_INFO(node_->get_logger(), "[Capability client] initialized.");
   }
@@ -540,21 +545,41 @@ protected:
   /**
    * @brief Wait for a service to become available.
    */
-  void wait_for_service(bool wait_for_logic, const std::string& service_name)
+  template <typename ClientT>
+  void wait_for_service(const std::shared_ptr<ClientT>& client, const std::string& service_name)
   {
-    while (wait_for_logic)
+    using namespace std::chrono_literals;
+
+    auto start = std::chrono::steady_clock::now();
+    while (rclcpp::ok())
     {
+      if (client->wait_for_service(1s))
+      {
+        RCLCPP_INFO(node_->get_logger(), "[Capability client] %s connected", service_name.c_str());
+        return;
+      }
+
       RCLCPP_INFO(node_->get_logger(), "[Capability client] %s is not available", service_name.c_str());
-      rclcpp::shutdown();
-      return;
+
+      if (service_wait_timeout_sec_ >= 0)
+      {
+        const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start);
+        if (elapsed.count() >= service_wait_timeout_sec_)
+        {
+          throw fabric::fabric_exception("Timed out waiting for service: " + service_name);
+        }
+      }
     }
-    RCLCPP_INFO(node_->get_logger(), "[Capability client] %s connected", service_name.c_str());
+
+    throw fabric::fabric_exception("ROS shutdown while waiting for service: " + service_name);
   }
 
   /**
    * @brief pointer to the ROS2 node
    */
   rclcpp::Node::SharedPtr node_;
+
+  int service_wait_timeout_sec_{ -1 };
 
   /**
    * @brief service names

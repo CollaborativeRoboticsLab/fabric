@@ -25,7 +25,6 @@ Currently the system support 4 types of Control fuctions
 - [Internal Data Structures](./docs/structs.md)
 - [ROS2 Interface](./docs/api.md)
 - [Fabric Status system](./docs/status.md)
-- [Examples and Testing](./docs/examples.md)
 
 ## Setting the Fabric
 
@@ -52,8 +51,7 @@ Setup the [capabilities2](https://github.com/CollaborativeRoboticsLab/capabiliti
 
 `fabric/plans` folder includes sample XML plans that can be used to test the system. New plans can be added to the same folder or a different location. 
 
-Then modify the `fabric/config/fabric.yaml` file to change the active execution plan.
-A number of plans are availabe with the package and included in the `fabric.yaml` file that has been commented out. Uncomment them to use. Make sure to leave only one line uncommented.
+Then modify the `fabric/config/fabric.yaml` file to change the active execution plan. A number of plans are availabe with the package and included in the `fabric.yaml` file that has been commented out. Uncomment them to use. Make sure to leave only one line uncommented.
 
 ```yaml
 /**:
@@ -61,9 +59,47 @@ A number of plans are availabe with the package and included in the `fabric.yaml
     plan_file_path: "install/fabric/share/fabric/plans/default.xml"
     
 ```
-Finally start the capabilities2 server. Run the following on a new terminal
+
+Finally start the fabric server. Run the following on a new terminal
 
 ```bash
 source install/setup.bash
-ros2 launch fabric fabric.launch.py
+ros2 launch fabric_server fabric.launch.py
+```
+
+## Composed launch
+
+Composed launch is a more efficient approach to spin up a system under a single process. Positives are IPC via shared memory, providing lower latency and optimized resoirce usage. Draw back of this approach is that, it becomes harder for debugging and fault tolerence.
+
+Use independent launch files with standard node based implementations for debugging. For deployment, utilize composed launch where ever possible.
+
+We provide several composed launch files for launching the system.
+
+### Non generative launch
+
+This launch file starts Fabric Server and [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2). Suitable for non-generative use with predefined plans.
+
+```bash
+source install/setup.bash
+ros2 launch fabric_server nongenerative.launch.py
+```
+
+### Generative launch
+
+This launch file starts Fabric Server, [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2) and [Prompt Tools](https://github.com/CollaborativeRoboticsLab/prompt_tools). Suitable for generative use without perception.
+
+```bash
+export OPENAI_API_KEY=
+source install/setup.bash
+ros2 launch fabric_server generative.launch.py
+```
+
+### Generative launch with perception
+
+This launch file starts Fabric Server, [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2), [Prompt Tools](https://github.com/CollaborativeRoboticsLab/prompt_tools), and [Perception Server](https://github.com/CollaborativeRoboticsLab/perception) . Suitable for generative use with perception.
+
+```bash
+export OPENAI_API_KEY=
+source install/setup.bash
+ros2 launch fabric_server generative_perception.launch.py
 ```

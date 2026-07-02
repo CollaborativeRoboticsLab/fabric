@@ -69,7 +69,7 @@ ament_target_dependencies(${PROJECT_NAME}_comp
 )
 
 rclcpp_components_register_node(${PROJECT_NAME}_comp
-  PLUGIN "Fabric"
+  PLUGIN "fabric_server::FabricServer"
   EXECUTABLE fabric_component
 )
 
@@ -88,6 +88,18 @@ install(TARGETS ${PROJECT_NAME}_comp
 
 install(DIRECTORY include/
   DESTINATION include
+)
+
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY plans
+  DESTINATION share/${PROJECT_NAME}
 )
 
 ament_export_libraries(${PROJECT_NAME}_comp)
