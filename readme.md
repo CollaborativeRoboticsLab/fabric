@@ -2,11 +2,11 @@
 
 Fabric is a ROS2 package that provides a system to coordinate and manage various capabilities as defined by the [Capabilities2 framework](https://github.com/CollaborativeRoboticsLab/capabilities2). This package extends the functionality of the Capabilities2 package to implement a Finite State Machine based on capabilities. It is designed to parse an execution plan given via an XML file and  identify connections between various capabilities in the system which would be relayed back to Capabilities2 framework to execute.
 
-Currently the system support 4 types of Control fuctions 
-- `sequential` : provides sequential triggering of capabilities. Exits if any capabilities fail
-- `parallel-all` : provides parallel triggering of capabilities and waits until at least one completes to proceed
-- `parallel-any` : provides parallel triggering of capabilities and waits until all completes to proceed
-- `recovery` : provides sequential triggering of recovery capabilities if the predecessor outside the recovery block fails. Exits if any recovery capabilities succeed
+Currently the system supports 4 control functions:
+- `sequential`: triggers child runners in sequence.
+- `parallel_all`: waits for all child branches to report success before proceeding.
+- `parallel_any`: proceeds when any child branch reports success.
+- `recovery`: defines a recovery branch that can be triggered on failure.
 
 ## Features
 
@@ -49,22 +49,29 @@ Setup the [capabilities2](https://github.com/CollaborativeRoboticsLab/capabiliti
 
 ## Launching fabric
 
-`fabric/plans` folder includes sample XML plans that can be used to test the system. New plans can be added to the same folder or a different location. 
+The [fabric_server/plans/default.xml](./fabric_server/plans/default.xml) file is the default example plan. New plans can be added there or stored anywhere else on disk.
 
-Then modify the `fabric/config/fabric.yaml` file to change the active execution plan. A number of plans are availabe with the package and included in the `fabric.yaml` file that has been commented out. Uncomment them to use. Make sure to leave only one line uncommented.
+The [fabric_server/config/fabric.yaml](./fabric_server/config/fabric.yaml) file configures the parser plugin, validation plugin, and capability client settings. The plan path itself is provided by the launch file.
 
-```yaml
-/**:
-  ros__parameters:
-    plan_file_path: "install/fabric/share/fabric/plans/default.xml"
-    
-```
-
-Finally start the fabric server. Run the following on a new terminal
+Launch with the packaged default plan:
 
 ```bash
 source install/setup.bash
 ros2 launch fabric_server fabric.launch.py
+```
+
+Launch with a different packaged plan by filename:
+
+```bash
+source install/setup.bash
+ros2 launch fabric_server fabric.launch.py filename:=default.xml
+```
+
+Launch with an explicit plan path:
+
+```bash
+source install/setup.bash
+ros2 launch fabric_server fabric.launch.py plan_file_path:=/absolute/path/to/plan.xml
 ```
 
 ## Composed launch
@@ -86,7 +93,7 @@ ros2 launch fabric_server nongenerative.launch.py
 
 ### Generative launch
 
-This launch file starts Fabric Server, [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2) and [Prompt Tools](https://github.com/CollaborativeRoboticsLab/prompt_tools). Suitable for generative use without perception.
+This launch file starts Fabric Server, [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2), and `prompt_bridge`. Suitable for generative use without perception.
 
 ```bash
 export OPENAI_API_KEY=
@@ -96,7 +103,7 @@ ros2 launch fabric_server generative.launch.py
 
 ### Generative launch with perception
 
-This launch file starts Fabric Server, [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2), [Prompt Tools](https://github.com/CollaborativeRoboticsLab/prompt_tools), and [Perception Server](https://github.com/CollaborativeRoboticsLab/perception) . Suitable for generative use with perception.
+This launch file starts Fabric Server, [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2), `prompt_bridge`, and [Perception Server](https://github.com/CollaborativeRoboticsLab/perception). Suitable for generative use with perception.
 
 ```bash
 export OPENAI_API_KEY=

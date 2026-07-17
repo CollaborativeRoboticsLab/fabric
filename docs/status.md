@@ -1,10 +1,10 @@
 # Fabric Status System
 
 ## Overview
-The Fabric system uses a robust status tracking mechanism to represent the lifecycle and health of each plan being processed. Statuses are tracked internally using the `PlanStatus` enum and are exposed externally via the `fabric_msgs/msg/FabricStatus` message type.
+Fabric tracks plan lifecycle internally with `fabric::PlanStatus` and exposes it through `fabric_msgs/msg/FabricStatus`.
 
 ## Status Lifecycle
-Each plan submitted to the Fabric server transitions through a well-defined set of statuses, including:
+The current server code uses the following statuses during normal processing:
 
 - **UNKNOWN**: Initial or indeterminate state.
 - **QUEUED**: Plan is queued for processing.
@@ -20,15 +20,24 @@ Each plan submitted to the Fabric server transitions through a well-defined set 
 - **CAPABILITY_CONNECT_FAILED**: Failed to connect capabilities.
 - **RUNNING**: Plan is actively running.
 - **COMPLETED**: Plan execution completed successfully.
-- **CANCELLED**: Plan was cancelled by the user or system.
+- **CANCELLED**: Plan execution was cancelled before completion.
+
+When `/fabric/cancel_plan` targets the active plan, the server now marks it `CANCELLED`, stops the bond, wakes the processing thread, and frees allocated capabilities before moving on.
 
 ## Retrieving Plan Status
 
-The status of any plan can be retrieved using the `/fabric/get_plan_status` ROS2 service. This service returns:
+The status of any plan can be retrieved using the `/fabric/get_plan_status` ROS2 service.
 
-- The current status code (as `fabric_msgs/msg/FabricStatus`)
-- The plan ID
-- A list of rejected items (if validation or parsing failed)
+Request fields:
+
+- `header`
+- `plan_id`
+
+Response fields:
+
+- `header`
+- `status` as `fabric_msgs/msg/FabricStatus`
+- `rejected_list`
 
 ### Example Service Call
 
@@ -41,16 +50,17 @@ ros2 service call /fabric/get_plan_status fabric_msgs/srv/GetPlanStatus "{plan_i
 ```
 status:
   code: 5  # VALIDATION_FAILED
-plan_id: "123e4567-e89b-12d3-a456-426614174000"
 rejected_list:
   - "Missing required capability: foo"
   - "Incompatible provider: bar"
 ```
 
+In the current implementation, `rejected_list` is populated by parser syntax checks. Validation failures from `CompatibilityValidation` throw immediately and may leave `rejected_list` empty.
+
 ## Status Conversion
 
-Internally, the Fabric server uses the `PlanStatus` enum (see `structs.hpp`) to track status. When responding to a status request, the server converts this enum to the appropriate `FabricStatus` message code in the callback, ensuring that only the server node depends on the ROS message type.
+When responding to a status request, the server maps `PlanStatus` to `fabric_msgs/msg/FabricStatus` in `status_msg()`.
 
 ## Extensibility
 
-The status system is designed to be type-safe, extensible, and easy to integrate with client applications. New statuses can be added to the `PlanStatus` enum and mapped in the server callback as needed.
+New statuses can be added by extending `PlanStatus` and updating the status mapping in the server.

@@ -19,7 +19,7 @@ The `CapabilityClient` class in Fabric is responsible for all interactions with 
 
 | Method                          | Purpose                                                                 | Related Capability Service                |
 |----------------------------------|-------------------------------------------------------------------------|-------------------------------------------|
-| `initialize(node)`               | Set up all service clients and parameters                               | (all services below)                      |
+| `initialize(node)`               | Set up service clients, read service names from `capability_client.services.*`, and wait for each service to become available | (all services below) |
 | `getInterfaces(capabilities)`    | Query all available interfaces and populate the list                    | `/capabilities/get_interfaces`            |
 | `getSemanticInterfaces(capabilities)` | Query and append semantic interfaces for each capability         | `/capabilities/get_semantic_interfaces`   |
 | `getProviders(capabilities)`     | Query and set providers and alternatives for each capability            | `/capabilities/get_providers`             |
@@ -65,7 +65,7 @@ The `CapabilityClient` class in Fabric is responsible for all interactions with 
 ## Error Handling
 - All service calls are checked for validity and throw `fabric::fabric_exception` on failure.
 
-- The client waits for each service to become available before proceeding.
+- The client waits for each service to become available before proceeding. The wait timeout is controlled by `capability_client.service_wait_timeout_sec`.
 
 - If any step fails, capabilities are freed and errors are logged.
 

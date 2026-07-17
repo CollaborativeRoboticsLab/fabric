@@ -4,7 +4,7 @@ This document describes the core data structures (structs) used in Fabric, their
 
 ## Overview
 
-The main structs are defined in `fabric_base/structs.hpp` and are central to representing plans, nodes, connections, and capabilities in the Fabric execution engine.
+The main structs are defined in `fabric_base/utils/structs.hpp` and are central to representing plans, nodes, connections, and capabilities in the Fabric execution engine.
 
 ## Structs Summary
 
@@ -14,6 +14,7 @@ The main structs are defined in `fabric_base/structs.hpp` and are central to rep
 | `connection`  | Represents a directed connection between nodes               |
 | `Plan`        | Represents a parsed plan, including all connections          |
 | `CapabilityInfo` | Describes a capability's interface, provider, and metadata |
+| `event`       | Enumerates supported event hooks (`ON_START`, `ON_SUCCESS`, `ON_FAILURE`, `ON_STOP`) |
 
 ---
 
@@ -25,11 +26,11 @@ Represents a single runner or capability in the plan.
 |---------------|-------------------------|---------------------------------------------|
 | `interface`   | `std::string`           | Interface name of the runner/capability     |
 | `provider`    | `std::string`           | Provider name of the runner/capability      |
-| `parameters`  | `tinyxml2::XMLElement*` | XML parameters for the runner/capability    |
+| `parameters`  | `capabilities2_events::EventParameters` | Runner parameters converted from XML attributes |
+| `instance_id` | `int`                   | Parser-assigned instance identifier         |
 
 **Key Methods:**
-- `exists() const`: Returns true if the node is valid (all fields set).
-- `parameter_to_string() const`: Serializes the parameters to a string.
+- `exists() const`: Returns true when both `interface` and `provider` are set.
 
 **Usage:**
 - Used as the source and target in `connection`.
@@ -49,7 +50,6 @@ Represents a directed edge in the plan's execution graph, connecting nodes and s
 | `on_success`  | `node`      | Node to trigger on success event            |
 | `on_failure`  | `node`      | Node to trigger on failure event            |
 | `description` | `std::string` | Human-readable description                 |
-| `trigger_id`  | `int`       | Unique ID for event triggering             |
 
 **Usage:**
 - Populated by the parser when traversing the XML plan.
@@ -63,10 +63,12 @@ Represents the entire parsed plan, including all connections and metadata.
 
 | Field           | Type                          | Description                                 |
 |-----------------|-------------------------------|---------------------------------------------|
+| `plan_id`       | `std::string`                 | Generated identifier used for tracking      |
 | `bond_id`       | `std::string`                 | Unique bond identifier for the plan         |
 | `plan`          | `std::string`                 | Raw XML plan as a string                    |
 | `connections`   | `std::map<int, connection>`   | All connections in the plan                 |
 | `rejected_list` | `std::vector<std::string>`    | List of rejected/invalid elements           |
+| `status`        | `PlanStatus`                  | Current lifecycle state for the plan        |
 
 **Usage:**
 - Created and populated by the parser plugin.

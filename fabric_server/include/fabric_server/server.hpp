@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <tinyxml2.h>
 #include <uuid/uuid.h>
 #include <rclcpp/rclcpp.hpp>
@@ -72,7 +73,8 @@ public:
     /*************************************************************************
      * Parameters
      ************************************************************************/
-    this->declare_parameter("plan_file_path", "install/fabric/share/fabric/plans/default.xml");
+    const std::string default_plan_file_path = ament_index_cpp::get_package_share_directory("fabric_server") + "/plans/default.xml";
+    this->declare_parameter("plan_file_path", default_plan_file_path);
     plan_file_path_ = this->get_parameter("plan_file_path").as_string();
 
     /*************************************************************************
@@ -164,6 +166,12 @@ protected:
       // get the next plan and parse it into a XML document
       current_plan_ = plan_queue_.front();
       plan_queue_.pop_front();
+
+      if (current_plan_.status == PlanStatus::CANCELLED)
+      {
+        RCLCPP_INFO(this->get_logger(), "[server] Skipping cancelled plan with id: %s", current_plan_.plan_id.c_str());
+        continue;
+      }
 
       // parse the plan to extract connections (Fabric::Plan) as per the parsing plugin
       try
@@ -301,6 +309,13 @@ protected:
         plan_cv_.wait(lock, [this]() { return plan_completed_; });
       }
 
+      if (current_plan_.status == PlanStatus::CANCELLED)
+      {
+        RCLCPP_INFO(this->get_logger(), "[server] Fabric plan cancelled. Releasing capabilities.");
+        capability_client_->free_capabilities(current_plan_);
+        continue;
+      }
+
       current_plan_.status = PlanStatus::COMPLETED;
       RCLCPP_INFO(this->get_logger(), "[server] Fabric processing completed. Waiting for next plan.");
     }
@@ -336,22 +351,29 @@ protected:
    */
   void cancelPlanCallback(const std::shared_ptr<CancelFabricPlan::Request> request, std::shared_ptr<CancelFabricPlan::Response> response)
   {
-    RCLCPP_INFO(this->get_logger(), "[server] Plan canncelling requested");
+    RCLCPP_INFO(this->get_logger(), "[server] Plan cancelling requested");
     std::string plan_id = request->plan_id;
     std::string bond_id_to_cancel;
+    bool found = false;
 
     // search for the bond id associated with the plan id from current plan or plan queue
     if (current_plan_.plan_id == plan_id)
     {
+      current_plan_.status = PlanStatus::CANCELLED;
       bond_id_to_cancel = current_plan_.bond_id;
+      plan_completed_ = true;
+      plan_cv_.notify_all();
+      found = true;
     }
     else
     {
-      for (const auto& plan : plan_queue_)
+      for (auto& plan : plan_queue_)
       {
         if (plan.plan_id == plan_id)
         {
+          plan.status = PlanStatus::CANCELLED;
           bond_id_to_cancel = plan.bond_id;
+          found = true;
           break;
         }
       }
@@ -373,7 +395,7 @@ protected:
       }
     }
 
-    response->success = true;
+    response->success = found;
   }
 
   /**

@@ -30,7 +30,7 @@ def generate_launch_description():
             ),
             ComposableNode(
                 package='fabric_server',
-                plugin='fabric_server::FabricServer',
+                plugin='fabric::Fabric',
                 name='fabric_server',
                 output='screen',
                 parameters=[fabric_config],
