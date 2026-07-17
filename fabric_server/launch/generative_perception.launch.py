@@ -27,29 +27,25 @@ def generate_launch_description():
                 package='capabilities2_server',
                 plugin='capabilities2_server::CapabilitiesServer',
                 name='capabilities',
-                parameters=[capability_config],
-                output='screen'
+                parameters=[capability_config]
             ),
             ComposableNode(
                 package='fabric_server',
                 plugin='fabric::Fabric',
                 name='fabric_server',
-                output='screen',
                 parameters=[fabric_config]
             ),
             ComposableNode(
                 package='prompt_bridge',
                 plugin='prompt_bridge::PromptBridge',
                 name='prompt_bridge',
-                parameters=[prompt_config],
-                output='screen'
+                parameters=[prompt_config]
             ),
             ComposableNode(
                 package='perception',
                 plugin='perception::PerceptionServer',
                 name='perception',
-                parameters=[perception_config],
-                output='screen'
+                parameters=[perception_config]
             )
         ]
     )
