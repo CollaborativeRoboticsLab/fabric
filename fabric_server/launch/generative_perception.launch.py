@@ -10,7 +10,7 @@ def generate_launch_description():
 
     # load config file
     capability_config = os.path.join(get_package_share_directory('capabilities2_server'), 'config', 'capabilities.yaml')
-    fabric_config = os.path.join(get_package_share_directory('fabric'), 'config', 'fabric.yaml')
+    fabric_config = os.path.join(get_package_share_directory('fabric_server'), 'config', 'fabric.yaml')
     prompt_config = os.path.join(get_package_share_directory('prompt_bridge'), 'config', 'prompt_bridge.yaml')
     perception_config = os.path.join(get_package_share_directory('perception'), 'config', 'config.yaml')
 
@@ -27,29 +27,25 @@ def generate_launch_description():
                 package='capabilities2_server',
                 plugin='capabilities2_server::CapabilitiesServer',
                 name='capabilities',
-                parameters=[capability_config],
-                output='screen'
+                parameters=[capability_config]
             ),
             ComposableNode(
                 package='fabric_server',
-                plugin='fabric_server::FabricServer',
+                plugin='fabric::Fabric',
                 name='fabric_server',
-                output='screen',
                 parameters=[fabric_config]
             ),
             ComposableNode(
                 package='prompt_bridge',
                 plugin='prompt_bridge::PromptBridge',
                 name='prompt_bridge',
-                parameters=[prompt_config],
-                output='screen'
+                parameters=[prompt_config]
             ),
             ComposableNode(
                 package='perception',
                 plugin='perception::PerceptionServer',
                 name='perception',
-                parameters=[perception_config],
-                output='screen'
+                parameters=[perception_config]
             )
         ]
     )

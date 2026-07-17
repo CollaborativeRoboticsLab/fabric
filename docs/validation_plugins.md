@@ -9,7 +9,7 @@ Validation plugins in Fabric provide a flexible and extensible mechanism for che
 
 - **Extensibility:** New validation plugins can be added to enforce custom rules or policies.
 
-- **Runtime selection:** Validation plugins can be loaded and chained at runtime.
+- **Runtime selection:** A validation plugin is selected at runtime through the `compatibility_validation_plugin` parameter.
 
 ## ValidationBase Interface
 
@@ -25,20 +25,20 @@ This ensures that all plugins are interchangeable and can be managed uniformly b
 
 The `CompatibilityValidation` plugin is the default validator for plan compatibility. Its key features include:
 
-- **Interface/provider matching:** Ensures every connection in the plan references a valid capability interface and provider.
+- **Interface/provider matching:** Ensures every connection source in the parsed plan references a valid capability interface and provider.
 
 - **Provider flexibility:** Supports both default and alternative providers for redundancy.
 
-- **Error reporting:** Logs and rejects any connection with unmatched interface/provider combinations, preventing invalid plans from executing.
+- **Error reporting:** Throws on the first unmatched interface/provider combination, preventing invalid plans from executing.
 
 ### How CompatibilityValidation Works
 
 1. **Initialization:** The plugin is initialized with the ROS2 node context.
 
 2. **Validation:** For each connection in the plan:
-   - Checks if the source node's interface and provider match any entry in the provided capabilities list.
-   - If not matched, checks alternative providers for the interface.
-   - If still unmatched, logs an error, adds the connection to the rejected list, and throws an exception to halt processing.
+   - Checks whether the source node's interface and provider match any entry in the provided capabilities list.
+   - If not matched, checks the interface's `alt_providers` list.
+   - If still unmatched, throws an exception to halt processing.
 
 3. **Result:** Only plans with valid capability assignments are allowed to proceed to execution.
 
@@ -54,7 +54,7 @@ The `CompatibilityValidation` plugin is the default validator for plan compatibi
 
 - After parsing a plan, the server calls `validate(plan, capabilities)` before proceeding to capability allocation and execution.
 
-- If validation fails, the plan is rejected and errors are logged for review.
+- If validation fails, the server marks the plan as `VALIDATION_FAILED` and logs the exception.
 
 ## Extending Validation
 
@@ -63,14 +63,14 @@ To support new validation policies:
 
 2. Register the plugin so it can be discovered and loaded by Fabric.
 
-3. The core remains unchanged; only the new plugin is added.
+3. Configure the `compatibility_validation_plugin` parameter to load the new plugin.
 
-Plugins can be chained or selected at runtime to enforce different validation policies.
+The current server loads a single validation plugin instance.
 
 ---
 
 **Summary:**
-- The validation plugin system enables Fabric to support multiple validation strategies in parallel.
+- The validation plugin system allows Fabric to swap validation strategies without changing the server.
 
 - The `CompatibilityValidation` plugin demonstrates how to enforce capability compatibility and prevent invalid plans from executing.
 

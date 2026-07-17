@@ -33,7 +33,11 @@ The `BondClient` class manages the lifecycle of a bond between the Fabric node a
 - If the bond is broken unexpectedly, the system can take recovery actions or log the failure.
 
 ## Parameters
-- `capability_client.bond_topic`: The ROS parameter specifying the bond topic (default: `/capabilities/bonds`).
+- `capability_client.bond_topic`: The ROS parameter specifying the bond topic (default: `/capabilities/bond`).
+
+## Runtime Behavior
+- `start()` creates a `bond::Bond`, sets a 0.10 s heartbeat period, sets a 10.0 s timeout, and starts the heartbeat.
+- `stop()` destroys the bond client instance if one exists.
 
 ## Example Flow
 1. **Initialization**: `BondClient` is constructed with the node and bond ID.
