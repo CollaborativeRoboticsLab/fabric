@@ -93,7 +93,7 @@ ros2 launch fabric_server nongenerative.launch.py
 
 ### Generative launch
 
-This launch file starts Fabric Server, [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2), and `prompt_bridge`. Suitable for generative use without perception.
+This launch file starts Fabric Server, [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2), and [prompt_tools](https://github.com/CollaborativeRoboticsLab/prompt_tools). Suitable for generative use without perception.
 
 ```bash
 export OPENAI_API_KEY=
@@ -103,7 +103,7 @@ ros2 launch fabric_server generative.launch.py
 
 ### Generative launch with perception
 
-This launch file starts Fabric Server, [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2), `prompt_bridge`, and [Perception Server](https://github.com/CollaborativeRoboticsLab/perception). Suitable for generative use with perception.
+This launch file starts Fabric Server, [Capabilities2 Server](https://github.com/CollaborativeRoboticsLab/capabilities2), [prompt_tools](https://github.com/CollaborativeRoboticsLab/prompt_tools), and [Perception Server](https://github.com/CollaborativeRoboticsLab/perception). Suitable for generative use with perception.
 
 ```bash
 export OPENAI_API_KEY=
