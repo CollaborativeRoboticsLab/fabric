@@ -1,0 +1,5 @@
+<map id="fabric::connection" name="fabric::connection">
+<area shape="rect" id="Node000001" title="Structure representing connections between nodes." alt="" coords="5,152,144,177"/>
+<area shape="rect" id="Node000002" href="$structfabric_1_1node.html" title="Structure representing a node in the fabric." alt="" coords="25,5,124,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="77,45,77,152,72,152,72,45"/>
+</map>

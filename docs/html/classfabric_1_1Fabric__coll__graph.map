@@ -1,0 +1,7 @@
+<map id="fabric::Fabric" name="fabric::Fabric">
+<area shape="rect" id="Node000001" title="Class representing the main server of the fabric." alt="" coords="65,93,171,119"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,5,108,31"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="75,41,112,91,107,94,71,44"/>
+<area shape="rect" id="Node000003" href="$structfabric_1_1Plan.html" title=" " alt="" coords="132,5,227,31"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="165,44,129,94,124,91,161,41"/>
+</map>
