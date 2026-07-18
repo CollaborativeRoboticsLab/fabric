@@ -1,9 +1,0 @@
-<map id="fabric_server/include/fabric_server/bond_client.hpp" name="fabric_server/include/fabric_server/bond_client.hpp">
-<area shape="rect" id="Node000001" title=" " alt="" coords="49,5,268,45"/>
-<area shape="rect" id="Node000002" title=" " alt="" coords="5,93,64,119"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="130,48,66,88,63,84,127,43"/>
-<area shape="rect" id="Node000003" title=" " alt="" coords="88,93,229,119"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="161,46,161,79,156,79,156,46"/>
-<area shape="rect" id="Node000004" title=" " alt="" coords="254,93,386,119"/>
-<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="198,43,285,85,283,90,196,48"/>
-</map>
