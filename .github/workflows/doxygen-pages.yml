@@ -7,6 +7,7 @@ on:
     paths:
       - Doxygen
       - README.md
+      - '**/package.xml'
       - docs/**
       - '**/*.md'
       - '**/*.dox'
@@ -26,6 +27,7 @@ on:
     paths:
       - Doxygen
       - README.md
+      - '**/package.xml'
       - docs/**
       - '**/*.md'
       - '**/*.dox'
@@ -57,6 +59,61 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Check package versions
+        run: |
+          python3 <<'PY'
+          import re
+          import sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          root = Path('.')
+          package_files = sorted(root.glob('**/package.xml'))
+
+          if not package_files:
+            print('No package.xml files found.')
+            sys.exit(1)
+
+          versions = {}
+          invalid = []
+          semver_re = re.compile(r'^\d+\.\d+\.\d+$')
+
+          for pkg_file in package_files:
+            tree = ET.parse(pkg_file)
+            package = tree.getroot()
+            name = package.findtext('name', '').strip()
+            version = package.findtext('version', '').strip()
+
+            if not name or not version:
+              invalid.append((str(pkg_file), name or '<missing name>', version or '<missing version>'))
+              continue
+
+            if not semver_re.match(version):
+              invalid.append((str(pkg_file), name, version))
+              continue
+
+            versions[name] = version
+
+          if invalid:
+            print('Invalid package metadata found:')
+            for path, name, version in invalid:
+              print(f'  - {path}: name={name}, version={version}')
+            sys.exit(1)
+
+          unique_versions = sorted(set(versions.values()))
+
+          print('Discovered package versions:')
+          for name, version in sorted(versions.items()):
+            print(f'  - {name}: {version}')
+
+          if len(unique_versions) != 1:
+            print('\nVersion mismatch detected across package.xml files.')
+            print('Unique versions found:', ', '.join(unique_versions))
+            sys.exit(1)
+
+          print(f'\nAll package.xml files use version {unique_versions[0]}.')
+          PY
 
       - name: Install Doxygen
         run: sudo apt-get update && sudo apt-get install -y doxygen
