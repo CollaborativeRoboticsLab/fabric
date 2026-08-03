@@ -73,3 +73,19 @@ Launch with an explicit plan path:
 source install/setup.bash
 ros2 launch fabric_server fabric.launch.py plan_file_path:=/absolute/path/to/plan.xml
 ```
+
+## Citation
+
+If you use this work in an academic context, please cite the following publication(s):
+
+```bibtex
+@misc{ratnayake2026gpsfsm,
+  title={A Generative Partially Specified Finite State Machine Approach to Complex Behaviour Planning}, 
+  author={Kalana Ratnayake and Michael Pritchard and David Hinwood and Maleen Jayasuriya and Damith Herath},
+  year={2026},
+  eprint={2607.15674},
+  archivePrefix={arXiv},
+  primaryClass={cs.RO},
+  url={https://arxiv.org/abs/2607.15674}, 
+}
+```
