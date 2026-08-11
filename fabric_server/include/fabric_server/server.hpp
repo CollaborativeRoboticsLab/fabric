@@ -80,8 +80,8 @@ public:
     /*************************************************************************
      * Fabric services
      ************************************************************************/
-    plan_server_ = this->create_service<SetFabricPlan>("/fabric/set_plan",
-                                                       std::bind(&Fabric::setPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+    set_plan_server_ = this->create_service<SetFabricPlan>(
+        "/fabric/set_plan", std::bind(&Fabric::setPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     cancel_server_ = this->create_service<CancelFabricPlan>(
         "/fabric/cancel_plan", std::bind(&Fabric::cancelPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
@@ -425,10 +425,10 @@ protected:
   {
     response->header.stamp = this->now();
 
-    // Search current plan
-    if (current_plan_.plan_id == request->plan_id)
+    // If the request plan_id and bond_id are empty, return the current plan status
+    if (request->plan_id.empty() && request->bond_id.empty())
     {
-      response->status = status_msg(current_plan_.status);
+      response->status = status_msg(current_plan_);
 
       if (current_plan_.status == PlanStatus::VALIDATION_FAILED || current_plan_.status == PlanStatus::PARSE_FAILED)
         response->rejected_list = current_plan_.rejected_list;
@@ -436,12 +436,12 @@ protected:
       return;
     }
 
-    // Search plan queue
+    // If plan id or bond id provided, search the plan queue
     for (const auto& plan : plan_queue_)
     {
-      if (plan.plan_id == request->plan_id)
+      if (plan.plan_id == request->plan_id || plan.bond_id == request->bond_id)
       {
-        response->status = status_msg(plan.status);
+        response->status = status_msg(plan);
 
         if (plan.status == PlanStatus::VALIDATION_FAILED || plan.status == PlanStatus::PARSE_FAILED)
           response->rejected_list = plan.rejected_list;
@@ -458,10 +458,14 @@ protected:
   /**
    * @brief Convert internal plan status to fabric_msgs/PlanStatus message
    */
-  fabric_msgs::msg::FabricStatus status_msg(PlanStatus status) const
+  fabric_msgs::msg::FabricStatus status_msg(Plan plan) const
   {
     fabric_msgs::msg::FabricStatus status_msg;
-    switch (status)
+
+    status_msg.plan_id = plan.plan_id;
+    status_msg.bond_id = plan.bond_id;
+    
+    switch (plan.status)
     {
       case PlanStatus::UNKNOWN:
         status_msg.code = fabric_msgs::msg::FabricStatus::UNKNOWN;
@@ -575,7 +579,7 @@ protected:
   std::string plan_file_path_;
 
   /** server to set a new plan to the capabilities2 fabric */
-  rclcpp::Service<SetFabricPlan>::SharedPtr plan_server_;
+  rclcpp::Service<SetFabricPlan>::SharedPtr set_plan_server_;
 
   /** server to cancel the current plan in the capabilities2 fabric */
   rclcpp::Service<CancelFabricPlan>::SharedPtr cancel_server_;

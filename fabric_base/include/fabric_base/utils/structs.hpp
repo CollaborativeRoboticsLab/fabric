@@ -69,8 +69,8 @@ enum class PlanStatus {
 struct Plan
 {
   std::string plan_id;
-  std::string plan;
   std::string bond_id;
+  std::string plan;
   std::map<int, connection> connections;
   std::vector<std::string> rejected_list;
   PlanStatus status = PlanStatus::UNKNOWN;
