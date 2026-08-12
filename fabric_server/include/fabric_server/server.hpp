@@ -9,12 +9,14 @@
 #include <tinyxml2.h>
 #include <uuid/uuid.h>
 #include <rclcpp/rclcpp.hpp>
+#include "rclcpp_action/rclcpp_action.hpp"
 #include <pluginlib/class_loader.hpp>
 
 #include <fabric_base/utils/xml_helper.hpp>
 #include <fabric_base/utils/structs.hpp>
 #include <fabric_base/validation_base.hpp>
 #include <fabric_base/parser_base.hpp>
+#include <fabric_base/generation_base.hpp>
 
 #include <fabric_server/capability_client.hpp>
 #include <fabric_server/bond_client.hpp>
@@ -24,6 +26,7 @@
 #include <fabric_msgs/srv/complete_fabric.hpp>
 #include <fabric_msgs/srv/get_plan_status.hpp>
 #include <fabric_msgs/msg/fabric_status.hpp>
+#include <fabric_msgs/action/generate_plan.hpp>
 
 namespace fabric
 {
@@ -39,6 +42,8 @@ public:
   using CancelFabricPlan = fabric_msgs::srv::CancelFabricPlan;
   using CompleteFabric = fabric_msgs::srv::CompleteFabric;
   using GetPlanStatus = fabric_msgs::srv::GetPlanStatus;
+  using GeneratePlan = fabric_msgs::action::GeneratePlan;
+  using GoalHandleGeneratePlan = rclcpp_action::ServerGoalHandle<GeneratePlan>;
 
   /**
    * @brief Construct a new Fabric object
@@ -49,6 +54,7 @@ public:
     : Node("Fabric", options)
     , validation_loader_("fabric_base", "fabric::ValidationBase")
     , parsing_loader_("fabric_base", "fabric::ParserBase")
+    , generation_loader_("fabric_base", "fabric::GenerationBase")
   {
     try
     {
@@ -80,17 +86,26 @@ public:
     /*************************************************************************
      * Fabric services
      ************************************************************************/
-    set_plan_server_ = this->create_service<SetFabricPlan>(
-        "/fabric/set_plan", std::bind(&Fabric::setPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+    set_plan_server_ = this->create_service<SetFabricPlan>("/fabric/plan/set",
+                                                           std::bind(&Fabric::setPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     cancel_server_ = this->create_service<CancelFabricPlan>(
-        "/fabric/cancel_plan", std::bind(&Fabric::cancelPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+        "/fabric/plan/cancel", std::bind(&Fabric::cancelPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     completion_server_ = this->create_service<CompleteFabric>(
-        "/fabric/set_completion", std::bind(&Fabric::setCompleteCallback, this, std::placeholders::_1, std::placeholders::_2));
+        "/fabric/plan/set_completion", std::bind(&Fabric::setCompleteCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     get_plan_status_server_ = this->create_service<GetPlanStatus>(
-        "/fabric/get_plan_status", std::bind(&Fabric::getPlanStatusCallback, this, std::placeholders::_1, std::placeholders::_2));
+        "/fabric/plan/get_status", std::bind(&Fabric::getPlanStatusCallback, this, std::placeholders::_1, std::placeholders::_2));
+
+    /*************************************************************************
+     * Fabric generate plan action
+     ************************************************************************/
+
+    generate_plan_server_ = rclcpp_action::create_server<GeneratePlan>(
+      shared_from_this(), "/fabric/plan/generate", std::bind(&Fabric::handleGeneratePlanGoal, this, std::placeholders::_1, std::placeholders::_2),
+      std::bind(&Fabric::handleGeneratePlanCancel, this, std::placeholders::_1),
+      std::bind(&Fabric::handleGeneratePlanAccepted, this, std::placeholders::_1));
 
     /*************************************************************************
      * Initialize Compatibility Validation Plugin
@@ -121,6 +136,20 @@ public:
     RCLCPP_INFO(this->get_logger(), "[server] Initialized parsing plugin: %s", parsing_plugin_name.c_str());
 
     /*************************************************************************
+     * Initialize Generation Plugins
+     ************************************************************************/
+
+    this->declare_parameter("generation_plugin", "fabric::PromptToolsGenerator");
+    std::string generation_plugin_name = this->get_parameter("generation_plugin").as_string();
+
+    RCLCPP_INFO(this->get_logger(), "[server] Loading generation plugin: %s", generation_plugin_name.c_str());
+
+    generation_plugin_ = generation_loader_.createSharedInstance(generation_plugin_name);
+    generation_plugin_->initialize(shared_from_this());
+
+    RCLCPP_INFO(this->get_logger(), "[server] Initialized generation plugin: %s", generation_plugin_name.c_str());
+
+    /*************************************************************************
      * Initialize internal components
      ************************************************************************/
     capability_client_ = std::make_shared<CapabilityClient>();
@@ -137,7 +166,7 @@ public:
     }
     starter_plan.plan_id = generate_uuid();
     starter_plan.status = PlanStatus::QUEUED;
-    
+
     plan_queue_.push_back(starter_plan);
 
     RCLCPP_INFO(this->get_logger(), "[server] Fabric node initialized");
@@ -324,6 +353,95 @@ protected:
   /**
    * @brief Callback function to set a new fabric plan.
    */
+  rclcpp_action::GoalResponse handleGeneratePlanGoal(const rclcpp_action::GoalUUID& uuid, std::shared_ptr<const GeneratePlan::Goal> goal)
+  {
+    (void)uuid;
+
+    if (goal->task.empty())
+    {
+      RCLCPP_WARN(this->get_logger(), "[server] Rejecting generation request with empty task");
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "[server] Accepted generation request");
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+  }
+
+  rclcpp_action::CancelResponse handleGeneratePlanCancel(const std::shared_ptr<GoalHandleGeneratePlan> goal_handle)
+  {
+    (void)goal_handle;
+    RCLCPP_INFO(this->get_logger(), "[server] Generation cancellation requested");
+    return rclcpp_action::CancelResponse::ACCEPT;
+  }
+
+  void handleGeneratePlanAccepted(const std::shared_ptr<GoalHandleGeneratePlan> goal_handle)
+  {
+    std::thread{ std::bind(&Fabric::executeGeneratePlan, this, std::placeholders::_1), goal_handle }.detach();
+  }
+
+  void executeGeneratePlan(const std::shared_ptr<GoalHandleGeneratePlan> goal_handle)
+  {
+    const auto goal = goal_handle->get_goal();
+    auto feedback = std::make_shared<GeneratePlan::Feedback>();
+    auto result = std::make_shared<GeneratePlan::Result>();
+
+    // Update feedback to indicate that plan generation has been requested
+    feedback->status.code = fabric_msgs::msg::FabricStatus::GENERATION_REQUESTED;
+    goal_handle->publish_feedback(feedback);
+
+    // Check if the goal has been canceled before proceeding
+    if (goal_handle->is_canceling())
+    {
+      goal_handle->canceled(result);
+      return;
+    }
+
+    // Generate the plan using the generation plugin 
+    fabric::Plan generated_plan;
+    try
+    {
+      generated_plan = generation_plugin_->generate(goal->task, goal->uuid, goal->flush);
+      generated_plan.plan_id = generate_uuid();
+      generated_plan.status = PlanStatus::QUEUED;
+    }
+    catch (const std::exception& e)
+    {
+      // If plan generation fails, log the error and abort the goal
+      RCLCPP_ERROR(this->get_logger(), "[server] Plan generation failed with error: %s", e.what());
+      goal_handle->abort(result);
+      return;
+    }
+
+    // Update feedback to indicate that plan generation has been completed
+    if (goal_handle->is_canceling())
+    {
+      goal_handle->canceled(result);
+      return;
+    }
+
+    // If auto_queue is true, check compatibility and queue the generated plan
+    if (goal->auto_queue)
+    {
+      if (!parsing_plugin_->check_compatibility(generated_plan))
+      {
+        RCLCPP_ERROR(this->get_logger(), "[server] Generated plan is not compatible with the loaded parser");
+        goal_handle->abort(result);
+        return;
+      }
+
+      plan_queue_.push_back(generated_plan);
+      RCLCPP_INFO(this->get_logger(), "[server] Generated plan queued with id: %s", generated_plan.plan_id.c_str());
+    }
+
+    feedback->status.code = fabric_msgs::msg::FabricStatus::GENERATION_COMPLETE;
+    feedback->status.plan_id = generated_plan.plan_id;
+    goal_handle->publish_feedback(feedback);
+
+    result->plan = generated_plan.plan;
+    result->plan_id = generated_plan.plan_id;
+    goal_handle->succeed(result);
+  }
+
   void setPlanCallback(const std::shared_ptr<SetFabricPlan::Request> request, std::shared_ptr<SetFabricPlan::Response> response)
   {
     RCLCPP_INFO(this->get_logger(), "[server] Received the request with a plan");
@@ -464,7 +582,7 @@ protected:
 
     status_msg.plan_id = plan.plan_id;
     status_msg.bond_id = plan.bond_id;
-    
+
     switch (plan.status)
     {
       case PlanStatus::UNKNOWN:
@@ -562,12 +680,16 @@ protected:
   /** Plugin loaders for each module package */
   pluginlib::ClassLoader<fabric::ValidationBase> validation_loader_;
   pluginlib::ClassLoader<fabric::ParserBase> parsing_loader_;
+  pluginlib::ClassLoader<fabric::GenerationBase> generation_loader_;
 
   /** shared pointer for parsing plugin */
   std::shared_ptr<fabric::ParserBase> parsing_plugin_;
 
   /** shared pointer for compatibility validation plugin */
   std::shared_ptr<fabric::ValidationBase> compatibility_validation_plugin_;
+
+  /** shared pointer for generation plugin */
+  std::shared_ptr<fabric::GenerationBase> generation_plugin_;
 
   /** Bond id */
   std::string bond_id_;
@@ -592,6 +714,9 @@ protected:
 
   /** Thread to manage sending goal */
   std::thread process_thread;
+
+  /** action server to generate a plan */
+  rclcpp_action::Server<GeneratePlan>::SharedPtr generate_plan_server_;
 
 };  // class Fabric
 

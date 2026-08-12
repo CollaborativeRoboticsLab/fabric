@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(fabric_validator)
+project(fabric_generator_prompttools)
 
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
@@ -15,17 +15,21 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(fabric_base REQUIRED)
+find_package(prompt_msgs REQUIRED)
+find_package(capabilities2_msgs REQUIRED)
 
 include_directories(
   include
 )
 
 add_library(${PROJECT_NAME} SHARED
-  src/validators.cpp
+  src/generator.cpp
 )
 
 ament_target_dependencies(${PROJECT_NAME}
   rclcpp
+  prompt_msgs
+  capabilities2_msgs
   pluginlib
   fabric_base
 )

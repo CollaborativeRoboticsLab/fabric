@@ -12,6 +12,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(action_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 
@@ -27,10 +28,15 @@ set(msg_files
   "msg/FabricStatus.msg"
 )
 
+set(action_files
+  "action/GeneratePlan.action"
+)
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${srv_files}
   ${msg_files}
-  DEPENDENCIES builtin_interfaces std_msgs
+  ${action_files}
+  DEPENDENCIES action_msgs builtin_interfaces std_msgs
 )
 
 # install the generated files

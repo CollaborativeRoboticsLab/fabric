@@ -10,11 +10,11 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(fabric_msgs REQUIRED)
 find_package(fabric_base REQUIRED)
 find_package(capabilities2_msgs REQUIRED)
-find_package(capabilities2_events REQUIRED)
 find_package(bondcpp REQUIRED)
 
 find_package(PkgConfig)
@@ -36,12 +36,12 @@ add_executable(${PROJECT_NAME}
 ament_target_dependencies(${PROJECT_NAME}
   ament_index_cpp
   rclcpp
+  rclcpp_action
   bondcpp
   pluginlib
   fabric_msgs
   fabric_base
   capabilities2_msgs
-  capabilities2_events
   UUID
 )
 
@@ -62,12 +62,12 @@ ament_target_dependencies(${PROJECT_NAME}_comp
   ament_index_cpp
   rclcpp
   rclcpp_components
+  rclcpp_action
   bondcpp
   pluginlib
   fabric_msgs
   fabric_base
   capabilities2_msgs
-  capabilities2_events
   UUID
 )
 

@@ -21,6 +21,7 @@
 #include <capabilities2_msgs/srv/trigger_capability.hpp>
 
 #include <capabilities2_msgs/msg/capability_event_code.hpp>
+#include <capabilities2_msgs/msg/capability_parameter.hpp>
 
 namespace fabric
 {
@@ -57,6 +58,23 @@ public:
   };
 
   virtual ~CapabilityClient() = default;
+
+  static capabilities2_msgs::msg::CapabilityParameter to_capability_parameter_msg(const fabric::Parameter& parameter)
+  {
+    capabilities2_msgs::msg::CapabilityParameter msg;
+    msg.key = parameter.key;
+    msg.value = parameter.value;
+    msg.type = static_cast<int>(parameter.type);
+    return msg;
+  }
+
+  static capabilities2_msgs::msg::Capability to_capability_msg(const fabric::EventParameters& parameters)
+  {
+    capabilities2_msgs::msg::Capability msg;
+    for (const auto& option : parameters.options)
+      msg.parameters.push_back(to_capability_parameter_msg(option));
+    return msg;
+  }
 
   /**
    * @brief Initialize the capability client with the given ROS2 node.
@@ -426,12 +444,12 @@ public:
 
     request->connection.type.code = code;
 
-    request->connection.source = source.parameters.toMsg();
+    request->connection.source = to_capability_msg(source.parameters);
     request->connection.source.capability = source.interface;
     request->connection.source.provider = source.provider;
     request->connection.source.instance_id = std::to_string(source.instance_id);
 
-    request->connection.target = target.parameters.toMsg();
+    request->connection.target = to_capability_msg(target.parameters);
     request->connection.target.capability = target.interface;
     request->connection.target.provider = target.provider;
     request->connection.target.instance_id = std::to_string(target.instance_id);
@@ -521,7 +539,7 @@ public:
     request_trigger->bond_id = plan.bond_id;
     request_trigger->capability.instance_id = std::to_string(plan.connections[0].source.instance_id);
     request_trigger->capability.capability = plan.connections[0].source.interface;
-    request_trigger->capability.parameters = plan.connections[0].source.parameters.toMsg().parameters;
+    request_trigger->capability.parameters = to_capability_msg(plan.connections[0].source.parameters).parameters;
 
     // send the request
     auto result_future =

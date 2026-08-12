@@ -26,7 +26,7 @@ Represents a single runner or capability in the plan.
 |---------------|-------------------------|---------------------------------------------|
 | `interface`   | `std::string`           | Interface name of the runner/capability     |
 | `provider`    | `std::string`           | Provider name of the runner/capability      |
-| `parameters`  | `capabilities2_events::EventParameters` | Runner parameters converted from XML attributes |
+| `parameters`  | `fabric::EventParameters` | Runner parameters converted from XML attributes |
 | `instance_id` | `int`                   | Parser-assigned instance identifier         |
 
 **Key Methods:**

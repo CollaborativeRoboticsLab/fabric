@@ -20,5 +20,8 @@ uint8 RUNNING = 12
 uint8 COMPLETED = 13
 uint8 CANCELLED = 14
 
+uint8 GENERATION_REQUESTED = 15
+uint8 GENERATION_COMPLETE = 16
+
 # status code
 uint8 code

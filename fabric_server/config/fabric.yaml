@@ -2,6 +2,13 @@
   ros__parameters:      
     compatibility_validation_plugin: fabric::CompatibilityValidation
     parsing_plugin : fabric::XMLParser
+    generation_plugin: fabric::PromptToolsGenerator
+    # generation_plugin: fabric::ExperienceGenerator
+    PromptToolsGeneratorPlugin:
+      model_family: openai
+      model: gpt-5.1
+      use_cache: true
+      use_chat_mode: false
     capability_client:
       bond_topic: "/capabilities/bond"
       service_wait_timeout_sec: -1

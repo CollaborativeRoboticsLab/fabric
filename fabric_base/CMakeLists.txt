@@ -14,7 +14,6 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(pluginlib REQUIRED)
-find_package(capabilities2_events REQUIRED)
 
 include_directories(
   include

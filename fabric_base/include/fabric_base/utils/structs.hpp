@@ -3,7 +3,7 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <capabilities2_events/event_parameters.hpp>
+#include <fabric_base/utils/event_parameters.hpp>
 
 namespace fabric
 {
@@ -26,7 +26,7 @@ struct node
 {
   std::string interface = "";
   std::string provider = "";
-  capabilities2_events::EventParameters parameters;
+  fabric::EventParameters parameters;
   int instance_id = -1;
 
   bool exists() const

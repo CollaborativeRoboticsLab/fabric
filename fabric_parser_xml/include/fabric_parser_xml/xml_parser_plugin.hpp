@@ -7,7 +7,6 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <fabric_base/parser_base.hpp>
-#include <capabilities2_events/event_parameters.hpp>
 
 namespace fabric
 {
@@ -353,7 +352,7 @@ protected:
     node.source.interface = "capabilities2_runner/InputMultiplexRunner";
     node.source.provider = "capabilities2_runner/InputMultiplexRunner";
     node.source.instance_id = runner_index;
-    node.source.parameters.set_value("input_count", input_count, capabilities2_events::OptionType::INT);
+    node.source.parameters.set_value("input_count", input_count, fabric::OptionType::INT);
 
     plan.connections[connection_id] = node;
     plan.connections[connection_id].description = description;
@@ -391,7 +390,7 @@ protected:
     node.source.interface = "capabilities2_runner/InputMultiplexRunner";
     node.source.provider = "capabilities2_runner/InputMultiplexRunner";
     node.source.instance_id = runner_index;
-    node.source.parameters.set_value("input_count", input_count, capabilities2_events::OptionType::INT);
+    node.source.parameters.set_value("input_count", input_count, fabric::OptionType::INT);
 
     plan.connections[connection_id] = node;
     plan.connections[connection_id].description = description;
@@ -431,7 +430,7 @@ protected:
   //       int id = std::any_cast<int>(predecessor.source.parameters.get_value("id", 0));
 
   //       // Set the id attribute for the successor system runner
-  //       successor.source.parameters.set_value("id", id, capabilities2_events::OptionType::INT);
+  //       successor.source.parameters.set_value("id", id, fabric::OptionType::INT);
 
   //       RCLCPP_INFO(node_->get_logger(), "[xml_parser] Updated successor runner id to %d", id);
   //     }
@@ -444,11 +443,11 @@ protected:
    *
    * @param element tinyxml2::XMLElement element to be converted.
    *
-   * @return capabilities2_events::EventParameters converted parameters
+   * @return fabric::EventParameters converted parameters
    */
-  capabilities2_events::EventParameters convert_xml_to_event_parameters(tinyxml2::XMLElement* element)
+  fabric::EventParameters convert_xml_to_event_parameters(tinyxml2::XMLElement* element)
   {
-    capabilities2_events::EventParameters parameters;
+    fabric::EventParameters parameters;
 
     // Iterate through the attributes of the XML element and add them to the EventParameters
     const tinyxml2::XMLAttribute* attr = element->FirstAttribute();
@@ -478,7 +477,7 @@ protected:
       {
         const bool bool_value = (string_value == "true");
         RCLCPP_INFO(node_->get_logger(), "[xml_parser] Extracted attribute: %s = %s (bool)", key.c_str(), bool_value ? "true" : "false");
-        parameters.set_value(key, bool_value, capabilities2_events::OptionType::BOOL);
+        parameters.set_value(key, bool_value, fabric::OptionType::BOOL);
       }
       else
       {
@@ -491,7 +490,7 @@ protected:
         {
           const int int_value = static_cast<int>(int_value_long);
           RCLCPP_INFO(node_->get_logger(), "[xml_parser] Extracted attribute: %s = %d (int)", key.c_str(), int_value);
-          parameters.set_value(key, int_value, capabilities2_events::OptionType::INT);
+          parameters.set_value(key, int_value, fabric::OptionType::INT);
         }
         else
         {
@@ -502,12 +501,12 @@ protected:
           if (double_end != nullptr && *double_end == '\0' && errno == 0)
           {
             RCLCPP_INFO(node_->get_logger(), "[xml_parser] Extracted attribute: %s = %f (double)", key.c_str(), double_value);
-            parameters.set_value(key, double_value, capabilities2_events::OptionType::DOUBLE);
+            parameters.set_value(key, double_value, fabric::OptionType::DOUBLE);
           }
           else
           {
             RCLCPP_INFO(node_->get_logger(), "[xml_parser] Extracted attribute: %s = %s (string)", key.c_str(), string_value.c_str());
-            parameters.set_value(key, string_value, capabilities2_events::OptionType::STRING);
+            parameters.set_value(key, string_value, fabric::OptionType::STRING);
           }
         }
       }
