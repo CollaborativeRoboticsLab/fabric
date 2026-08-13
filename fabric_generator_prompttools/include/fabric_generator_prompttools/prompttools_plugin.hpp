@@ -34,7 +34,7 @@ public:
    */
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
-    initialize_base(node, "PromptToolsGeneratorPlugin");
+    initialize_base(node, "PromptToolsGenerator");
 
     prompt_service_client_ = node_->create_client<Prompt>("prompt/prompt");
 
