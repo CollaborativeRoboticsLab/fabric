@@ -1,7 +1,7 @@
 # Fabric Status System
 
 ## Overview
-Fabric tracks plan lifecycle internally with `fabric::PlanStatus` and exposes it through `fabric_msgs/msg/FabricStatus`.
+Fabric tracks plan lifecycle internally with `fabric::PlanStatus` and exposes it through `fabric_msgs/msg/FabricStatus`, keyed by `plan_id`.
 
 ## Status Lifecycle
 The current server code uses the following statuses during normal processing:

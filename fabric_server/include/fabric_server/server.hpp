@@ -218,11 +218,12 @@ protected:
       }
       RCLCPP_INFO(this->get_logger(), "[server] Fabric plan parsing completed successfully.");
 
-      // get the capabilities required for the plan
+      // get the capabilities available in the system
       try
       {
-        RCLCPP_INFO(this->get_logger(), "[server] Getting capabilities required for the plan.");
+        RCLCPP_INFO(this->get_logger(), "[server] Getting capabilities available in the system");
         current_plan_.status = PlanStatus::VALIDATING;
+
         capability_client_->getInterfaces(capability_list_);
         capability_client_->getSemanticInterfaces(capability_list_);
         capability_client_->getProviders(capability_list_);
@@ -236,7 +237,7 @@ protected:
 
       RCLCPP_INFO(this->get_logger(), "[server] Capability information retrieval completed successfully.");
 
-      // validate the plan for compatibility as per the validation plugin
+      // validate the plan for compatibility based on the capabilities available in the system
       try
       {
         RCLCPP_INFO(this->get_logger(), "[server] Validating the fabric plan for compatibility.");
@@ -581,7 +582,6 @@ protected:
     fabric_msgs::msg::FabricStatus status_msg;
 
     status_msg.plan_id = plan.plan_id;
-    status_msg.bond_id = plan.bond_id;
 
     switch (plan.status)
     {

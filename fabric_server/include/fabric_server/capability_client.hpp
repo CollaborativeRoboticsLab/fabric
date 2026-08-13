@@ -436,13 +436,14 @@ public:
       started_capabilities_.erase(std::remove(started_capabilities_.begin(), started_capabilities_.end(), capability), started_capabilities_.end());
   }
 
-  void connect_capability(const std::string& bond_id, uint8_t code, const fabric::node& source, const fabric::node& target)
+  void connect_capability(const std::string& ownership_id, const std::string& bond_id, uint8_t code, const fabric::node& source, const fabric::node& target)
   {
     auto request = std::make_shared<ConnectCapability::Request>();
 
     request->bond_id = bond_id;
 
     request->connection.type.code = code;
+    request->connection.ownership_id = ownership_id;
 
     request->connection.source = to_capability_msg(source.parameters);
     request->connection.source.capability = source.interface;
@@ -495,28 +496,28 @@ public:
       {
         RCLCPP_INFO(node_->get_logger(), "[Capability client] connection to %s/%d on_start configuration requested",
                     connection.on_start.interface.c_str(), connection.on_start.instance_id);
-        connect_capability(plan.bond_id, CapabilityEventCode::STARTED, connection.source, connection.on_start);
+        connect_capability(plan.plan_id, plan.bond_id, CapabilityEventCode::STARTED, connection.source, connection.on_start);
       }
 
       if (connection.on_stop.exists())
       {
         RCLCPP_INFO(node_->get_logger(), "[Capability client] connection to %s/%d on_stop configuration requested",
                     connection.on_stop.interface.c_str(), connection.on_stop.instance_id);
-        connect_capability(plan.bond_id, CapabilityEventCode::STOPPED, connection.source, connection.on_stop);
+        connect_capability(plan.plan_id, plan.bond_id, CapabilityEventCode::STOPPED, connection.source, connection.on_stop);
       }
 
       if (connection.on_success.exists())
       {
         RCLCPP_INFO(node_->get_logger(), "[Capability client] connection to %s/%d on_success configuration requested",
                     connection.on_success.interface.c_str(), connection.on_success.instance_id);
-        connect_capability(plan.bond_id, CapabilityEventCode::SUCCEEDED, connection.source, connection.on_success);
+        connect_capability(plan.plan_id, plan.bond_id, CapabilityEventCode::SUCCEEDED, connection.source, connection.on_success);
       }
 
       if (connection.on_failure.exists())
       {
         RCLCPP_INFO(node_->get_logger(), "[Capability client] connection to %s/%d on_failure configuration requested",
                     connection.on_failure.interface.c_str(), connection.on_failure.instance_id);
-        connect_capability(plan.bond_id, CapabilityEventCode::FAILED, connection.source, connection.on_failure);
+        connect_capability(plan.plan_id, plan.bond_id, CapabilityEventCode::FAILED, connection.source, connection.on_failure);
       }
     }
   }

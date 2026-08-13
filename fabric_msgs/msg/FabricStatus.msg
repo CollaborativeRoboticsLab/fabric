@@ -1,9 +1,6 @@
 # plan id of the plan
 string plan_id
 
-# bond id related to the plan
-string bond_id
-
 uint8 UNKNOWN = 0
 uint8 QUEUED = 1
 uint8 PARSING = 2
