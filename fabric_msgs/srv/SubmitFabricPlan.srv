@@ -1,9 +1,10 @@
 std_msgs/Header header
 string plan
+FabricMetaData metadata
 ---
 std_msgs/Header header
 
-# if plan_id is set it mean plan got accepted. 
+# if plan_id is set it mean plan got accepted.
 # if empty (""), it got rejected.
 string plan_id
 

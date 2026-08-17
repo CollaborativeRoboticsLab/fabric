@@ -1,0 +1,6 @@
+fabric_msgs/FabricNode source
+fabric_msgs/FabricNode on_start
+fabric_msgs/FabricNode on_stop
+fabric_msgs/FabricNode on_success
+fabric_msgs/FabricNode on_failure
+string description

@@ -81,8 +81,7 @@ public:
     };
 
     send_goal_options_.result_callback = [this, &completed, &cv](const rclcpp_action::ClientGoalHandle<GeneratePlan>::WrappedResult& wrapped_result) {
-      
-      if (wrapped_result.code == rclcpp_action::ResultCode::SUCCEEDED)
+            if (wrapped_result.code == rclcpp_action::ResultCode::SUCCEEDED)
       {
         RCLCPP_INFO(node_->get_logger(), "Generation succeeded");
       }
@@ -105,6 +104,9 @@ public:
 
     fabric::Plan plan;
     plan.plan = result_->plan;
+    plan.metadata.planning_request_id = result_->planning_request_id;
+    plan.metadata.candidate_plan_id = result_->candidate_plan_id;
+    plan.metadata.graph_hash = result_->graph_hash;
     return plan;
   }
 

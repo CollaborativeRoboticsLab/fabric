@@ -102,9 +102,10 @@ The plugin waits for this action server during initialization:
 ### Generation Behavior
 
 1. Send the Fabric task as `task_description` to the Experience action server.
-2. Log feedback status updates from the Experience action.
-3. Wait for the action result.
-4. Return a `fabric::Plan` whose `plan.plan` is the Experience result plan.
+2. Experience gathers capability metadata and fallback evidence, then prompts PromptTools for a draft Fabric XML plan.
+3. Experience critiques the draft using the Fabric parser and its own evidence checks, then prompts PromptTools again for a refined Fabric XML plan.
+4. Experience returns the refined Fabric XML plan to Fabric.
+5. Fabric queues and executes that plan exactly as it would any other generated plan.
 
 The current Experience action interface does not consume the Fabric `uuid` or `flush` inputs, so this plugin ignores those arguments.
 

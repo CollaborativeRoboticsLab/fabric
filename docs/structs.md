@@ -66,6 +66,7 @@ Represents the entire parsed plan, including all connections and metadata.
 | `plan_id`       | `std::string`                 | Generated identifier used for tracking      |
 | `bond_id`       | `std::string`                 | Unique bond identifier for the plan         |
 | `plan`          | `std::string`                 | Raw XML plan as a string                    |
+| `metadata`      | `fabric::FabricMetaData`     | Optional metadata carried with the plan |
 | `connections`   | `std::map<int, connection>`   | All connections in the plan                 |
 | `rejected_list` | `std::vector<std::string>`    | List of rejected/invalid elements           |
 | `status`        | `PlanStatus`                  | Current lifecycle state for the plan        |

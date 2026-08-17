@@ -1,6 +1,8 @@
 # plan id of the plan
 string plan_id
 
+FabricMetaData metadata
+
 uint8 UNKNOWN = 0
 uint8 QUEUED = 1
 uint8 PARSING = 2

@@ -18,14 +18,18 @@ find_package(std_msgs REQUIRED)
 
 
 set(srv_files
-  "srv/SetFabricPlan.srv"
+  "srv/SubmitFabricPlan.srv"
   "srv/CancelFabricPlan.srv"
   "srv/CompleteFabric.srv"
   "srv/GetPlanStatus.srv"
+  "srv/ParsePlan.srv"
 )
 
 set(msg_files
+  "msg/FabricMetaData.msg"
   "msg/FabricStatus.msg"
+  "msg/FabricNode.msg"
+  "msg/FabricConnection.msg"
 )
 
 set(action_files

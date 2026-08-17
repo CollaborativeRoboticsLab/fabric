@@ -48,7 +48,8 @@ struct connection
   std::string description;
 };
 
-enum class PlanStatus {
+enum class PlanStatus
+{
   UNKNOWN,
   QUEUED,
   PARSING,
@@ -66,11 +67,24 @@ enum class PlanStatus {
   CANCELLED
 };
 
+struct FabricMetaData
+{
+  std::string planning_request_id;
+  std::string candidate_plan_id;
+  std::string graph_hash;
+
+  bool empty() const
+  {
+    return planning_request_id.empty() && candidate_plan_id.empty() && graph_hash.empty();
+  }
+};
+
 struct Plan
 {
   std::string plan_id;
   std::string bond_id;
   std::string plan;
+  FabricMetaData metadata;
   std::map<int, connection> connections;
   std::vector<std::string> rejected_list;
   PlanStatus status = PlanStatus::UNKNOWN;

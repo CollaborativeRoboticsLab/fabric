@@ -21,10 +21,11 @@
 #include <fabric_server/capability_client.hpp>
 #include <fabric_server/bond_client.hpp>
 
-#include <fabric_msgs/srv/set_fabric_plan.hpp>
+#include <fabric_msgs/srv/submit_fabric_plan.hpp>
 #include <fabric_msgs/srv/cancel_fabric_plan.hpp>
 #include <fabric_msgs/srv/complete_fabric.hpp>
 #include <fabric_msgs/srv/get_plan_status.hpp>
+#include <fabric_msgs/srv/parse_plan.hpp>
 #include <fabric_msgs/msg/fabric_status.hpp>
 #include <fabric_msgs/action/generate_plan.hpp>
 
@@ -38,13 +39,13 @@ namespace fabric
 class Fabric : public rclcpp::Node
 {
 public:
-  using SetFabricPlan = fabric_msgs::srv::SetFabricPlan;
+  using SubmitFabricPlan = fabric_msgs::srv::SubmitFabricPlan;
   using CancelFabricPlan = fabric_msgs::srv::CancelFabricPlan;
   using CompleteFabric = fabric_msgs::srv::CompleteFabric;
   using GetPlanStatus = fabric_msgs::srv::GetPlanStatus;
+  using ParsePlan = fabric_msgs::srv::ParsePlan;
   using GeneratePlan = fabric_msgs::action::GeneratePlan;
   using GoalHandleGeneratePlan = rclcpp_action::ServerGoalHandle<GeneratePlan>;
-
   /**
    * @brief Construct a new Fabric object
    *
@@ -86,8 +87,8 @@ public:
     /*************************************************************************
      * Fabric services
      ************************************************************************/
-    set_plan_server_ = this->create_service<SetFabricPlan>("/fabric/plan/set",
-                                                           std::bind(&Fabric::setPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+    submit_plan_server_ = this->create_service<SubmitFabricPlan>(
+      "/fabric/plan/submit", std::bind(&Fabric::submitPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     cancel_server_ = this->create_service<CancelFabricPlan>(
         "/fabric/plan/cancel", std::bind(&Fabric::cancelPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
@@ -98,14 +99,17 @@ public:
     get_plan_status_server_ = this->create_service<GetPlanStatus>(
         "/fabric/plan/get_status", std::bind(&Fabric::getPlanStatusCallback, this, std::placeholders::_1, std::placeholders::_2));
 
+    parse_plan_server_ = this->create_service<ParsePlan>("/fabric/plan/parse",
+                                                         std::bind(&Fabric::parsePlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+
     /*************************************************************************
      * Fabric generate plan action
      ************************************************************************/
 
     generate_plan_server_ = rclcpp_action::create_server<GeneratePlan>(
-      shared_from_this(), "/fabric/plan/generate", std::bind(&Fabric::handleGeneratePlanGoal, this, std::placeholders::_1, std::placeholders::_2),
-      std::bind(&Fabric::handleGeneratePlanCancel, this, std::placeholders::_1),
-      std::bind(&Fabric::handleGeneratePlanAccepted, this, std::placeholders::_1));
+        shared_from_this(), "/fabric/plan/generate", std::bind(&Fabric::handleGeneratePlanGoal, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&Fabric::handleGeneratePlanCancel, this, std::placeholders::_1),
+        std::bind(&Fabric::handleGeneratePlanAccepted, this, std::placeholders::_1));
 
     /*************************************************************************
      * Initialize Compatibility Validation Plugin
@@ -397,7 +401,7 @@ protected:
       return;
     }
 
-    // Generate the plan using the generation plugin 
+    // Generate the plan using the generation plugin
     fabric::Plan generated_plan;
     try
     {
@@ -443,26 +447,72 @@ protected:
     goal_handle->succeed(result);
   }
 
-  void setPlanCallback(const std::shared_ptr<SetFabricPlan::Request> request, std::shared_ptr<SetFabricPlan::Response> response)
+  void submitPlanCallback(const std::shared_ptr<SubmitFabricPlan::Request> request,
+                          std::shared_ptr<SubmitFabricPlan::Response> response)
   {
-    RCLCPP_INFO(this->get_logger(), "[server] Received the request with a plan");
+    RCLCPP_INFO(this->get_logger(), "[server] Received the request with a plan and extended metadata");
 
     fabric::Plan new_plan;
     new_plan.plan = request->plan;
     new_plan.plan_id = generate_uuid();
     new_plan.status = PlanStatus::QUEUED;
+    new_plan.metadata.planning_request_id = request->metadata.planning_request_id;
+    new_plan.metadata.candidate_plan_id = request->metadata.candidate_plan_id;
+    new_plan.metadata.graph_hash = request->metadata.graph_hash;
 
     if (!parsing_plugin_->check_compatibility(new_plan))
     {
-      RCLCPP_ERROR(this->get_logger(), "[server] Plan received via service request not compatible with the loaded parser.");
+      RCLCPP_ERROR(this->get_logger(), "[server] Plan received via submit request not compatible with the loaded parser.");
       response->plan_id = "";
       response->error = "[server] Plan is not compatible with the loaded parser.";
       return;
     }
-    RCLCPP_INFO(this->get_logger(), "[server] Plan accepted from service request message");
 
     plan_queue_.push_back(new_plan);
     response->plan_id = new_plan.plan_id;
+    response->error.clear();
+  }
+
+  void parsePlanCallback(const std::shared_ptr<ParsePlan::Request> request, std::shared_ptr<ParsePlan::Response> response)
+  {
+    fabric::Plan plan;
+    plan.plan = request->plan;
+    plan.plan_id = "experience_parse_request";
+
+    try
+    {
+      parsing_plugin_->parse(plan);
+      response->success = true;
+      response->error.clear();
+      for (const auto& [connection_id, connection] : plan.connections)
+      {
+        (void)connection_id;
+        fabric_msgs::msg::FabricConnection message;
+        message.source.interface = connection.source.interface;
+        message.source.provider = connection.source.provider;
+        message.source.instance_id = connection.source.instance_id;
+        message.on_start.interface = connection.on_start.interface;
+        message.on_start.provider = connection.on_start.provider;
+        message.on_start.instance_id = connection.on_start.instance_id;
+        message.on_stop.interface = connection.on_stop.interface;
+        message.on_stop.provider = connection.on_stop.provider;
+        message.on_stop.instance_id = connection.on_stop.instance_id;
+        message.on_success.interface = connection.on_success.interface;
+        message.on_success.provider = connection.on_success.provider;
+        message.on_success.instance_id = connection.on_success.instance_id;
+        message.on_failure.interface = connection.on_failure.interface;
+        message.on_failure.provider = connection.on_failure.provider;
+        message.on_failure.instance_id = connection.on_failure.instance_id;
+        message.description = connection.description;
+        response->connections.push_back(message);
+      }
+    }
+    catch (const std::exception& ex)
+    {
+      response->success = false;
+      response->error = ex.what();
+      response->connections.clear();
+    }
   }
 
   /**
@@ -582,6 +632,9 @@ protected:
     fabric_msgs::msg::FabricStatus status_msg;
 
     status_msg.plan_id = plan.plan_id;
+    status_msg.metadata.planning_request_id = plan.metadata.planning_request_id;
+    status_msg.metadata.candidate_plan_id = plan.metadata.candidate_plan_id;
+    status_msg.metadata.graph_hash = plan.metadata.graph_hash;
 
     switch (plan.status)
     {
@@ -700,8 +753,8 @@ protected:
   /** File Path link */
   std::string plan_file_path_;
 
-  /** server to set a new plan to the capabilities2 fabric */
-  rclcpp::Service<SetFabricPlan>::SharedPtr set_plan_server_;
+  /** server to submit a plan with optional Fabric-owned metadata */
+  rclcpp::Service<SubmitFabricPlan>::SharedPtr submit_plan_server_;
 
   /** server to cancel the current plan in the capabilities2 fabric */
   rclcpp::Service<CancelFabricPlan>::SharedPtr cancel_server_;
@@ -711,6 +764,9 @@ protected:
 
   /** server to get the status of a fabric plan */
   rclcpp::Service<GetPlanStatus>::SharedPtr get_plan_status_server_;
+
+  /** service to parse Fabric XML into connection graph data */
+  rclcpp::Service<ParsePlan>::SharedPtr parse_plan_server_;
 
   /** Thread to manage sending goal */
   std::thread process_thread;

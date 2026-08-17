@@ -1,0 +1,3 @@
+string planning_request_id
+string candidate_plan_id
+string graph_hash
