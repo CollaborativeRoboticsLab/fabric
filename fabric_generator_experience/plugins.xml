@@ -1,7 +1,0 @@
-<library path="fabric_generator_experience">
-  <class type="fabric::ExperienceGenerator" base_class_type="fabric::GenerationBase">
-    <description>
-      Generates a fabric::Plan object based on the experience.
-    </description>
-  </class>
-</library>
