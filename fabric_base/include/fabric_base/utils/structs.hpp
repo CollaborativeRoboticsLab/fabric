@@ -84,6 +84,7 @@ struct Plan
   std::string plan_id;
   std::string bond_id;
   std::string plan;
+  std::string reasoning;
   FabricMetaData metadata;
   std::map<int, connection> connections;
   std::vector<std::string> rejected_list;

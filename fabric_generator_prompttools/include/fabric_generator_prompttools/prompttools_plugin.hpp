@@ -3,6 +3,7 @@
 #include <condition_variable>
 #include <cstdlib>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
@@ -79,22 +80,22 @@ public:
     bool specs_completed = false;
     bool prompt_completed = false;
 
-    runnable_spec_service_client_->async_send_request(
-        runnable_spec_request, [this, &specs_completed, &cv](typename rclcpp::Client<RunnableSpec>::SharedFuture future) {
-          if (!future.valid())
-          {
-            RCLCPP_ERROR(node_->get_logger(), "GetRunnable result call failed");
-          }
-          else
-          {
-            RCLCPP_INFO(node_->get_logger(), "GetRunnable result call succeeded");
+    runnable_spec_service_client_->async_send_request(runnable_spec_request,
+                                                      [this, &specs_completed, &cv](typename rclcpp::Client<RunnableSpec>::SharedFuture future) {
+                                                        if (!future.valid())
+                                                        {
+                                                          RCLCPP_ERROR(node_->get_logger(), "GetRunnable result call failed");
+                                                        }
+                                                        else
+                                                        {
+                                                          RCLCPP_INFO(node_->get_logger(), "GetRunnable result call succeeded");
 
-            specs_response_ = future.get();
-          }
+                                                          specs_response_ = future.get();
+                                                        }
 
-          specs_completed = true;
-          cv.notify_all();
-        });
+                                                        specs_completed = true;
+                                                        cv.notify_all();
+                                                      });
 
     // Conditional wait
     cv.wait(lockSpec, [&specs_completed] { return specs_completed; });
@@ -108,7 +109,9 @@ public:
     }
 
     std::string text = "Build a xml plan based on the following capabilities to achieve the task: " + task +
-                       ". Return only the xml plan without explanations or comments.";
+               ". Return the xml plan along with a brief reasoning summary for the plan in the response. The response should be in the "
+               "following json format: {\"plan\": \"<xml_plan>\", \"reasoning\": \"<brief_reasoning_summary>\"}. The xml plan should be "
+               "well-formed and valid.";
 
     auto prompt_request = std::make_shared<Prompt::Request>();
 
@@ -135,29 +138,45 @@ public:
 
     std::unique_lock<std::mutex> lockPrompt(block_mutex);
 
-    prompt_service_client_->async_send_request(
-        prompt_request, [this, &prompt_completed, &cv](typename rclcpp::Client<Prompt>::SharedFuture future) {
-          if (!future.valid())
-          {
-            RCLCPP_ERROR(node_->get_logger(), "GetRunnable result call failed");
-          }
-          else
-          {
-            RCLCPP_INFO(node_->get_logger(), "GetRunnable result call succeeded");
+    prompt_service_client_->async_send_request(prompt_request, [this, &prompt_completed, &cv](typename rclcpp::Client<Prompt>::SharedFuture future) {
+      if (!future.valid())
+      {
+        RCLCPP_ERROR(node_->get_logger(), "GetRunnable result call failed");
+      }
+      else
+      {
+        RCLCPP_INFO(node_->get_logger(), "GetRunnable result call succeeded");
 
-            prompt_response_ = future.get();
-          }
+        prompt_response_ = future.get();
+      }
 
-          prompt_completed = true;
-          cv.notify_all();
-        });
+      prompt_completed = true;
+      cv.notify_all();
+    });
 
     // Conditional wait
     cv.wait(lockPrompt, [&prompt_completed] { return prompt_completed; });
     RCLCPP_INFO(node_->get_logger(), "Generation completed. Result received.");
 
     fabric::Plan plan;
-    plan.plan = prompt_response_->response.response;
+
+    try
+    {
+      const auto parsed_response = nlohmann::json::parse(prompt_response_->response.response);
+
+      plan.plan = parsed_response.at("plan").get<std::string>();
+      if (parsed_response.contains("reasoning") && !parsed_response.at("reasoning").is_null())
+      {
+        plan.reasoning = parsed_response.at("reasoning").get<std::string>();
+      }
+    }
+    catch (const nlohmann::json::exception& e)
+    {
+      RCLCPP_WARN(node_->get_logger(), "Failed to parse prompt response as JSON: %s", e.what());
+      plan.plan = prompt_response_->response.response;
+      plan.reasoning.clear();
+    }
+
     return plan;
   }
 

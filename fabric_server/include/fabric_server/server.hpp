@@ -443,6 +443,7 @@ protected:
     goal_handle->publish_feedback(feedback);
 
     result->plan = generated_plan.plan;
+    result->reasoning = generated_plan.reasoning;
     result->plan_id = generated_plan.plan_id;
     goal_handle->succeed(result);
   }

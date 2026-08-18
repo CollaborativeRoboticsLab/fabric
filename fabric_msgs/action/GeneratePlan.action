@@ -6,6 +6,7 @@ bool flush
 ---
 std_msgs/Header header
 string plan
+string reasoning
 string plan_id
 ---
 std_msgs/Header header

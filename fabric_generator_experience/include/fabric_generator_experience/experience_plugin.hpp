@@ -53,12 +53,11 @@ public:
    */
   fabric::Plan generate(const std::string& task, const std::string& uuid, bool flush) override
   {
-    (void)uuid;
-    (void)flush;
-
     auto goal_msg = GeneratePlan::Goal();
     goal_msg.task_description = task;
     goal_msg.use_optimiztion = false;
+    goal_msg.uuid = uuid;
+    goal_msg.flush = flush;
 
     std::mutex block_mutex;
     std::condition_variable cv;
@@ -104,6 +103,7 @@ public:
 
     fabric::Plan plan;
     plan.plan = result_->plan;
+    plan.reasoning = result_->reasoning;
     plan.metadata.planning_request_id = result_->planning_request_id;
     plan.metadata.candidate_plan_id = result_->candidate_plan_id;
     plan.metadata.graph_hash = result_->graph_hash;

@@ -12,6 +12,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(nlohmann_json REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(fabric_base REQUIRED)
@@ -24,6 +25,10 @@ include_directories(
 
 add_library(${PROJECT_NAME} SHARED
   src/generator.cpp
+)
+
+target_link_libraries(${PROJECT_NAME}
+  nlohmann_json::nlohmann_json
 )
 
 ament_target_dependencies(${PROJECT_NAME}
