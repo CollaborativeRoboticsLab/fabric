@@ -1,11 +1,13 @@
 #pragma once
 
 #include <chrono>
-#include <mutex>
 #include <condition_variable>
+#include <mutex>
+#include <unordered_map>
 
 #include <bondcpp/bond.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <yaml-cpp/yaml.h>
 
 #include <fabric_base/utils/structs.hpp>
 #include <fabric_base/utils/exception.hpp>
@@ -15,6 +17,7 @@
 #include <capabilities2_msgs/srv/get_interfaces.hpp>
 #include <capabilities2_msgs/srv/get_semantic_interfaces.hpp>
 #include <capabilities2_msgs/srv/get_providers.hpp>
+#include <capabilities2_msgs/srv/get_runnable_specs.hpp>
 #include <capabilities2_msgs/srv/use_capability.hpp>
 #include <capabilities2_msgs/srv/free_capability.hpp>
 #include <capabilities2_msgs/srv/connect_capability.hpp>
@@ -36,6 +39,7 @@ public:
   using GetInterfaces = capabilities2_msgs::srv::GetInterfaces;
   using GetSemanticInterfaces = capabilities2_msgs::srv::GetSemanticInterfaces;
   using GetProviders = capabilities2_msgs::srv::GetProviders;
+  using GetRunnableSpecs = capabilities2_msgs::srv::GetRunnableSpecs;
   using EstablishBond = capabilities2_msgs::srv::EstablishBond;
   using UseCapability = capabilities2_msgs::srv::UseCapability;
   using FreeCapability = capabilities2_msgs::srv::FreeCapability;
@@ -47,6 +51,7 @@ public:
   using GetInterfacesClient = rclcpp::Client<GetInterfaces>;
   using GetSemanticInterfacesClient = rclcpp::Client<GetSemanticInterfaces>;
   using GetProvidersClient = rclcpp::Client<GetProviders>;
+  using GetRunnableSpecsClient = rclcpp::Client<GetRunnableSpecs>;
   using EstablishBondClient = rclcpp::Client<EstablishBond>;
   using UseCapabilityClient = rclcpp::Client<UseCapability>;
   using FreeCapabilityClient = rclcpp::Client<FreeCapability>;
@@ -92,6 +97,7 @@ public:
     node_->declare_parameter<std::string>("capability_client.services.get_interfaces", "/capabilities/get_interfaces");
     node_->declare_parameter<std::string>("capability_client.services.get_semantic_interfaces", "/capabilities/get_semantic_interfaces");
     node_->declare_parameter<std::string>("capability_client.services.get_providers", "/capabilities/get_providers");
+    node_->declare_parameter<std::string>("capability_client.services.get_runnable_specs", "/capabilities/get_runnable_specs");
     node_->declare_parameter<std::string>("capability_client.services.establish_bond", "/capabilities/establish_bond");
     node_->declare_parameter<std::string>("capability_client.services.use_capability", "/capabilities/use_capability");
     node_->declare_parameter<std::string>("capability_client.services.free_capability", "/capabilities/free_capability");
@@ -101,6 +107,7 @@ public:
     node_->get_parameter("capability_client.services.get_interfaces", get_interfaces_);
     node_->get_parameter("capability_client.services.get_semantic_interfaces", get_semantic_interfaces_);
     node_->get_parameter("capability_client.services.get_providers", get_providers_);
+    node_->get_parameter("capability_client.services.get_runnable_specs", get_runnable_specs_);
     node_->get_parameter("capability_client.services.establish_bond", establish_bond_);
     node_->get_parameter("capability_client.services.use_capability", use_capability_);
     node_->get_parameter("capability_client.services.free_capability", free_capability_);
@@ -110,6 +117,7 @@ public:
     get_interfaces_client_ = node_->create_client<GetInterfaces>(get_interfaces_);
     get_sem_interf_client_ = node_->create_client<GetSemanticInterfaces>(get_semantic_interfaces_);
     get_providers_client_ = node_->create_client<GetProviders>(get_providers_);
+    get_runnable_specs_client_ = node_->create_client<GetRunnableSpecs>(get_runnable_specs_);
     establish_bond_client_ = node_->create_client<EstablishBond>(establish_bond_);
     use_capability_client_ = node_->create_client<UseCapability>(use_capability_);
     free_capability_client_ = node_->create_client<FreeCapability>(free_capability_);
@@ -120,6 +128,7 @@ public:
     wait_for_service(get_interfaces_client_, get_interfaces_);
     wait_for_service(get_sem_interf_client_, get_semantic_interfaces_);
     wait_for_service(get_providers_client_, get_providers_);
+    wait_for_service(get_runnable_specs_client_, get_runnable_specs_);
     wait_for_service(establish_bond_client_, establish_bond_);
     wait_for_service(use_capability_client_, use_capability_);
     wait_for_service(free_capability_client_, free_capability_);
@@ -185,8 +194,6 @@ public:
    */
   void getSemanticInterfaces(std::vector<CapabilityInfo>& capabilities)
   {
-    int interface_count = capabilities.size();
-
     std::vector<CapabilityInfo> new_capabilities;
 
     for (auto& capability : capabilities)
@@ -278,6 +285,61 @@ public:
       RCLCPP_INFO(node_->get_logger(), "[Capability client] received for %s, default provider: %s, number of alternative providers: %d\n",
                   capability.interface.c_str(), capability.provider.c_str(), static_cast<int>(capability.alt_providers.size()));
     }
+  }
+
+  void getRunnableSpecs(std::vector<CapabilityInfo>& capabilities)
+  {
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting runnable specifications");
+
+    auto request_specs = std::make_shared<GetRunnableSpecs::Request>();
+
+    bool completed = false;
+    std::mutex mtx;
+    std::condition_variable cv;
+    std::unique_lock<std::mutex> lock(mtx);
+    std::unordered_map<std::string, CapabilityProviderInfo> provider_metadata_by_name;
+
+    auto result_specs_future = get_runnable_specs_client_->async_send_request(
+        request_specs, [this, &provider_metadata_by_name, &completed, &cv](GetRunnableSpecsClient::SharedFuture future) {
+          if (!future.valid())
+          {
+            throw fabric::fabric_exception("Failed to get runnable specifications from server");
+          }
+
+          auto response = future.get();
+          if (response->index_of_specs.size() != response->runnable_specs.size())
+          {
+            throw fabric::fabric_exception("Runnable specification response has mismatched index and payload sizes");
+          }
+
+          for (const auto& runnable_spec : response->runnable_specs)
+          {
+            CapabilityProviderInfo provider_info = parse_provider_info(runnable_spec.spec);
+            if (!provider_info.provider.empty())
+            {
+              provider_metadata_by_name[provider_info.provider] = provider_info;
+            }
+          }
+
+          completed = true;
+          cv.notify_all();
+        });
+
+    cv.wait(lock, [&completed]() { return completed; });
+
+    for (auto& capability : capabilities)
+    {
+      capability.provider_details.clear();
+
+      add_provider_details(capability, capability.provider, provider_metadata_by_name);
+      for (const auto& provider_name : capability.alt_providers)
+      {
+        add_provider_details(capability, provider_name, provider_metadata_by_name);
+      }
+    }
+
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] attached runnable metadata to %d capabilities\n",
+                static_cast<int>(capabilities.size()));
   }
 
   /**
@@ -561,6 +623,121 @@ public:
   }
 
 protected:
+  static std::string yaml_string_or_empty(const YAML::Node& node, const char* key)
+  {
+    if (!node || !node[key])
+    {
+      return "";
+    }
+    return node[key].as<std::string>();
+  }
+
+  static bool yaml_bool_or_false(const YAML::Node& node, const char* key)
+  {
+    if (!node || !node[key])
+    {
+      return false;
+    }
+    return node[key].as<bool>();
+  }
+
+  static std::vector<std::string> yaml_string_list_or_empty(const YAML::Node& node, const char* key)
+  {
+    std::vector<std::string> values;
+    if (!node || !node[key] || !node[key].IsSequence())
+    {
+      return values;
+    }
+
+    for (const auto& item : node[key])
+    {
+      values.push_back(item.as<std::string>());
+    }
+
+    return values;
+  }
+
+  static std::string yaml_serialized_value_or_empty(const YAML::Node& node, const char* key)
+  {
+    if (!node || !node[key])
+    {
+      return "";
+    }
+
+    std::string serialized = YAML::Dump(node[key]);
+    if (!serialized.empty() && serialized.back() == '\n')
+    {
+      serialized.pop_back();
+    }
+    return serialized;
+  }
+
+  static CapabilityParameterInfo parse_parameter_info(const YAML::Node& node)
+  {
+    CapabilityParameterInfo parameter;
+    parameter.name = yaml_string_or_empty(node, "name");
+    parameter.type = yaml_string_or_empty(node, "type");
+    parameter.description = yaml_string_or_empty(node, "description");
+    parameter.semantic_key = yaml_string_or_empty(node, "semantic_key");
+    parameter.required = yaml_bool_or_false(node, "required");
+    parameter.satisfiable_from = yaml_string_list_or_empty(node, "satisfiable_from");
+    parameter.fallback_parameter = yaml_string_or_empty(node, "fallback_parameter");
+    parameter.aliases = yaml_string_list_or_empty(node, "aliases");
+    parameter.default_value = yaml_serialized_value_or_empty(node, "default");
+    parameter.has_default = !parameter.default_value.empty();
+    return parameter;
+  }
+
+  static std::vector<CapabilityParameterInfo> parse_parameter_list(const YAML::Node& node)
+  {
+    std::vector<CapabilityParameterInfo> parameters;
+    if (!node || !node.IsSequence())
+    {
+      return parameters;
+    }
+
+    for (const auto& item : node)
+    {
+      parameters.push_back(parse_parameter_info(item));
+    }
+
+    return parameters;
+  }
+
+  static CapabilityProviderInfo parse_provider_info(const std::string& yaml_text)
+  {
+    CapabilityProviderInfo provider_info;
+    const YAML::Node root = YAML::Load(yaml_text);
+    provider_info.provider = yaml_string_or_empty(root["provider"], "name");
+
+    const YAML::Node definition = root["definition"];
+    provider_info.configuration_parameters = parse_parameter_list(definition["configuration_parameters"]);
+
+    const YAML::Node runtime_parameters = definition["runtime_parameters"];
+    provider_info.runtime_input_parameters = parse_parameter_list(runtime_parameters["input"]);
+    provider_info.runtime_output_parameters = parse_parameter_list(runtime_parameters["output"]);
+    return provider_info;
+  }
+
+  static void add_provider_details(
+      CapabilityInfo& capability,
+      const std::string& provider_name,
+      const std::unordered_map<std::string, CapabilityProviderInfo>& provider_metadata_by_name)
+  {
+    if (provider_name.empty())
+    {
+      return;
+    }
+
+    auto it = provider_metadata_by_name.find(provider_name);
+    if (it == provider_metadata_by_name.end())
+    {
+      return;
+    }
+
+    capability.provider_details.push_back(it->second);
+  }
+
   /**
    * @brief Wait for a service to become available.
    */
@@ -606,6 +783,7 @@ protected:
   std::string get_interfaces_;
   std::string get_semantic_interfaces_;
   std::string get_providers_;
+  std::string get_runnable_specs_;
   std::string establish_bond_;
   std::string use_capability_;
   std::string free_capability_;
@@ -628,6 +806,9 @@ protected:
 
   /** Get providers from capabilities server */
   GetProvidersClient::SharedPtr get_providers_client_;
+
+  /** Get runnable specs from capabilities server */
+  GetRunnableSpecsClient::SharedPtr get_runnable_specs_client_;
 
   /** establish bond */
   EstablishBondClient::SharedPtr establish_bond_client_;

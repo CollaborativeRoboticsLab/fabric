@@ -112,18 +112,27 @@ public:
         std::bind(&Fabric::handleGeneratePlanAccepted, this, std::placeholders::_1));
 
     /*************************************************************************
-     * Initialize Compatibility Validation Plugin
+     * Initialize Validation Plugins
      ************************************************************************/
 
-    this->declare_parameter("compatibility_validation_plugin", "fabric::CompatibilityValidation");
-    std::string compatibility_validation_plugin_name = this->get_parameter("compatibility_validation_plugin").as_string();
+    this->declare_parameter<std::vector<std::string>>(
+        "validation_plugins", std::vector<std::string>{ "fabric::CompatibilityValidation", "fabric::ParameterValidation" });
+    std::vector<std::string> validation_plugin_names = this->get_parameter("validation_plugins").as_string_array();
+    if (validation_plugin_names.empty())
+    {
+      throw std::runtime_error("Parameter 'validation_plugins' must contain at least one validation plugin");
+    }
 
-    RCLCPP_INFO(this->get_logger(), "[server] Loading compatibility validation plugin: %s", compatibility_validation_plugin_name.c_str());
+    for (const auto& validation_plugin_name : validation_plugin_names)
+    {
+      RCLCPP_INFO(this->get_logger(), "[server] Loading validation plugin: %s", validation_plugin_name.c_str());
 
-    compatibility_validation_plugin_ = validation_loader_.createSharedInstance(compatibility_validation_plugin_name);
-    compatibility_validation_plugin_->initialize(shared_from_this());
+      auto validation_plugin = validation_loader_.createSharedInstance(validation_plugin_name);
+      validation_plugin->initialize(shared_from_this());
+      validation_plugins_.push_back(validation_plugin);
 
-    RCLCPP_INFO(this->get_logger(), "[server] Initialized compatibility validation plugin: %s", compatibility_validation_plugin_name.c_str());
+      RCLCPP_INFO(this->get_logger(), "[server] Initialized validation plugin: %s", validation_plugin_name.c_str());
+    }
 
     /*************************************************************************
      * Initialize Parsing Plugins
@@ -231,6 +240,7 @@ protected:
         capability_client_->getInterfaces(capability_list_);
         capability_client_->getSemanticInterfaces(capability_list_);
         capability_client_->getProviders(capability_list_);
+        capability_client_->getRunnableSpecs(capability_list_);
       }
       catch (const fabric::fabric_exception& e)
       {
@@ -246,7 +256,10 @@ protected:
       {
         RCLCPP_INFO(this->get_logger(), "[server] Validating the fabric plan for compatibility.");
 
-        compatibility_validation_plugin_->validate(current_plan_, capability_list_);
+        for (const auto& validation_plugin : validation_plugins_)
+        {
+          validation_plugin->validate(current_plan_, capability_list_);
+        }
       }
       catch (const fabric::fabric_exception& e)
       {
@@ -573,6 +586,8 @@ protected:
    */
   void setCompleteCallback(const std::shared_ptr<CompleteFabric::Request> request, std::shared_ptr<CompleteFabric::Response> response)
   {
+    (void)response;
+
     // mark the plan as completed using plan id
     RCLCPP_INFO(this->get_logger(), "[server] Plan completion received for plan id: %s", request->plan_id.c_str());
 
@@ -739,8 +754,8 @@ protected:
   /** shared pointer for parsing plugin */
   std::shared_ptr<fabric::ParserBase> parsing_plugin_;
 
-  /** shared pointer for compatibility validation plugin */
-  std::shared_ptr<fabric::ValidationBase> compatibility_validation_plugin_;
+  /** ordered validation plugins applied to each parsed plan */
+  std::vector<std::shared_ptr<fabric::ValidationBase>> validation_plugins_;
 
   /** shared pointer for generation plugin */
   std::shared_ptr<fabric::GenerationBase> generation_plugin_;

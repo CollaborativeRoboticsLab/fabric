@@ -16,6 +16,7 @@ find_package(fabric_msgs REQUIRED)
 find_package(fabric_base REQUIRED)
 find_package(capabilities2_msgs REQUIRED)
 find_package(bondcpp REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 find_package(PkgConfig)
 pkg_check_modules(UUID REQUIRED uuid)
@@ -45,6 +46,10 @@ ament_target_dependencies(${PROJECT_NAME}
   UUID
 )
 
+target_link_libraries(${PROJECT_NAME}
+  yaml-cpp
+)
+
 install(TARGETS ${PROJECT_NAME}
   DESTINATION lib/${PROJECT_NAME}
 )
@@ -69,6 +74,10 @@ ament_target_dependencies(${PROJECT_NAME}_comp
   fabric_base
   capabilities2_msgs
   UUID
+)
+
+target_link_libraries(${PROJECT_NAME}_comp
+  yaml-cpp
 )
 
 rclcpp_components_register_node(${PROJECT_NAME}_comp

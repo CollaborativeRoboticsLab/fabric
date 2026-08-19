@@ -91,12 +91,35 @@ struct Plan
   PlanStatus status = PlanStatus::UNKNOWN;
 };
 
+struct CapabilityParameterInfo
+{
+  std::string name;
+  std::string type;
+  std::string description;
+  std::string semantic_key;
+  bool required = false;
+  std::vector<std::string> satisfiable_from;
+  std::string fallback_parameter;
+  std::vector<std::string> aliases;
+  bool has_default = false;
+  std::string default_value;
+};
+
+struct CapabilityProviderInfo
+{
+  std::string provider;
+  std::vector<CapabilityParameterInfo> configuration_parameters;
+  std::vector<CapabilityParameterInfo> runtime_input_parameters;
+  std::vector<CapabilityParameterInfo> runtime_output_parameters;
+};
+
 struct CapabilityInfo
 {
   std::string interface;
   std::string provider;
   bool is_semantic;
   std::vector<std::string> alt_providers;
+  std::vector<CapabilityProviderInfo> provider_details;
 };
 
 }  // namespace fabric

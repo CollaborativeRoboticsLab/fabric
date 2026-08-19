@@ -1,6 +1,6 @@
 /**:
   ros__parameters:      
-    compatibility_validation_plugin: fabric::CompatibilityValidation
+    validation_plugins: [fabric::CompatibilityValidation, fabric::ParameterValidation]
     parsing_plugin : fabric::XMLParser
     generation_plugin: fabric::PromptToolsGenerator
     # generation_plugin: fabric::ExperienceGenerator

@@ -1,7 +1,12 @@
 <library path="fabric_validator">
   <class type="fabric::CompatibilityValidation" base_class_type="fabric::ValidationBase">
     <description>
-      Validates the XML plan for syntax errors.
+      Validates interface and provider compatibility for Fabric plans.
+    </description>
+  </class>
+  <class type="fabric::ParameterValidation" base_class_type="fabric::ValidationBase">
+    <description>
+      Validates interface/provider compatibility and required runtime parameter coverage for Fabric plans.
     </description>
   </class>
 </library>
