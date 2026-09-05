@@ -53,6 +53,11 @@ The [fabric_server/plans/default.xml](./fabric_server/plans/default.xml) file is
 
 The [fabric_server/config/fabric.yaml](./fabric_server/config/fabric.yaml) file configures the parser plugin, validation plugin, and capability client settings. The plan path itself is provided by the launch file.
 
+By default, `fabric.launch.py` starts Fabric together with `capabilities2_server` and `prompt_bridge`. One optional launch flag and one opt-out flag extend that composition:
+
+- `start_experience_stack:=true` includes `experience_server.launch.py`, which in turn starts the Experience and Supervisor stacks.
+- `start_prompt_tools:=false` disables `prompt_bridge` when prompt-based plan generation is not needed.
+
 Launch with the packaged default plan:
 
 ```bash
@@ -72,4 +77,34 @@ Launch with an explicit plan path:
 ```bash
 source install/setup.bash
 ros2 launch fabric_server fabric.launch.py plan_file_path:=/absolute/path/to/plan.xml
+```
+
+Launch with the Experience stack composed into the same process graph:
+
+```bash
+source install/setup.bash
+ros2 launch fabric_server fabric.launch.py start_experience_stack:=true
+```
+
+Launch with the default prompt-based generation support enabled:
+
+```bash
+export OPENAI_API_KEY=<your_openai_api_key>
+source install/setup.bash
+ros2 launch fabric_server fabric.launch.py
+```
+
+Disable prompt tools explicitly when you only want direct plan execution:
+
+```bash
+source install/setup.bash
+ros2 launch fabric_server fabric.launch.py start_prompt_tools:=false
+```
+
+You can combine Experience with the default prompt-tools startup when Fabric should own the full planning stack:
+
+```bash
+export OPENAI_API_KEY=<your_openai_api_key>
+source install/setup.bash
+ros2 launch fabric_server fabric.launch.py start_experience_stack:=true
 ```

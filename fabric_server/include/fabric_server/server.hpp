@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <atomic>
 #include <deque>
 #include <string>
 #include <thread>
@@ -68,6 +69,27 @@ public:
     catch (const std::bad_weak_ptr&)
     {
       // Not yet safe — probably standalone without make_shared
+    }
+  }
+
+  ~Fabric()
+  {
+    shutting_down_.store(true);
+
+    {
+      std::lock_guard<std::mutex> lock(plan_mutex_);
+      plan_completed_ = true;
+    }
+    plan_cv_.notify_all();
+
+    if (startup_thread_.joinable())
+    {
+      startup_thread_.join();
+    }
+
+    if (process_thread_.joinable())
+    {
+      process_thread_.join();
     }
   }
 
@@ -180,15 +202,17 @@ public:
     starter_plan.plan_id = generate_uuid();
     starter_plan.status = PlanStatus::QUEUED;
 
-    plan_queue_.push_back(starter_plan);
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex_);
+      plan_queue_.push_back(starter_plan);
+    }
 
-    RCLCPP_INFO(this->get_logger(), "[server] Fabric node initialized");
+    RCLCPP_INFO(this->get_logger(), "[server] Fabric node initialized. Waiting for capabilities2 readiness.");
 
     /*************************************************************************
-     * Initialize process thread
+     * Initialize deferred startup thread
      ************************************************************************/
-
-    process_thread = std::thread(&Fabric::process, this);
+    startup_thread_ = std::thread(&Fabric::wait_for_capabilities_ready, this);
   }
 
 protected:
@@ -198,16 +222,23 @@ protected:
    */
   void process()
   {
-    while (plan_queue_.size() > 0)
+    while (!shutting_down_.load())
     {
+      {
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        if (plan_queue_.empty())
+        {
+          break;
+        }
+
+        current_plan_ = plan_queue_.front();
+        plan_queue_.pop_front();
+      }
+
       // reset internal data structures
       reset();
 
       RCLCPP_INFO(this->get_logger(), "[server] A new Fabric plan processing starting");
-
-      // get the next plan and parse it into a XML document
-      current_plan_ = plan_queue_.front();
-      plan_queue_.pop_front();
 
       if (current_plan_.status == PlanStatus::CANCELLED)
       {
@@ -353,7 +384,12 @@ protected:
       // wait for the plan to complete
       {
         std::unique_lock<std::mutex> lock(plan_mutex_);
-        plan_cv_.wait(lock, [this]() { return plan_completed_; });
+        plan_cv_.wait(lock, [this]() { return plan_completed_ || shutting_down_.load(); });
+      }
+
+      if (shutting_down_.load())
+      {
+        return;
       }
 
       if (current_plan_.status == PlanStatus::CANCELLED)
@@ -366,6 +402,57 @@ protected:
       current_plan_.status = PlanStatus::COMPLETED;
       RCLCPP_INFO(this->get_logger(), "[server] Fabric processing completed. Waiting for next plan.");
     }
+  }
+
+  void wait_for_capabilities_ready()
+  {
+    try
+    {
+      capability_client_->wait_until_ready();
+      capabilities_ready_.store(true);
+      RCLCPP_INFO(this->get_logger(), "[server] Capabilities2 is ready. Fabric processing is enabled.");
+      maybe_start_process_thread();
+    }
+    catch (const std::exception& ex)
+    {
+      if (!shutting_down_.load())
+      {
+        RCLCPP_ERROR(this->get_logger(), "[server] Waiting for capabilities2 readiness failed: %s", ex.what());
+      }
+    }
+  }
+
+  void maybe_start_process_thread()
+  {
+    if (!capabilities_ready_.load() || shutting_down_.load())
+    {
+      return;
+    }
+
+    {
+      std::lock_guard<std::mutex> queue_lock(queue_mutex_);
+      if (plan_queue_.empty())
+      {
+        return;
+      }
+    }
+
+    std::lock_guard<std::mutex> process_lock(process_thread_mutex_);
+    if (process_thread_running_.load())
+    {
+      return;
+    }
+
+    if (process_thread_.joinable())
+    {
+      process_thread_.join();
+    }
+
+    process_thread_running_.store(true);
+    process_thread_ = std::thread([this]() {
+      process();
+      process_thread_running_.store(false);
+    });
   }
 
   /**
@@ -447,7 +534,11 @@ protected:
         return;
       }
 
-      plan_queue_.push_back(generated_plan);
+      {
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        plan_queue_.push_back(generated_plan);
+      }
+      maybe_start_process_thread();
       RCLCPP_INFO(this->get_logger(), "[server] Generated plan queued with id: %s", generated_plan.plan_id.c_str());
     }
 
@@ -482,7 +573,11 @@ protected:
       return;
     }
 
-    plan_queue_.push_back(new_plan);
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex_);
+      plan_queue_.push_back(new_plan);
+    }
+    maybe_start_process_thread();
     response->plan_id = new_plan.plan_id;
     response->error.clear();
   }
@@ -550,6 +645,7 @@ protected:
     }
     else
     {
+      std::lock_guard<std::mutex> lock(queue_mutex_);
       for (auto& plan : plan_queue_)
       {
         if (plan.plan_id == plan_id)
@@ -622,6 +718,7 @@ protected:
     }
 
     // If plan id or bond id provided, search the plan queue
+    std::lock_guard<std::mutex> lock(queue_mutex_);
     for (const auto& plan : plan_queue_)
     {
       if (plan.plan_id == request->plan_id || plan.bond_id == request->bond_id)
@@ -732,13 +829,24 @@ protected:
   /** Vector of plans */
   std::deque<fabric::Plan> plan_queue_;
 
+  /** Protect queued plan access across callbacks and processing thread */
+  std::mutex queue_mutex_;
+
   /** Current plan being processed */
   fabric::Plan current_plan_;
 
   /** Current plan related synchronization */
-  bool plan_completed_;
+  bool plan_completed_{ false };
   std::mutex plan_mutex_;
   std::condition_variable plan_cv_;
+
+  /** Deferred startup and process thread lifecycle */
+  std::thread startup_thread_;
+  std::thread process_thread_;
+  std::mutex process_thread_mutex_;
+  std::atomic<bool> capabilities_ready_{ false };
+  std::atomic<bool> process_thread_running_{ false };
+  std::atomic<bool> shutting_down_{ false };
 
   /** Capability client to interact with capability server */
   std::shared_ptr<CapabilityClient> capability_client_;
@@ -783,9 +891,6 @@ protected:
 
   /** service to parse Fabric XML into connection graph data */
   rclcpp::Service<ParsePlan>::SharedPtr parse_plan_server_;
-
-  /** Thread to manage sending goal */
-  std::thread process_thread;
 
   /** action server to generate a plan */
   rclcpp_action::Server<GeneratePlan>::SharedPtr generate_plan_server_;

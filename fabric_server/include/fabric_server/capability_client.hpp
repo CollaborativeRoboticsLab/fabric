@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <condition_variable>
+#include <limits>
 #include <mutex>
 #include <unordered_map>
 
@@ -124,18 +125,40 @@ public:
     trig_capability_client_ = node_->create_client<TriggerCapability>(trigger_capability_);
     connect_capability_client_ = node_->create_client<ConnectCapability>(connect_capability_);
 
-    // Wait for services to become available
-    wait_for_service(get_interfaces_client_, get_interfaces_);
-    wait_for_service(get_sem_interf_client_, get_semantic_interfaces_);
-    wait_for_service(get_providers_client_, get_providers_);
-    wait_for_service(get_runnable_specs_client_, get_runnable_specs_);
-    wait_for_service(establish_bond_client_, establish_bond_);
-    wait_for_service(use_capability_client_, use_capability_);
-    wait_for_service(free_capability_client_, free_capability_);
-    wait_for_service(trig_capability_client_, trigger_capability_);
-    wait_for_service(connect_capability_client_, connect_capability_);
-
     RCLCPP_INFO(node_->get_logger(), "[Capability client] initialized.");
+  }
+
+  /**
+   * @brief Wait until the capabilities2 server is ready to serve requests.
+   *
+   * Waits for all required services and then performs one probe request so
+   * Fabric only proceeds once the server can answer discovery traffic.
+   *
+   * @param timeout_sec Optional override for the wait timeout. Negative values
+   * use the configured parameter value.
+   */
+  void wait_until_ready(int timeout_sec = std::numeric_limits<int>::min())
+  {
+    const int effective_timeout_sec =
+        timeout_sec == std::numeric_limits<int>::min() ? service_wait_timeout_sec_ : timeout_sec;
+
+    wait_for_service(get_interfaces_client_, get_interfaces_, effective_timeout_sec);
+    wait_for_service(get_sem_interf_client_, get_semantic_interfaces_, effective_timeout_sec);
+    wait_for_service(get_providers_client_, get_providers_, effective_timeout_sec);
+    wait_for_service(get_runnable_specs_client_, get_runnable_specs_, effective_timeout_sec);
+    wait_for_service(establish_bond_client_, establish_bond_, effective_timeout_sec);
+    wait_for_service(use_capability_client_, use_capability_, effective_timeout_sec);
+    wait_for_service(free_capability_client_, free_capability_, effective_timeout_sec);
+    wait_for_service(trig_capability_client_, trigger_capability_, effective_timeout_sec);
+    wait_for_service(connect_capability_client_, connect_capability_, effective_timeout_sec);
+
+    probe_server_readiness();
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] capabilities2 server is ready.");
+  }
+
+  void wait_till_ready(int timeout_sec = std::numeric_limits<int>::min())
+  {
+    wait_until_ready(timeout_sec);
   }
 
   /**
@@ -742,7 +765,7 @@ protected:
    * @brief Wait for a service to become available.
    */
   template <typename ClientT>
-  void wait_for_service(const std::shared_ptr<ClientT>& client, const std::string& service_name)
+  void wait_for_service(const std::shared_ptr<ClientT>& client, const std::string& service_name, int timeout_sec)
   {
     using namespace std::chrono_literals;
 
@@ -757,10 +780,10 @@ protected:
 
       RCLCPP_INFO(node_->get_logger(), "[Capability client] %s is not available", service_name.c_str());
 
-      if (service_wait_timeout_sec_ >= 0)
+      if (timeout_sec >= 0)
       {
         const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start);
-        if (elapsed.count() >= service_wait_timeout_sec_)
+        if (elapsed.count() >= timeout_sec)
         {
           throw fabric::fabric_exception("Timed out waiting for service: " + service_name);
         }
@@ -768,6 +791,32 @@ protected:
     }
 
     throw fabric::fabric_exception("ROS shutdown while waiting for service: " + service_name);
+  }
+
+  void probe_server_readiness()
+  {
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] probing capabilities2 server readiness");
+
+    auto request_specs = std::make_shared<GetRunnableSpecs::Request>();
+
+    bool completed = false;
+    std::mutex mtx;
+    std::condition_variable cv;
+    std::unique_lock<std::mutex> lock(mtx);
+
+    auto result_specs_future = get_runnable_specs_client_->async_send_request(
+        request_specs, [this, &completed, &cv](GetRunnableSpecsClient::SharedFuture future) {
+          if (!future.valid())
+          {
+            throw fabric::fabric_exception("Capabilities2 readiness probe failed");
+          }
+
+          (void)future.get();
+          completed = true;
+          cv.notify_all();
+        });
+
+    cv.wait(lock, [&completed]() { return completed; });
   }
 
   /**
