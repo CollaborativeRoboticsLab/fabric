@@ -74,11 +74,11 @@ The plugin waits for these services during initialization:
 | Service | Type | Purpose |
 |---------|------|---------|
 | `prompt/prompt` | `prompt_msgs/srv/Prompt` | Sends the constructed prompt to the configured model backend |
-| `capabilities2/get_runnable_specs` | `capabilities2_msgs/srv/GetRunnableSpecs` | Retrieves capability descriptions used as prompt context |
+| `/capabilities/get_runnable_specs` | `capabilities2_msgs/srv/GetRunnableSpecs` | Retrieves capability descriptions used as prompt context |
 
 ### Generation Behavior
 
-1. Request runnable specs from `capabilities2/get_runnable_specs`.
+1. Request runnable specs from `/capabilities/get_runnable_specs`.
 2. Build a prompt containing capability names, descriptions, and the user task.
 3. Send the prompt to `prompt/prompt` with `uuid`, cache settings, and model options.
 4. Return a `fabric::Plan` whose `plan.plan` is the prompt response text.

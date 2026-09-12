@@ -57,7 +57,7 @@ Accepted satisfaction paths are:
 
 Matching currently prefers exact semantic-key or parameter-name overlap with type equality when both sides declare a type.
 
-This validator depends on runnable-spec metadata loaded from `capabilities2/get_runnable_specs`.
+This validator depends on runnable-spec metadata loaded from `/capabilities/get_runnable_specs`.
 
 ## Main Method
 
