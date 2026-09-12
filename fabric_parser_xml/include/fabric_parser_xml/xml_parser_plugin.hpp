@@ -1,6 +1,8 @@
 #pragma once
 #include <cerrno>
 #include <cstdlib>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <tinyxml2.h>
@@ -42,7 +44,25 @@ public:
    */
   bool load_file(const std::string& file_path, fabric::Plan& plan) override
   {
-    tinyxml2::XMLError xml_status = default_document.LoadFile(file_path.c_str());
+    std::ifstream file(file_path);
+    if (!file.is_open())
+    {
+      RCLCPP_ERROR(node_->get_logger(), "[xml_parser] Error opening plan: %s", file_path.c_str());
+      return false;
+    }
+
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    plan.plan = buffer.str();
+
+    if (plan.plan.empty())
+    {
+      RCLCPP_ERROR(node_->get_logger(), "[xml_parser] Loaded empty plan file: %s", file_path.c_str());
+      return false;
+    }
+
+    default_document.Clear();
+    tinyxml2::XMLError xml_status = default_document.Parse(plan.plan.c_str());
 
     // check if the file loading failed
     if (xml_status != tinyxml2::XMLError::XML_SUCCESS)
@@ -51,9 +71,7 @@ public:
       return false;
     }
 
-    RCLCPP_INFO(node_->get_logger(), "Plan loaded from : %s", file_path.c_str());
-
-    convert_to_string(default_document, plan.plan);
+    RCLCPP_INFO(node_->get_logger(), "Plan loaded from : %s (%zu bytes)", file_path.c_str(), plan.plan.size());
 
     return true;
   }
@@ -92,8 +110,17 @@ public:
   {
     RCLCPP_INFO(node_->get_logger(), "Plan being parsed: \n\n %s", plan.plan.c_str());
 
+    if (plan.plan.empty())
+      throw fabric::fabric_exception("XML plan is empty.");
+
     // parse the fabric::plan into a XML document
-    current_document_.Parse(plan.plan.c_str());
+    current_document_.Clear();
+    tinyxml2::XMLError xml_status = current_document_.Parse(plan.plan.c_str());
+    if (xml_status != tinyxml2::XMLError::XML_SUCCESS)
+      throw fabric::fabric_exception("XML plan parsing failed: " + std::string(current_document_.ErrorName()));
+
+    if (current_document_.FirstChildElement("Plan") == nullptr)
+      throw fabric::fabric_exception("No <Plan> root element found.");
 
     // Add a completion runner to the plan
     RCLCPP_INFO(node_->get_logger(), "[xml_parser] Adding completion runner to the plan");
@@ -110,7 +137,7 @@ public:
     plan_ = extract_plan(current_document_);
 
     if (plan_ == nullptr)
-      throw fabric::fabric_exception("No <Plan> element found.");
+      throw fabric::fabric_exception("No executable elements found inside <Plan>.");
 
     RCLCPP_INFO(node_->get_logger(), "[xml_parser] <Plan> element extracted successfully.");
 
@@ -171,12 +198,12 @@ protected:
    */
   tinyxml2::XMLElement* extract_plan(tinyxml2::XMLDocument& document)
   {
-    std::string plan_tag(document.FirstChildElement()->Name());
+    tinyxml2::XMLElement* root = document.FirstChildElement("Plan");
 
-    if (plan_tag == "Plan")
-      return document.FirstChildElement("Plan")->FirstChildElement();
-    else
+    if (root == nullptr)
       return nullptr;
+
+    return root->FirstChildElement();
   }
 
   /**
@@ -306,6 +333,8 @@ protected:
   {
     // Get the root <Plan> element
     tinyxml2::XMLElement* plan = document.FirstChildElement("Plan");
+    if (plan == nullptr)
+      throw fabric::fabric_exception("No <Plan> root element found.");
 
     // Create the outer <Control type="sequential"> element
     tinyxml2::XMLElement* outerControl = document.NewElement("Control");
@@ -314,7 +343,10 @@ protected:
 
     // Move all existing children of <Plan> into the new outer control
     while (tinyxml2::XMLNode* child = plan->FirstChild())
-      outerControl->InsertEndChild(child);
+    {
+      outerControl->InsertEndChild(child->DeepClone(&document));
+      plan->DeleteChild(child);
+    }
 
     // Add the new outer control to the <Plan>
     plan->InsertEndChild(outerControl);

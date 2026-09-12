@@ -224,6 +224,9 @@ protected:
   {
     while (!shutting_down_.load())
     {
+      // Reset per-run state before taking the next queued plan.
+      reset();
+
       {
         std::lock_guard<std::mutex> lock(queue_mutex_);
         if (plan_queue_.empty())
@@ -234,9 +237,6 @@ protected:
         current_plan_ = plan_queue_.front();
         plan_queue_.pop_front();
       }
-
-      // reset internal data structures
-      reset();
 
       RCLCPP_INFO(this->get_logger(), "[server] A new Fabric plan processing starting");
 

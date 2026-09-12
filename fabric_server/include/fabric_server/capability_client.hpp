@@ -734,6 +734,11 @@ protected:
     provider_info.provider = yaml_string_or_empty(root["provider"], "name");
 
     const YAML::Node definition = root["definition"];
+    if (!definition || !definition.IsMap())
+    {
+      return provider_info;
+    }
+
     provider_info.configuration_parameters = parse_parameter_list(definition["configuration_parameters"]);
 
     const YAML::Node runtime_parameters = definition["runtime_parameters"];
