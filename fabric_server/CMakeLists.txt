@@ -11,6 +11,7 @@ find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(fabric_msgs REQUIRED)
 find_package(fabric_base REQUIRED)
@@ -38,6 +39,7 @@ ament_target_dependencies(${PROJECT_NAME}
   ament_index_cpp
   rclcpp
   rclcpp_action
+  std_srvs
   bondcpp
   pluginlib
   fabric_msgs
@@ -68,6 +70,7 @@ ament_target_dependencies(${PROJECT_NAME}_comp
   rclcpp
   rclcpp_components
   rclcpp_action
+  std_srvs
   bondcpp
   pluginlib
   fabric_msgs

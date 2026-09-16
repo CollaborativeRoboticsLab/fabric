@@ -2,8 +2,8 @@
   ros__parameters:      
     validation_plugins: [fabric::CompatibilityValidation, fabric::ParameterValidation]
     parsing_plugin : fabric::XMLParser
-    generation_plugin: fabric::PromptToolsGenerator
-    # generation_plugin: fabric::ExperienceGenerator
+    # generation_plugin: fabric::PromptToolsGenerator
+    generation_plugin: fabric::ExperienceGenerator
     PromptToolsGenerator:
       model_family: openai
       model: gpt-5.1

@@ -56,6 +56,7 @@ The [fabric_server/config/fabric.yaml](./fabric_server/config/fabric.yaml) file 
 By default, `fabric.launch.py` starts Fabric together with `capabilities2_server` and `prompt_bridge`. One optional launch flag and one opt-out flag extend that composition:
 
 - `start_experience_stack:=true` includes `experience_server.launch.py`, which in turn starts the Experience and Supervisor stacks.
+- `experience_only:=true` starts the Experience stack, forces a CoreGraphRag rebuild, and skips launching Fabric.
 - `start_prompt_tools:=false` disables `prompt_bridge` when prompt-based plan generation is not needed.
 
 Launch with the packaged default plan:
@@ -84,6 +85,14 @@ Launch with the Experience stack composed into the same process graph:
 ```bash
 source install/setup.bash
 ros2 launch fabric_server fabric.launch.py start_experience_stack:=true
+```
+
+Launch only the Experience stack to rebuild CoreGraphRag without starting Fabric:
+
+```bash
+export OPENAI_API_KEY=<your_openai_api_key>
+source install/setup.bash
+ros2 launch fabric_server fabric.launch.py experience_only:=true
 ```
 
 Launch with the default prompt-based generation support enabled:

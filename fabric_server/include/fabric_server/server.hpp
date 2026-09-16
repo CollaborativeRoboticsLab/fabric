@@ -29,6 +29,7 @@
 #include <fabric_msgs/srv/parse_plan.hpp>
 #include <fabric_msgs/msg/fabric_status.hpp>
 #include <fabric_msgs/action/generate_plan.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 namespace fabric
 {
@@ -47,6 +48,7 @@ public:
   using ParsePlan = fabric_msgs::srv::ParsePlan;
   using GeneratePlan = fabric_msgs::action::GeneratePlan;
   using GoalHandleGeneratePlan = rclcpp_action::ServerGoalHandle<GeneratePlan>;
+  using Trigger = std_srvs::srv::Trigger;
   /**
    * @brief Construct a new Fabric object
    *
@@ -105,6 +107,10 @@ public:
     const std::string default_plan_file_path = ament_index_cpp::get_package_share_directory("fabric_server") + "/plans/default.xml";
     this->declare_parameter("plan_file_path", default_plan_file_path);
     plan_file_path_ = this->get_parameter("plan_file_path").as_string();
+    this->declare_parameter("require_experience_ready", false);
+    require_experience_ready_ = this->get_parameter("require_experience_ready").as_bool();
+    this->declare_parameter("experience_ready_service", std::string("/experience/ready"));
+    experience_ready_service_ = this->get_parameter("experience_ready_service").as_string();
 
     /*************************************************************************
      * Fabric services
@@ -410,6 +416,13 @@ protected:
     {
       capability_client_->wait_until_ready();
       capabilities_ready_.store(true);
+      if (require_experience_ready_)
+      {
+        RCLCPP_INFO(this->get_logger(), "[server] Capabilities2 is ready. Waiting for experience readiness.");
+        wait_for_experience_ready();
+        experience_ready_.store(true);
+      }
+
       RCLCPP_INFO(this->get_logger(), "[server] Capabilities2 is ready. Fabric processing is enabled.");
       maybe_start_process_thread();
     }
@@ -422,9 +435,48 @@ protected:
     }
   }
 
+  void wait_for_experience_ready()
+  {
+    auto ready_client = this->create_client<Trigger>(experience_ready_service_);
+
+    while (!shutting_down_.load())
+    {
+      if (!ready_client->wait_for_service(std::chrono::seconds(1)))
+      {
+        RCLCPP_INFO(this->get_logger(), "[server] Waiting for experience ready service: %s",
+                    experience_ready_service_.c_str());
+        continue;
+      }
+
+      auto request = std::make_shared<Trigger::Request>();
+      auto future = ready_client->async_send_request(request);
+
+      if (future.wait_for(std::chrono::seconds(1)) != std::future_status::ready)
+      {
+        RCLCPP_INFO(this->get_logger(), "[server] Waiting for experience readiness response from %s",
+                    experience_ready_service_.c_str());
+        continue;
+      }
+
+      const auto response = future.get();
+      if (response->success)
+      {
+        RCLCPP_INFO(this->get_logger(), "[server] Experience is ready: %s", response->message.c_str());
+        return;
+      }
+
+      RCLCPP_INFO(this->get_logger(), "[server] Experience not ready yet: %s", response->message.c_str());
+    }
+  }
+
   void maybe_start_process_thread()
   {
     if (!capabilities_ready_.load() || shutting_down_.load())
+    {
+      return;
+    }
+
+    if (require_experience_ready_ && !experience_ready_.load())
     {
       return;
     }
@@ -845,6 +897,10 @@ protected:
   std::thread process_thread_;
   std::mutex process_thread_mutex_;
   std::atomic<bool> capabilities_ready_{ false };
+  std::atomic<bool> experience_ready_{ false };
+
+  bool require_experience_ready_{ false };
+  std::string experience_ready_service_;
   std::atomic<bool> process_thread_running_{ false };
   std::atomic<bool> shutting_down_{ false };
 
