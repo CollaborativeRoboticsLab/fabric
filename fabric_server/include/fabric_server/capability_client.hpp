@@ -8,6 +8,7 @@
 
 #include <bondcpp/bond.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <yaml-cpp/yaml.h>
 
 #include <fabric_base/utils/structs.hpp>
@@ -46,6 +47,7 @@ public:
   using FreeCapability = capabilities2_msgs::srv::FreeCapability;
   using ConnectCapability = capabilities2_msgs::srv::ConnectCapability;
   using TriggerCapability = capabilities2_msgs::srv::TriggerCapability;
+  using Ready = std_srvs::srv::Trigger;
 
   using CapabilityEventCode = capabilities2_msgs::msg::CapabilityEventCode;
 
@@ -58,6 +60,7 @@ public:
   using FreeCapabilityClient = rclcpp::Client<FreeCapability>;
   using ConnectCapabilityClient = rclcpp::Client<ConnectCapability>;
   using TriggerCapabilityClient = rclcpp::Client<TriggerCapability>;
+  using ReadyClient = rclcpp::Client<Ready>;
 
   CapabilityClient() {
 
@@ -104,6 +107,7 @@ public:
     node_->declare_parameter<std::string>("capability_client.services.free_capability", "/capabilities/free_capability");
     node_->declare_parameter<std::string>("capability_client.services.trigger_capability", "/capabilities/trigger_capability");
     node_->declare_parameter<std::string>("capability_client.services.connect_capability", "/capabilities/connect_capability");
+    node_->declare_parameter<std::string>("capability_client.services.ready", "/capabilities/ready");
 
     node_->get_parameter("capability_client.services.get_interfaces", get_interfaces_);
     node_->get_parameter("capability_client.services.get_semantic_interfaces", get_semantic_interfaces_);
@@ -114,6 +118,7 @@ public:
     node_->get_parameter("capability_client.services.free_capability", free_capability_);
     node_->get_parameter("capability_client.services.trigger_capability", trigger_capability_);
     node_->get_parameter("capability_client.services.connect_capability", connect_capability_);
+    node_->get_parameter("capability_client.services.ready", ready_);
 
     get_interfaces_client_ = node_->create_client<GetInterfaces>(get_interfaces_);
     get_sem_interf_client_ = node_->create_client<GetSemanticInterfaces>(get_semantic_interfaces_);
@@ -124,6 +129,7 @@ public:
     free_capability_client_ = node_->create_client<FreeCapability>(free_capability_);
     trig_capability_client_ = node_->create_client<TriggerCapability>(trigger_capability_);
     connect_capability_client_ = node_->create_client<ConnectCapability>(connect_capability_);
+    ready_client_ = node_->create_client<Ready>(ready_);
 
     RCLCPP_INFO(node_->get_logger(), "[Capability client] initialized.");
   }
@@ -151,6 +157,7 @@ public:
     wait_for_service(free_capability_client_, free_capability_, effective_timeout_sec);
     wait_for_service(trig_capability_client_, trigger_capability_, effective_timeout_sec);
     wait_for_service(connect_capability_client_, connect_capability_, effective_timeout_sec);
+    wait_for_service(ready_client_, ready_, effective_timeout_sec);
 
     probe_server_readiness();
     RCLCPP_INFO(node_->get_logger(), "[Capability client] capabilities2 server is ready.");
@@ -802,26 +809,32 @@ protected:
   {
     RCLCPP_INFO(node_->get_logger(), "[Capability client] probing capabilities2 server readiness");
 
-    auto request_specs = std::make_shared<GetRunnableSpecs::Request>();
+    auto request_ready = std::make_shared<Ready::Request>();
 
     bool completed = false;
+    bool ready = false;
     std::mutex mtx;
     std::condition_variable cv;
     std::unique_lock<std::mutex> lock(mtx);
 
-    auto result_specs_future = get_runnable_specs_client_->async_send_request(
-        request_specs, [this, &completed, &cv](GetRunnableSpecsClient::SharedFuture future) {
+    auto result_ready_future = ready_client_->async_send_request(
+        request_ready, [this, &completed, &ready, &cv](ReadyClient::SharedFuture future) {
           if (!future.valid())
           {
             throw fabric::fabric_exception("Capabilities2 readiness probe failed");
           }
 
-          (void)future.get();
+          ready = future.get()->success;
           completed = true;
           cv.notify_all();
         });
 
     cv.wait(lock, [&completed]() { return completed; });
+
+    if (!ready)
+    {
+      throw fabric::fabric_exception("Capabilities2 server reported not ready");
+    }
   }
 
   /**
@@ -844,6 +857,7 @@ protected:
   std::string trigger_capability_;
   std::string configure_capability_;
   std::string connect_capability_;
+  std::string ready_;
 
   /**
    * @brief Heart beat bond with capabilities server
@@ -878,5 +892,8 @@ protected:
 
   /** trigger an selected capability */
   TriggerCapabilityClient::SharedPtr trig_capability_client_;
+
+  /** readiness probe */
+  ReadyClient::SharedPtr ready_client_;
 };
 }  // namespace fabric
