@@ -13,8 +13,9 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 #include <pluginlib/class_loader.hpp>
 
+#include <fabric_base/utils/metadata_structs.hpp>
+#include <fabric_base/utils/plan_structs.hpp>
 #include <fabric_base/utils/xml_helper.hpp>
-#include <fabric_base/utils/structs.hpp>
 #include <fabric_base/validation_base.hpp>
 #include <fabric_base/parser_base.hpp>
 #include <fabric_base/generation_base.hpp>
@@ -199,14 +200,14 @@ public:
     /*************************************************************************
      * Load Starter plan from file
      ************************************************************************/
-    fabric::Plan starter_plan;
+    fabric::plan::Plan starter_plan;
     if (!parsing_plugin_->load_file(plan_file_path_, starter_plan))
     {
       RCLCPP_ERROR(this->get_logger(), "[server] Failed to load default plan from file: %s", plan_file_path_.c_str());
       throw fabric::fabric_exception("Failed to load default plan");
     }
     starter_plan.plan_id = generate_uuid();
-    starter_plan.status = PlanStatus::QUEUED;
+    starter_plan.status = fabric::plan::Status::QUEUED;
 
     {
       std::lock_guard<std::mutex> lock(queue_mutex_);
@@ -246,24 +247,24 @@ protected:
 
       RCLCPP_INFO(this->get_logger(), "[server] A new Fabric plan processing starting");
 
-      if (current_plan_.status == PlanStatus::CANCELLED)
+      if (current_plan_.status == fabric::plan::Status::CANCELLED)
       {
         RCLCPP_INFO(this->get_logger(), "[server] Skipping cancelled plan with id: %s", current_plan_.plan_id.c_str());
         continue;
       }
 
-      // parse the plan to extract connections (Fabric::Plan) as per the parsing plugin
+      // Parse the plan into fabric::plan::Plan connections using the active parsing plugin.
       try
       {
         RCLCPP_INFO(this->get_logger(), "[server] Parsing the fabric plan.");
-        current_plan_.status = PlanStatus::PARSING;
+        current_plan_.status = fabric::plan::Status::PARSING;
 
         parsing_plugin_->parse(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "[server] Fabric plan parsing failed with error: %s", e.what());
-        current_plan_.status = PlanStatus::PARSE_FAILED;
+        current_plan_.status = fabric::plan::Status::PARSE_FAILED;
         continue;
       }
       RCLCPP_INFO(this->get_logger(), "[server] Fabric plan parsing completed successfully.");
@@ -272,7 +273,7 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "[server] Getting capabilities available in the system");
-        current_plan_.status = PlanStatus::VALIDATING;
+        current_plan_.status = fabric::plan::Status::VALIDATING;
 
         capability_client_->getInterfaces(capability_list_);
         capability_client_->getSemanticInterfaces(capability_list_);
@@ -282,7 +283,7 @@ protected:
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "[server] Capability information retrieval failed with error: %s", e.what());
-        current_plan_.status = PlanStatus::VALIDATION_FAILED;
+        current_plan_.status = fabric::plan::Status::VALIDATION_FAILED;
         continue;
       }
 
@@ -301,7 +302,7 @@ protected:
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "[server] Compatibility validation failed with error: %s", e.what());
-        current_plan_.status = PlanStatus::VALIDATION_FAILED;
+        current_plan_.status = fabric::plan::Status::VALIDATION_FAILED;
         continue;
       }
 
@@ -309,14 +310,14 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "[server] Requesting bond from capabilities2 server.");
-        current_plan_.status = PlanStatus::BONDING;
+        current_plan_.status = fabric::plan::Status::BONDING;
 
         current_plan_.bond_id = capability_client_->request_bond();
       }
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "[server] Capability bond request failed with error: %s", e.what());
-        current_plan_.status = PlanStatus::BOND_FAILED;
+        current_plan_.status = fabric::plan::Status::BOND_FAILED;
         continue;
       }
 
@@ -340,14 +341,14 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "[server] Requesting use of capabilities for the plan.");
-        current_plan_.status = PlanStatus::CAPABILITY_STARTING;
+        current_plan_.status = fabric::plan::Status::CAPABILITY_STARTING;
 
         capability_client_->use_capabilities(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "[server] Capability usage failed with error: %s", e.what());
-        current_plan_.status = PlanStatus::CAPABILITY_START_FAILED;
+        current_plan_.status = fabric::plan::Status::CAPABILITY_START_FAILED;
 
         capability_client_->free_capabilities(current_plan_);
         continue;
@@ -357,14 +358,14 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "[server] Connecting capabilities as per the plan.");
-        current_plan_.status = PlanStatus::CAPABILITY_CONNECTING;
+        current_plan_.status = fabric::plan::Status::CAPABILITY_CONNECTING;
 
         capability_client_->connect_capabilities(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(this->get_logger(), "[server] Capability connection failed with error: %s", e.what());
-        current_plan_.status = PlanStatus::CAPABILITY_CONNECT_FAILED;
+        current_plan_.status = fabric::plan::Status::CAPABILITY_CONNECT_FAILED;
 
         capability_client_->free_capabilities(current_plan_);
         continue;
@@ -376,7 +377,7 @@ protected:
       try
       {
         RCLCPP_INFO(this->get_logger(), "[server] Triggering the first capability in the plan.");
-        current_plan_.status = PlanStatus::RUNNING;
+        current_plan_.status = fabric::plan::Status::RUNNING;
 
         capability_client_->trigger_first_node(current_plan_);
       }
@@ -398,14 +399,14 @@ protected:
         return;
       }
 
-      if (current_plan_.status == PlanStatus::CANCELLED)
+      if (current_plan_.status == fabric::plan::Status::CANCELLED)
       {
         RCLCPP_INFO(this->get_logger(), "[server] Fabric plan cancelled. Releasing capabilities.");
         capability_client_->free_capabilities(current_plan_);
         continue;
       }
 
-      current_plan_.status = PlanStatus::COMPLETED;
+      current_plan_.status = fabric::plan::Status::COMPLETED;
       RCLCPP_INFO(this->get_logger(), "[server] Fabric processing completed. Waiting for next plan.");
     }
   }
@@ -554,12 +555,12 @@ protected:
     }
 
     // Generate the plan using the generation plugin
-    fabric::Plan generated_plan;
+    fabric::plan::Plan generated_plan;
     try
     {
       generated_plan = generation_plugin_->generate(goal->task, goal->uuid, goal->flush);
       generated_plan.plan_id = generate_uuid();
-      generated_plan.status = PlanStatus::QUEUED;
+      generated_plan.status = fabric::plan::Status::QUEUED;
     }
     catch (const std::exception& e)
     {
@@ -609,10 +610,10 @@ protected:
   {
     RCLCPP_INFO(this->get_logger(), "[server] Received the request with a plan and extended metadata");
 
-    fabric::Plan new_plan;
+    fabric::plan::Plan new_plan;
     new_plan.plan = request->plan;
     new_plan.plan_id = generate_uuid();
-    new_plan.status = PlanStatus::QUEUED;
+    new_plan.status = fabric::plan::Status::QUEUED;
     new_plan.metadata.planning_request_id = request->metadata.planning_request_id;
     new_plan.metadata.candidate_plan_id = request->metadata.candidate_plan_id;
     new_plan.metadata.graph_hash = request->metadata.graph_hash;
@@ -636,7 +637,7 @@ protected:
 
   void parsePlanCallback(const std::shared_ptr<ParsePlan::Request> request, std::shared_ptr<ParsePlan::Response> response)
   {
-    fabric::Plan plan;
+    fabric::plan::Plan plan;
     plan.plan = request->plan;
     plan.plan_id = "experience_parse_request";
 
@@ -689,7 +690,7 @@ protected:
     // search for the bond id associated with the plan id from current plan or plan queue
     if (current_plan_.plan_id == plan_id)
     {
-      current_plan_.status = PlanStatus::CANCELLED;
+      current_plan_.status = fabric::plan::Status::CANCELLED;
       bond_id_to_cancel = current_plan_.bond_id;
       plan_completed_ = true;
       plan_cv_.notify_all();
@@ -702,7 +703,7 @@ protected:
       {
         if (plan.plan_id == plan_id)
         {
-          plan.status = PlanStatus::CANCELLED;
+          plan.status = fabric::plan::Status::CANCELLED;
           bond_id_to_cancel = plan.bond_id;
           found = true;
           break;
@@ -763,7 +764,8 @@ protected:
     {
       response->status = status_msg(current_plan_);
 
-      if (current_plan_.status == PlanStatus::VALIDATION_FAILED || current_plan_.status == PlanStatus::PARSE_FAILED)
+        if (current_plan_.status == fabric::plan::Status::VALIDATION_FAILED ||
+          current_plan_.status == fabric::plan::Status::PARSE_FAILED)
         response->rejected_list = current_plan_.rejected_list;
 
       return;
@@ -777,7 +779,7 @@ protected:
       {
         response->status = status_msg(plan);
 
-        if (plan.status == PlanStatus::VALIDATION_FAILED || plan.status == PlanStatus::PARSE_FAILED)
+        if (plan.status == fabric::plan::Status::VALIDATION_FAILED || plan.status == fabric::plan::Status::PARSE_FAILED)
           response->rejected_list = plan.rejected_list;
 
         return;
@@ -792,7 +794,7 @@ protected:
   /**
    * @brief Convert internal plan status to fabric_msgs/PlanStatus message
    */
-  fabric_msgs::msg::FabricStatus status_msg(Plan plan) const
+  fabric_msgs::msg::FabricStatus status_msg(fabric::plan::Plan plan) const
   {
     fabric_msgs::msg::FabricStatus status_msg;
 
@@ -803,49 +805,49 @@ protected:
 
     switch (plan.status)
     {
-      case PlanStatus::UNKNOWN:
+      case fabric::plan::Status::UNKNOWN:
         status_msg.code = fabric_msgs::msg::FabricStatus::UNKNOWN;
         break;
-      case PlanStatus::QUEUED:
+      case fabric::plan::Status::QUEUED:
         status_msg.code = fabric_msgs::msg::FabricStatus::QUEUED;
         break;
-      case PlanStatus::PARSING:
+      case fabric::plan::Status::PARSING:
         status_msg.code = fabric_msgs::msg::FabricStatus::PARSING;
         break;
-      case PlanStatus::PARSE_FAILED:
+      case fabric::plan::Status::PARSE_FAILED:
         status_msg.code = fabric_msgs::msg::FabricStatus::PARSE_FAILED;
         break;
-      case PlanStatus::VALIDATING:
+      case fabric::plan::Status::VALIDATING:
         status_msg.code = fabric_msgs::msg::FabricStatus::VALIDATING;
         break;
-      case PlanStatus::VALIDATION_FAILED:
+      case fabric::plan::Status::VALIDATION_FAILED:
         status_msg.code = fabric_msgs::msg::FabricStatus::VALIDATION_FAILED;
         break;
-      case PlanStatus::BONDING:
+      case fabric::plan::Status::BONDING:
         status_msg.code = fabric_msgs::msg::FabricStatus::BONDING;
         break;
-      case PlanStatus::BOND_FAILED:
+      case fabric::plan::Status::BOND_FAILED:
         status_msg.code = fabric_msgs::msg::FabricStatus::BOND_FAILED;
         break;
-      case PlanStatus::CAPABILITY_STARTING:
+      case fabric::plan::Status::CAPABILITY_STARTING:
         status_msg.code = fabric_msgs::msg::FabricStatus::CAPABILITY_STARTING;
         break;
-      case PlanStatus::CAPABILITY_START_FAILED:
+      case fabric::plan::Status::CAPABILITY_START_FAILED:
         status_msg.code = fabric_msgs::msg::FabricStatus::CAPABILITY_START_FAILED;
         break;
-      case PlanStatus::CAPABILITY_CONNECTING:
+      case fabric::plan::Status::CAPABILITY_CONNECTING:
         status_msg.code = fabric_msgs::msg::FabricStatus::CAPABILITY_CONNECTING;
         break;
-      case PlanStatus::CAPABILITY_CONNECT_FAILED:
+      case fabric::plan::Status::CAPABILITY_CONNECT_FAILED:
         status_msg.code = fabric_msgs::msg::FabricStatus::CAPABILITY_CONNECT_FAILED;
         break;
-      case PlanStatus::RUNNING:
+      case fabric::plan::Status::RUNNING:
         status_msg.code = fabric_msgs::msg::FabricStatus::RUNNING;
         break;
-      case PlanStatus::COMPLETED:
+      case fabric::plan::Status::COMPLETED:
         status_msg.code = fabric_msgs::msg::FabricStatus::COMPLETED;
         break;
-      case PlanStatus::CANCELLED:
+      case fabric::plan::Status::CANCELLED:
         status_msg.code = fabric_msgs::msg::FabricStatus::CANCELLED;
         break;
       default:
@@ -872,20 +874,20 @@ protected:
    */
   void reset()
   {
-    current_plan_ = fabric::Plan();
+    current_plan_ = fabric::plan::Plan();
     capability_list_.clear();
     bond_id_.clear();
     plan_completed_ = false;
   }
 
   /** Vector of plans */
-  std::deque<fabric::Plan> plan_queue_;
+  std::deque<fabric::plan::Plan> plan_queue_;
 
   /** Protect queued plan access across callbacks and processing thread */
   std::mutex queue_mutex_;
 
   /** Current plan being processed */
-  fabric::Plan current_plan_;
+  fabric::plan::Plan current_plan_;
 
   /** Current plan related synchronization */
   bool plan_completed_{ false };
@@ -908,7 +910,7 @@ protected:
   std::shared_ptr<CapabilityClient> capability_client_;
 
   /** Capability List */
-  std::vector<CapabilityInfo> capability_list_;
+  std::vector<fabric::capability::Info> capability_list_;
 
   /** Plugin loaders for each module package */
   pluginlib::ClassLoader<fabric::ValidationBase> validation_loader_;

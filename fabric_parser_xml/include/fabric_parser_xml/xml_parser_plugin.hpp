@@ -42,7 +42,7 @@ public:
    * @param document The path to the XML file to be loaded
    * @return true if the file was loaded successfully, false otherwise
    */
-  bool load_file(const std::string& file_path, fabric::Plan& plan) override
+  bool load_file(const std::string& file_path, fabric::plan::Plan& plan) override
   {
     std::ifstream file(file_path);
     if (!file.is_open())
@@ -82,7 +82,7 @@ public:
    * @param plan The plan to check for compatibility.
    * @return true if the plan is compatible, false otherwise.
    */
-  bool check_compatibility(const fabric::Plan& plan) override
+  bool check_compatibility(const fabric::plan::Plan& plan) override
   {
     // XML Document to check the validity of the plan
     tinyxml2::XMLDocument documentChecking;
@@ -106,7 +106,7 @@ public:
    * @param document The XMLDocument representing the plan.
    * @param plan The parsed plan.
    */
-  void parse(fabric::Plan& plan) override
+  void parse(fabric::plan::Plan& plan) override
   {
     RCLCPP_INFO(node_->get_logger(), "Plan being parsed: \n\n %s", plan.plan.c_str());
 
@@ -364,12 +364,12 @@ protected:
   /**
    * @brief Adds a system connection for parallel input multiplexing with waiting for all inputs
    *
-   * @param connections fabric::Plan containing connections
+  * @param connections fabric::plan::Plan containing connections
    * @param connection_id connection id to be used for the new connection
    * @param description description of the connection
    * @return int next connection id
    */
-  int add_parallel_all(fabric::Plan& plan, int connection_id = 0, std::string description = "")
+  int add_parallel_all(fabric::plan::Plan& plan, int connection_id = 0, std::string description = "")
   {
     int input_count = 0;
 
@@ -380,7 +380,7 @@ protected:
       if (connection.second.on_success.interface == "")
         input_count += 1;
 
-    fabric::connection node;
+    fabric::plan::connection node;
     node.source.interface = "capabilities2_runner/InputMultiplexRunner";
     node.source.provider = "capabilities2_runner/InputMultiplexRunner";
     node.source.instance_id = runner_index;
@@ -406,19 +406,19 @@ protected:
   /**
    * @brief Adds a system connection for parallel input multiplexing with waiting for any inputs
    *
-   * @param plan fabric::Plan containing connections
+  * @param plan fabric::plan::Plan containing connections
    * @param connection_id connection id to be used for the new connection
    * @param description description of the connection
    * @return int next connection id
    */
-  int add_parallel_any(fabric::Plan& plan, int connection_id = 0, std::string description = "")
+  int add_parallel_any(fabric::plan::Plan& plan, int connection_id = 0, std::string description = "")
   {
     // Since we are adding a parallel_any connection, we only need to wait for a single success
     // trigger to succeed, so we can set the input count to 1 for the multiplex runner
     int input_count = 1;
 
     // create a system runner for parallel any with the identified number of inputs
-    fabric::connection node;
+    fabric::plan::connection node;
     node.source.interface = "capabilities2_runner/InputMultiplexRunner";
     node.source.provider = "capabilities2_runner/InputMultiplexRunner";
     node.source.instance_id = runner_index;
@@ -555,8 +555,9 @@ protected:
    * @param element XML Element to be evaluated
    * @param connections std::map containing extracted connections
    */
-  int extract_connections(tinyxml2::XMLElement* element, fabric::Plan& plan, int connection_id = 0,
-                          fabric::event connection_type = fabric::event::ON_SUCCESS, std::string conn_description = "")
+  int extract_connections(tinyxml2::XMLElement* element, fabric::plan::Plan& plan, int connection_id = 0,
+                          fabric::plan::event connection_type = fabric::plan::event::ON_SUCCESS,
+                          std::string conn_description = "")
   {
     int predecessor_id;
     int last_conn_id = connection_id;
@@ -590,14 +591,14 @@ protected:
       if (typetag == "sequential")
       {
         if (hasChildren)
-          last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::event::ON_SUCCESS, description);
+          last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::plan::event::ON_SUCCESS, description);
       }
       else if (typetag == "parallel_any")
       {
         if (hasChildren)
         {
           // extract plan.connections from the first child element
-          last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::event::ON_START, description);
+          last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::plan::event::ON_START, description);
 
           // add a system connection for parallel_any to proceed when at least one parallel runner is completed
           last_conn_id = add_parallel_any(plan, last_conn_id + 1, "parallel_any_for_muxing_outputs");
@@ -608,7 +609,7 @@ protected:
         if (hasChildren)
         {
           // extract connections from the first child element
-          last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::event::ON_START, description);
+          last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::plan::event::ON_START, description);
 
           // add a system connection for parallel_all to proceed when all parallel runners are completed
           last_conn_id = add_parallel_all(plan, last_conn_id + 1, "parallel_all_for_muxing_outputs");
@@ -619,7 +620,7 @@ protected:
         if (hasChildren)
         {
           // extract connections from the first child element
-          last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::event::ON_FAILURE, description);
+          last_conn_id = extract_connections(element->FirstChildElement(), plan, connection_id, fabric::plan::event::ON_FAILURE, description);
 
           // add a system connection for recovery to proceed when the original runner or at least one recovery runner is completed
           last_conn_id = add_parallel_any(plan, last_conn_id + 1, "parallel_any_for_muxing_recovery");
@@ -648,7 +649,7 @@ protected:
       RCLCPP_INFO(node_->get_logger(), "[xml_parser] Creating fabric connection: interface = %s, provider = %s", interfacetag.c_str(),
                   providertag.c_str());
 
-      fabric::connection connection;
+      fabric::plan::connection connection;
 
       connection.source.interface = interfacetag;
       connection.source.provider = providertag;
@@ -667,7 +668,7 @@ protected:
         // if the predecessor is a system runner, we need to update the successor's parameters with the predecessor's id
         // this->check_and_update_runner_id(connections[predecessor_id], connections[connection_id]);
 
-        if (connection_type == fabric::event::ON_SUCCESS)
+        if (connection_type == fabric::plan::event::ON_SUCCESS)
         {
           // Set the target_on_success for the predecessor connection
           plan.connections[predecessor_id].on_success = plan.connections[connection_id].source;
@@ -675,14 +676,14 @@ protected:
           RCLCPP_INFO(node_->get_logger(), "[xml_parser] set on_success for id %d to interface %s", predecessor_id,
                       plan.connections[predecessor_id].on_success.interface.c_str());
         }
-        else if (connection_type == fabric::event::ON_START)
+        else if (connection_type == fabric::plan::event::ON_START)
         {
           // Set the target_on_start for the predecessor connection
           plan.connections[predecessor_id].on_start = plan.connections[connection_id].source;
           RCLCPP_INFO(node_->get_logger(), "[xml_parser] set on_start for id %d to interface %s", predecessor_id,
                       plan.connections[predecessor_id].on_start.interface.c_str());
         }
-        else if (connection_type == fabric::event::ON_FAILURE)
+        else if (connection_type == fabric::plan::event::ON_FAILURE)
         {
           // Set the target_on_failure for the predecessor connection
           plan.connections[predecessor_id].on_failure = plan.connections[connection_id].source;

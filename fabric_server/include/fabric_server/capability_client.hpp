@@ -11,7 +11,8 @@
 #include <std_srvs/srv/trigger.hpp>
 #include <yaml-cpp/yaml.h>
 
-#include <fabric_base/utils/structs.hpp>
+#include <fabric_base/utils/metadata_structs.hpp>
+#include <fabric_base/utils/plan_structs.hpp>
 #include <fabric_base/utils/exception.hpp>
 #include <fabric_base/utils/xml_helper.hpp>
 
@@ -175,7 +176,7 @@ public:
    * @param interfaces std::vector of interfaces for which the information will be requested
    *
    */
-  void getInterfaces(std::vector<CapabilityInfo>& capabilities)
+  void getInterfaces(std::vector<fabric::capability::Info>& capabilities)
   {
     RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting Interface information");
 
@@ -199,7 +200,7 @@ public:
 
           for (const auto& interface : response->interfaces)
           {
-            CapabilityInfo info;
+            fabric::capability::Info info;
             info.interface = interface;
             info.is_semantic = false;
 
@@ -222,9 +223,9 @@ public:
    *
    * @param interfaces std::vector of interfaces for which the semantic interfaces will be requested
    */
-  void getSemanticInterfaces(std::vector<CapabilityInfo>& capabilities)
+  void getSemanticInterfaces(std::vector<fabric::capability::Info>& capabilities)
   {
-    std::vector<CapabilityInfo> new_capabilities;
+    std::vector<fabric::capability::Info> new_capabilities;
 
     for (auto& capability : capabilities)
     {
@@ -251,7 +252,7 @@ public:
             // add semantic interfaces to the capability info
             for (const auto& interface : response->semantic_interfaces)
             {
-              CapabilityInfo info;
+              fabric::capability::Info info;
               info.interface = interface;
               info.is_semantic = true;
 
@@ -275,10 +276,10 @@ public:
    * @brief Get the Provider information for the related interfaces. T
    * @throws `fabric::fabric_exception` if the service call fails
    *
-   * @param capabilities std::vector of CapabilityInfo for which the provider information will be requested
+  * @param capabilities std::vector of fabric::capability::Info for which provider information will be requested
    *
    */
-  void getProviders(std::vector<CapabilityInfo>& capabilities)
+  void getProviders(std::vector<fabric::capability::Info>& capabilities)
   {
     for (auto& capability : capabilities)
     {
@@ -317,7 +318,7 @@ public:
     }
   }
 
-  void getRunnableSpecs(std::vector<CapabilityInfo>& capabilities)
+  void getRunnableSpecs(std::vector<fabric::capability::Info>& capabilities)
   {
     RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting runnable specifications");
 
@@ -327,7 +328,7 @@ public:
     std::mutex mtx;
     std::condition_variable cv;
     std::unique_lock<std::mutex> lock(mtx);
-    std::unordered_map<std::string, CapabilityProviderInfo> provider_metadata_by_name;
+    std::unordered_map<std::string, fabric::capability::ProviderInfo> provider_metadata_by_name;
 
     auto result_specs_future = get_runnable_specs_client_->async_send_request(
         request_specs, [this, &provider_metadata_by_name, &completed, &cv](GetRunnableSpecsClient::SharedFuture future) {
@@ -344,7 +345,7 @@ public:
 
           for (const auto& runnable_spec : response->runnable_specs)
           {
-            CapabilityProviderInfo provider_info = parse_provider_info(runnable_spec.spec);
+            fabric::capability::ProviderInfo provider_info = parse_provider_info(runnable_spec.spec);
             if (!provider_info.provider.empty())
             {
               provider_metadata_by_name[provider_info.provider] = provider_info;
@@ -419,7 +420,7 @@ public:
    * @param plan Fabric plan containing the bond id and capabilities to be used
    *
    */
-  void use_capabilities(fabric::Plan& plan)
+  void use_capabilities(fabric::plan::Plan& plan)
   {
     int index = 0;
 
@@ -465,7 +466,7 @@ public:
    * @param plan Fabric plan containing the bond id and capabilities to be freed
    *
    */
-  void free_capabilities(fabric::Plan& plan)
+  void free_capabilities(fabric::plan::Plan& plan)
   {
     // track freed capabilities
     std::vector<std::string> freed_capabilities;
@@ -528,7 +529,8 @@ public:
       started_capabilities_.erase(std::remove(started_capabilities_.begin(), started_capabilities_.end(), capability), started_capabilities_.end());
   }
 
-  void connect_capability(const std::string& ownership_id, const std::string& bond_id, uint8_t code, const fabric::node& source, const fabric::node& target)
+  void connect_capability(const std::string& ownership_id, const std::string& bond_id, uint8_t code,
+                          const fabric::plan::node& source, const fabric::plan::node& target)
   {
     auto request = std::make_shared<ConnectCapability::Request>();
 
@@ -577,7 +579,7 @@ public:
    *
    * @param plan Fabric plan containing the bond id and connections to be established
    */
-  void connect_capabilities(fabric::Plan& plan)
+  void connect_capabilities(fabric::plan::Plan& plan)
   {
     for (const auto& [id, connection] : plan.connections)
     {
@@ -620,7 +622,7 @@ public:
    *
    * @param plan Fabric plan containing the bond id and connections to be triggered
    */
-  void trigger_first_node(fabric::Plan& plan)
+  void trigger_first_node(fabric::plan::Plan& plan)
   {
     auto request_trigger = std::make_shared<TriggerCapability::Request>();
 
@@ -702,9 +704,9 @@ protected:
     return serialized;
   }
 
-  static CapabilityParameterInfo parse_parameter_info(const YAML::Node& node)
+  static fabric::capability::ParameterInfo parse_parameter_info(const YAML::Node& node)
   {
-    CapabilityParameterInfo parameter;
+    fabric::capability::ParameterInfo parameter;
     parameter.name = yaml_string_or_empty(node, "name");
     parameter.type = yaml_string_or_empty(node, "type");
     parameter.description = yaml_string_or_empty(node, "description");
@@ -718,9 +720,9 @@ protected:
     return parameter;
   }
 
-  static std::vector<CapabilityParameterInfo> parse_parameter_list(const YAML::Node& node)
+  static std::vector<fabric::capability::ParameterInfo> parse_parameter_list(const YAML::Node& node)
   {
-    std::vector<CapabilityParameterInfo> parameters;
+    std::vector<fabric::capability::ParameterInfo> parameters;
     if (!node || !node.IsSequence())
     {
       return parameters;
@@ -734,9 +736,9 @@ protected:
     return parameters;
   }
 
-  static CapabilityProviderInfo parse_provider_info(const std::string& yaml_text)
+  static fabric::capability::ProviderInfo parse_provider_info(const std::string& yaml_text)
   {
-    CapabilityProviderInfo provider_info;
+    fabric::capability::ProviderInfo provider_info;
     const YAML::Node root = YAML::Load(yaml_text);
     provider_info.provider = yaml_string_or_empty(root["provider"], "name");
 
@@ -755,9 +757,9 @@ protected:
   }
 
   static void add_provider_details(
-      CapabilityInfo& capability,
+      fabric::capability::Info& capability,
       const std::string& provider_name,
-      const std::unordered_map<std::string, CapabilityProviderInfo>& provider_metadata_by_name)
+      const std::unordered_map<std::string, fabric::capability::ProviderInfo>& provider_metadata_by_name)
   {
     if (provider_name.empty())
     {

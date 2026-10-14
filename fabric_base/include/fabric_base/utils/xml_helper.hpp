@@ -6,8 +6,8 @@
 #include <string>
 #include <tinyxml2.h>
 
-#include <fabric_base/utils/structs.hpp>
 #include <fabric_base/utils/exception.hpp>
+#include <fabric_base/utils/plan_structs.hpp>
 
 namespace fabric
 {

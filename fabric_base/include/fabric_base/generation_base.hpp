@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <rclcpp/rclcpp.hpp>
-#include <fabric_base/utils/structs.hpp>
+#include <fabric_base/utils/plan_structs.hpp>
 #include <fabric_base/utils/xml_helper.hpp>
 
 namespace fabric
@@ -12,7 +12,7 @@ namespace fabric
  * @brief Abstract base class for plan generation.
  *
  * Implementations should provide a parse() method that extracts information from the XML
- * plan and return a fabric::Plan object.
+ * plan and return a fabric::plan::Plan object.
  */
 class GenerationBase
 {
@@ -36,7 +36,7 @@ public:
    * @param plan The plan to check for compatibility.
    * @return true if the plan is compatible, false otherwise.
    */
-  virtual fabric::Plan generate(const std::string& task, const std::string& uuid, bool flush) = 0;
+  virtual fabric::plan::Plan generate(const std::string& task, const std::string& uuid, bool flush) = 0;
 
 protected:
   /**

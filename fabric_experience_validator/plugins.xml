@@ -1,0 +1,22 @@
+<library path="fabric_experience_validator">
+  <class type="fabric::CompatibilityValidation" base_class_type="fabric::ValidationBase">
+    <description>
+      Reject candidate plans that reference unknown capabilities or invalid candidate graph edges.
+    </description>
+  </class>
+  <class type="fabric::DependencyValidation" base_class_type="fabric::ValidationBase">
+    <description>
+      Warn when a candidate plan explicitly includes a capability that is already an implicit backend dependency of another step.
+    </description>
+  </class>
+  <class type="fabric::DataflowValidation" base_class_type="fabric::ValidationBase">
+    <description>
+      Validate required runtime-parameter satisfaction and penalize weak dataflow matches.
+    </description>
+  </class>
+  <class type="fabric::SemanticValidation" base_class_type="fabric::ValidationBase">
+    <description>
+      Ask the configured prompt backend whether the ordered capability plan semantically matches the task.
+    </description>
+  </class>
+</library>

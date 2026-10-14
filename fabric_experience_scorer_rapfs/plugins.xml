@@ -1,0 +1,7 @@
+<library path="fabric_experience_scorer_rapfs">
+  <class type="fabric::RapfsScorerPlugin" base_class_type="fabric::ScorerBase">
+    <description>
+      Score candidate Fabric XML plans with RAPFS using estimator plugins and CoreBase-backed evidence lookup.
+    </description>
+  </class>
+</library>

@@ -29,13 +29,13 @@ public:
   /**
    * @brief Validate the given XML plan for compatibility.
    *
-   * @param plan The fabric::Plan to validate.
-   * @param capabilities Support data for evaluation as a vector of fabric::CapabilityInfo.
+    * @param plan The fabric::plan::Plan to validate.
+    * @param capabilities Support data for evaluation as a vector of fabric::capability::Info.
    */
-  void validate(fabric::Plan& plan, std::vector<CapabilityInfo>& capabilities) override
+    void validate(fabric::plan::Plan& plan, std::vector<fabric::capability::Info>& capabilities) override
   {
     // Iterate through the plan and check whether each connection's interface and provider are matched in
-    // the provided CapabilityInfo data. If a provider is not matched, it could be in alternative providers.
+    // the provided capability metadata. If a provider is not matched, it could be in alternative providers.
 
     for (const auto& [id, connection] : plan.connections)
     {

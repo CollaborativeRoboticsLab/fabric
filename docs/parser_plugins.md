@@ -10,7 +10,7 @@ The parser in Fabric is implemented as a plugin so plan interpretation can be ch
 
 - **Runtime selection**: The appropriate parser can be loaded at runtime based on the deployed plan format.
 
-The parser's main responsibility is to convert an XML plan into a `fabric::Plan` object, which is the internal representation used by the Fabric execution engine.
+The parser's main responsibility is to convert an XML plan into a `fabric::plan::Plan` object, which is the internal representation used by the Fabric execution engine.
 
 ## ParserBase Interface
 
@@ -18,11 +18,11 @@ All parser plugins inherit from the `ParserBase` abstract class, which defines t
 
 - `initialize(const rclcpp::Node::SharedPtr&)`: Prepares the plugin with the ROS2 node context.
 
-- `load_file(const std::string&, fabric::Plan&)`: Loads a plan file and stores its XML text in `plan.plan`.
+- `load_file(const std::string&, fabric::plan::Plan&)`: Loads a plan file and stores its XML text in `plan.plan`.
 
-- `check_compatibility(const fabric::Plan&)`: Performs a lightweight compatibility check for externally submitted plan text.
+- `check_compatibility(const fabric::plan::Plan&)`: Performs a lightweight compatibility check for externally submitted plan text.
 
-- `parse(fabric::Plan&)`: Parses the XML text already stored in the `fabric::Plan`.
+- `parse(fabric::plan::Plan&)`: Parses the XML text already stored in the `fabric::plan::Plan`.
 
 This ensures that all plugins are interchangeable and can be managed uniformly by the Fabric core.
 
@@ -36,7 +36,7 @@ The `XMLParserPlugin` is the default parser for standard XML plans. Its key feat
 
 - **Control flow extraction**: Supports control tags `sequential`, `parallel_any`, `parallel_all`, and `recovery`.
 
-- **Connection extraction**: Recursively traverses the XML tree to build the execution graph (connections) in the `fabric::Plan`.
+- **Connection extraction**: Recursively traverses the XML tree to build the execution graph (connections) in the `fabric::plan::Plan`.
 
 ### Handling Parallelism: `parallel_all` and `parallel_any`
 
@@ -58,7 +58,7 @@ The parser traverses the XML plan recursively:
 
 - System runners for parallelism are inserted as needed, and unique IDs are assigned to each runner for tracking.
 
-- The process ensures that the resulting `fabric::Plan` accurately represents the intended execution flow, including complex parallel and recovery structures.
+- The process ensures that the resulting `fabric::plan::Plan` accurately represents the intended execution flow, including complex parallel and recovery structures.
 
 ## Extending for Multiple Plan Versions
 

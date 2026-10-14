@@ -15,7 +15,7 @@ All validation plugins inherit from the `ValidationBase` abstract class, which d
 
 - `initialize(const rclcpp::Node::SharedPtr&)`: Prepares the plugin with the ROS2 node context.
 
-- `validate(fabric::Plan&, std::vector<CapabilityInfo>&)`: Validates the plan against available capabilities.
+- `validate(fabric::plan::Plan&, std::vector<fabric::capability::Info>&)`: Validates the plan against available capabilities.
 
 This ensures that all plugins are interchangeable and can be managed uniformly by the Fabric core.
 
