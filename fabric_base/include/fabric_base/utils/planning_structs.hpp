@@ -143,6 +143,16 @@ struct Result
   std::string selected_reasoning;
 };
 
+struct PendingGeneratedPlan
+{
+  std::string planning_request_id;
+  std::string candidate_plan_id;
+  std::string graph_hash;
+  CandidatePlan candidate;
+  int32_t recorded_at_sec = 0;
+  uint32_t recorded_at_nanosec = 0;
+};
+
 /**
  * @brief Normalize free-form text into a lowercase identifier.
  *

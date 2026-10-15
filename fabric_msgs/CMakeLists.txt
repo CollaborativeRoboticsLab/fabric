@@ -23,6 +23,11 @@ set(srv_files
   "srv/CompleteFabric.srv"
   "srv/GetPlanStatus.srv"
   "srv/ParsePlan.srv"
+  "srv/GetScoringEpoch.srv"
+  "srv/GetPlanScoreExplanation.srv"
+  "srv/ScorePlan.srv"
+  "srv/RecordPlanFeedback.srv"
+  "srv/RecordScoringEpoch.srv"
 )
 
 set(msg_files
@@ -30,6 +35,10 @@ set(msg_files
   "msg/FabricStatus.msg"
   "msg/FabricNode.msg"
   "msg/FabricConnection.msg"
+  "msg/EstimatorOutput.msg"
+  "msg/PlanNodeScoreExplanation.msg"
+  "msg/PlanScoreExplanation.msg"
+  "msg/Status.msg"
 )
 
 set(action_files

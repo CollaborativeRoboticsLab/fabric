@@ -1,10 +1,30 @@
 #pragma once
 
-#include <map>
-#include <atomic>
-#include <deque>
 #include <string>
+#include <array>
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <limits>
+#include <optional>
+#include <iomanip>
+#include <unordered_map>
+#include <sstream>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+#include <deque>
+#include <memory>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
+#include <atomic>
+#include <unordered_set>
+#include <map>
 
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <tinyxml2.h>
@@ -15,10 +35,17 @@
 
 #include <fabric_base/utils/metadata_structs.hpp>
 #include <fabric_base/utils/plan_structs.hpp>
+#include <fabric_base/utils/planning_structs.hpp>
 #include <fabric_base/utils/xml_helper.hpp>
+
 #include <fabric_base/validation_base.hpp>
 #include <fabric_base/parser_base.hpp>
 #include <fabric_base/generation_base.hpp>
+#include <fabric_base/behaviour_interface_base.hpp>
+#include <fabric_base/metadata_base.hpp>
+#include <fabric_base/planner_base.hpp>
+#include <fabric_base/scorer_base.hpp>
+#include <fabric_base/validation_base.hpp>
 
 #include <fabric_server/capability_client.hpp>
 #include <fabric_server/bond_client.hpp>
@@ -28,9 +55,17 @@
 #include <fabric_msgs/srv/complete_fabric.hpp>
 #include <fabric_msgs/srv/get_plan_status.hpp>
 #include <fabric_msgs/srv/parse_plan.hpp>
+#include <fabric_msgs/srv/get_scoring_epoch.hpp>
+#include <fabric_msgs/srv/get_plan_score_explanation.hpp>
+#include <fabric_msgs/srv/record_plan_feedback.hpp>
+#include <fabric_msgs/srv/record_scoring_epoch.hpp>
+#include <fabric_msgs/srv/score_plan.hpp>
+
 #include <fabric_msgs/msg/fabric_status.hpp>
+
+#include <supervisor_msgs/msg/system_status.hpp>
+
 #include <fabric_msgs/action/generate_plan.hpp>
-#include <std_srvs/srv/trigger.hpp>
 
 namespace fabric
 {
@@ -47,9 +82,15 @@ public:
   using CompleteFabric = fabric_msgs::srv::CompleteFabric;
   using GetPlanStatus = fabric_msgs::srv::GetPlanStatus;
   using ParsePlan = fabric_msgs::srv::ParsePlan;
+  using GetScoringEpoch = fabric_msgs::srv::GetScoringEpoch;
+  using GetPlanScoreExplanation = fabric_msgs::srv::GetPlanScoreExplanation;
+  using RecordPlanFeedback = fabric_msgs::srv::RecordPlanFeedback;
+  using RecordScoringEpoch = fabric_msgs::srv::RecordScoringEpoch;
+  using ScorePlan = fabric_msgs::srv::ScorePlan;
+
   using GeneratePlan = fabric_msgs::action::GeneratePlan;
   using GoalHandleGeneratePlan = rclcpp_action::ServerGoalHandle<GeneratePlan>;
-  using Trigger = std_srvs::srv::Trigger;
+
   /**
    * @brief Construct a new Fabric object
    *
@@ -60,6 +101,12 @@ public:
     , validation_loader_("fabric_base", "fabric::ValidationBase")
     , parsing_loader_("fabric_base", "fabric::ParserBase")
     , generation_loader_("fabric_base", "fabric::GenerationBase")
+    , metadata_loader_("fabric_base", "fabric::MetadataBase")
+    , core_loader_("fabric_base", "fabric::CoreBase")
+    , behaviour_loader_("fabric_base", "fabric::BehaviourInterfaceBase")
+    , planner_loader_("fabric_base", "fabric::PlannerBase")
+    , scorer_loader_("fabric_base", "fabric::ScorerBase")
+    , estimator_loader_("fabric_base", "fabric::EstimateBase")
   {
     try
     {
@@ -94,6 +141,11 @@ public:
     {
       process_thread_.join();
     }
+
+    if (core_plugin_)
+    {
+      core_plugin_->shutdown();
+    }
   }
 
   /**
@@ -106,18 +158,31 @@ public:
      * Parameters
      ************************************************************************/
     const std::string default_plan_file_path = ament_index_cpp::get_package_share_directory("fabric_server") + "/plans/default.xml";
+
     this->declare_parameter("plan_file_path", default_plan_file_path);
     plan_file_path_ = this->get_parameter("plan_file_path").as_string();
-    this->declare_parameter("require_experience_ready", false);
-    require_experience_ready_ = this->get_parameter("require_experience_ready").as_bool();
-    this->declare_parameter("experience_ready_service", std::string("/experience/ready"));
-    experience_ready_service_ = this->get_parameter("experience_ready_service").as_string();
+
+    this->declare_parameter("use_experience", false);
+    use_experience_ = this->get_parameter("use_experience").as_bool();
+
+    this->declare_parameter<bool>("rebuild_experience", false);
+    rebuild_experience_ = this->get_parameter("rebuild_experience").as_bool();
+
+    this->declare_parameter<bool>("consume_feedback", false);
+    consume_feedback_ = this->get_parameter("consume_feedback").as_bool();
+
+    this->declare_parameter<std::string>("user_feedback_root_dir", "");
+    user_feedback_root_dir_ = this->get_parameter("user_feedback_root_dir").as_string();
+
+    this->declare_parameter<bool>("dispatch_terminal_success_only", false);
+    dispatch_terminal_success_only_ = this->get_parameter("dispatch_terminal_success_only").as_bool();
 
     /*************************************************************************
      * Fabric services
      ************************************************************************/
+
     submit_plan_server_ = this->create_service<SubmitFabricPlan>(
-      "/fabric/plan/submit", std::bind(&Fabric::submitPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+        "/fabric/plan/submit", std::bind(&Fabric::submitPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     cancel_server_ = this->create_service<CancelFabricPlan>(
         "/fabric/plan/cancel", std::bind(&Fabric::cancelPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
@@ -132,7 +197,27 @@ public:
                                                          std::bind(&Fabric::parsePlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     /*************************************************************************
-     * Fabric generate plan action
+     * Fabric experience services
+     ************************************************************************/
+
+    get_plan_score_explanation_service_ = this->create_service<GetPlanScoreExplanation>(
+        "/fabric/experience/score_explanation",
+        std::bind(&Server::handleGetPlanScoreExplanation, this, std::placeholders::_1, std::placeholders::_2));
+
+    score_plan_service_ = this->create_service<ScorePlan>("/fabric/experience/score",
+                                                          std::bind(&Server::handleScorePlan, this, std::placeholders::_1, std::placeholders::_2));
+
+    get_scoring_epoch_service_ = this->create_service<GetScoringEpoch>(
+        "/fabric/experience/get_scoring_epoch", std::bind(&Server::handleGetScoringEpoch, this, std::placeholders::_1, std::placeholders::_2));
+
+    record_plan_feedback_service_ = this->create_service<RecordPlanFeedback>(
+        "/fabric/experience/record_plan_feedback", std::bind(&Server::handleRecordPlanFeedback, this, std::placeholders::_1, std::placeholders::_2));
+
+    record_scoring_epoch_service_ = this->create_service<RecordScoringEpoch>(
+        "/fabric/experience/record_scoring_epoch", std::bind(&Server::handleRecordScoringEpoch, this, std::placeholders::_1, std::placeholders::_2));
+
+    /*************************************************************************
+     * Fabric plan generate action
      ************************************************************************/
 
     generate_plan_server_ = rclcpp_action::create_server<GeneratePlan>(
@@ -141,11 +226,20 @@ public:
         std::bind(&Fabric::handleGeneratePlanAccepted, this, std::placeholders::_1));
 
     /*************************************************************************
+     * Subscribe to system status updates from supervisor server
+     ************************************************************************/
+
+    system_status_sub_ = this->create_subscription<supervisor_msgs::msg::SystemStatus>(
+        "system_status", rclcpp::QoS(rclcpp::KeepLast(10)).best_effort(), std::bind(&Server::systemStatusCallback, this, std::placeholders::_1));
+
+    /*************************************************************************
      * Initialize Validation Plugins
      ************************************************************************/
 
-    this->declare_parameter<std::vector<std::string>>(
-        "validation_plugins", std::vector<std::string>{ "fabric::CompatibilityValidation", "fabric::ParameterValidation" });
+    this->declare_parameter<std::vector<std::string>>("validation_plugins", std::vector<std::string>{ "fabric::CompatibilityValidation", "fabric::"
+                                                                                                                                         "ParameterVa"
+                                                                                                                                         "lidatio"
+                                                                                                                                         "n" });
     std::vector<std::string> validation_plugin_names = this->get_parameter("validation_plugins").as_string_array();
     if (validation_plugin_names.empty())
     {
@@ -192,8 +286,65 @@ public:
     RCLCPP_INFO(this->get_logger(), "[server] Initialized generation plugin: %s", generation_plugin_name.c_str());
 
     /*************************************************************************
+     * Initialize Knowledge Core Plugins
+     ************************************************************************/
+
+    if (use_experience_)
+    {
+      this->declare_parameter("core_plugin", "fabric::CoreGraphRag");
+      std::string core_plugin_name = this->get_parameter("core_plugin").as_string();
+
+      RCLCPP_INFO(this->get_logger(), "[server] Loading knowledge core plugin: %s", core_plugin_name.c_str());
+
+      const bool should_attempt_persisted_load = !rebuild_experience_ && hasPersistedCoreDb();
+
+      if (rebuild_experience_)
+      {
+        removePersistedCoreDbIfSupported();
+      }      
+      
+      core_plugin_ = core_loader_.createSharedInstance(core_plugin_name);
+      core_plugin_->initialize(shared_from_this());
+
+      RCLCPP_INFO(this->get_logger(), "[server] Initialized knowledge core plugin: %s", core_plugin_name.c_str());
+
+      bool loaded_from_db = false;
+      if (should_attempt_persisted_load)
+      {
+        RCLCPP_INFO(this->get_logger(),
+                    "Reusing persisted core database; skipping startup capability metadata collection.");
+        try
+        {
+          core_plugin_->load(capabilities_);
+          loaded_from_db = true;
+          RCLCPP_INFO(this->get_logger(), "Core plugin loaded from persisted database.");
+        }
+        catch (const experience::exception& ex)
+        {
+          RCLCPP_WARN(this->get_logger(), "Failed to load core plugin from persisted database: %s", ex.what());
+        }
+      }
+
+      if (!loaded_from_db)
+      {
+        collect_capabilities_if_needed();
+        core_plugin_->build(capabilities_);
+        RCLCPP_INFO(this->get_logger(), "Core plugin built with capability information.");
+      }
+
+      loadPlannerPlugin();
+      loadBehaviourInterfacePlugin();
+      loadValidationPlugins();
+      loadPlanningRefinementConfig();
+      loadEstimatorPlugins();
+      loadScorerPlugin();
+      consumePersistedUserFeedback();
+    }
+
+    /*************************************************************************
      * Initialize internal components
      ************************************************************************/
+
     capability_client_ = std::make_shared<CapabilityClient>();
     capability_client_->initialize(this->shared_from_this());
 
@@ -417,7 +568,7 @@ protected:
     {
       capability_client_->wait_until_ready();
       capabilities_ready_.store(true);
-      if (require_experience_ready_)
+      if (use_experience_)
       {
         RCLCPP_INFO(this->get_logger(), "[server] Capabilities2 is ready. Waiting for experience readiness.");
         wait_for_experience_ready();
@@ -444,8 +595,7 @@ protected:
     {
       if (!ready_client->wait_for_service(std::chrono::seconds(1)))
       {
-        RCLCPP_INFO(this->get_logger(), "[server] Waiting for experience ready service: %s",
-                    experience_ready_service_.c_str());
+        RCLCPP_INFO(this->get_logger(), "[server] Waiting for experience ready service: %s", experience_ready_service_.c_str());
         continue;
       }
 
@@ -454,8 +604,7 @@ protected:
 
       if (future.wait_for(std::chrono::seconds(1)) != std::future_status::ready)
       {
-        RCLCPP_INFO(this->get_logger(), "[server] Waiting for experience readiness response from %s",
-                    experience_ready_service_.c_str());
+        RCLCPP_INFO(this->get_logger(), "[server] Waiting for experience readiness response from %s", experience_ready_service_.c_str());
         continue;
       }
 
@@ -477,7 +626,7 @@ protected:
       return;
     }
 
-    if (require_experience_ready_ && !experience_ready_.load())
+    if (use_experience_ && !experience_ready_.load())
     {
       return;
     }
@@ -605,8 +754,7 @@ protected:
     goal_handle->succeed(result);
   }
 
-  void submitPlanCallback(const std::shared_ptr<SubmitFabricPlan::Request> request,
-                          std::shared_ptr<SubmitFabricPlan::Response> response)
+  void submitPlanCallback(const std::shared_ptr<SubmitFabricPlan::Request> request, std::shared_ptr<SubmitFabricPlan::Response> response)
   {
     RCLCPP_INFO(this->get_logger(), "[server] Received the request with a plan and extended metadata");
 
@@ -764,8 +912,7 @@ protected:
     {
       response->status = status_msg(current_plan_);
 
-        if (current_plan_.status == fabric::plan::Status::VALIDATION_FAILED ||
-          current_plan_.status == fabric::plan::Status::PARSE_FAILED)
+      if (current_plan_.status == fabric::plan::Status::VALIDATION_FAILED || current_plan_.status == fabric::plan::Status::PARSE_FAILED)
         response->rejected_list = current_plan_.rejected_list;
 
       return;
@@ -880,6 +1027,175 @@ protected:
     plan_completed_ = false;
   }
 
+  /**
+   * @brief Load and initialize the configured estimator plugins.
+    *
+    * Estimators are loaded dynamically so deployments can add or remove feature
+    * generators without recompiling the server.
+   */
+  void loadEstimatorPlugins()
+  {
+    const std::vector<std::string> default_estimators = {
+      "experience::SuccessProbabilityPlugin", "experience::RuntimePlugin",  "experience::EnergyPlugin",
+      "experience::FaultBurdenPlugin",        "experience::ResourcePlugin", "experience::UncertaintyPlugin"
+    };
+
+    const std::vector<std::string> default_estimator_names = {
+      "success", "time", "energy", "fault", "resource", "uncertainty"
+    };
+
+    const std::unordered_map<std::string, std::string> default_estimator_types = {
+      { "success", "experience::SuccessProbabilityPlugin" },
+      { "time", "experience::RuntimePlugin" },
+      { "energy", "experience::EnergyPlugin" },
+      { "fault", "experience::FaultBurdenPlugin" },
+      { "resource", "experience::ResourcePlugin" },
+      { "uncertainty", "experience::UncertaintyPlugin" },
+    };
+
+    this->declare_parameter<std::vector<std::string>>("RapfsScorerPlugin.estimator_names", default_estimator_names);
+    std::vector<std::string> configured_estimator_names;
+    this->get_parameter("RapfsScorerPlugin.estimator_names", configured_estimator_names);
+
+    std::vector<std::string> configured_plugins;
+    for (const auto& estimator_name : configured_estimator_names)
+    {
+      const auto default_type_it = default_estimator_types.find(estimator_name);
+      const std::string default_type =
+        default_type_it != default_estimator_types.end() ? default_type_it->second : std::string();
+      const std::string type_key = "RapfsScorerPlugin.estimators." + estimator_name + ".type";
+      this->declare_parameter<std::string>(type_key, default_type);
+      const std::string plugin_type = this->get_parameter(type_key).as_string();
+      if (!plugin_type.empty())
+        configured_plugins.push_back(plugin_type);
+    }
+
+    this->declare_parameter<std::vector<std::string>>("estimator_plugins", default_estimators);
+    this->get_parameter("estimator_plugins", estimator_plugin_names_);
+    if (!configured_plugins.empty())
+      estimator_plugin_names_ = configured_plugins;
+
+    estimator_plugins_.clear();
+    for (const auto& plugin_name : estimator_plugin_names_)
+    {
+      try
+      {
+        auto plugin = estimator_loader_.createSharedInstance(plugin_name);
+        plugin->initialize(shared_from_this());
+        estimator_plugins_.push_back(plugin);
+        RCLCPP_INFO(this->get_logger(), "Loaded estimator plugin: %s", plugin_name.c_str());
+      }
+      catch (const pluginlib::PluginlibException& ex)
+      {
+        RCLCPP_WARN(this->get_logger(), "Failed to load estimator plugin '%s': %s", plugin_name.c_str(), ex.what());
+      }
+    }
+  }
+
+  /**
+   * @brief Load and initialize the configured scorer plugin.
+    *
+    * The scorer is configured after estimators so it can immediately consume the
+    * active feature pipeline during planning requests.
+   */
+  void loadScorerPlugin()
+  {
+    this->declare_parameter<std::string>("scorer_plugin", "experience::RapfsScorerPlugin");
+    this->get_parameter("scorer_plugin", scorer_plugin_name_);
+
+    scorer_plugin_ = scorer_loader_.createSharedInstance(scorer_plugin_name_);
+    scorer_plugin_->initialize(shared_from_this());
+    scorer_plugin_->configure(core_plugin_, &estimator_plugins_);
+    RCLCPP_INFO(this->get_logger(), "Loaded scorer plugin: %s", scorer_plugin_name_.c_str());
+  }
+
+  /**
+   * @brief Load and initialize the configured validation plugins.
+   *
+   * Validators run after parsing and before scoring so malformed or
+   * unsatisfied candidate plans never win final selection.
+   */
+  void loadValidationPlugins()
+  {
+    this->declare_parameter<std::vector<std::string>>(
+      "validation_plugins",
+      std::vector<std::string>{ "experience::CompatibilityValidation", "experience::DependencyValidation",
+                                "experience::DataflowValidation" });
+    this->get_parameter("validation_plugins", validation_plugin_names_);
+
+    validation_plugins_.clear();
+    for (const auto& plugin_name : validation_plugin_names_)
+    {
+      try
+      {
+        auto plugin = validation_loader_.createSharedInstance(plugin_name);
+        plugin->initialize(shared_from_this());
+        validation_plugins_.push_back(plugin);
+        RCLCPP_INFO(this->get_logger(), "Loaded validation plugin: %s", plugin_name.c_str());
+      }
+      catch (const pluginlib::PluginlibException& ex)
+      {
+        RCLCPP_WARN(this->get_logger(), "Failed to load validation plugin '%s': %s", plugin_name.c_str(), ex.what());
+      }
+    }
+  }
+
+  /**
+   * @brief Load refinement retry policy driven by validation outcomes.
+   */
+  void loadPlanningRefinementConfig()
+  {
+    const std::string max_attempts_key = planner_plugin_name_ + ".refinement.max_attempts";
+    const std::string retry_on_penalty_key = planner_plugin_name_ + ".refinement.retry_on_penalty_findings";
+    const std::string retry_on_warning_key = planner_plugin_name_ + ".refinement.retry_on_warning_findings";
+
+    this->declare_parameter<int>(max_attempts_key, planning_refinement_max_attempts_);
+    this->declare_parameter<bool>(retry_on_penalty_key,
+                                  planning_refinement_retry_on_penalty_findings_);
+    this->declare_parameter<bool>(retry_on_warning_key,
+                                  planning_refinement_retry_on_warning_findings_);
+
+    planning_refinement_max_attempts_ =
+      std::max(0, static_cast<int>(this->get_parameter(max_attempts_key).as_int()));
+    planning_refinement_retry_on_penalty_findings_ =
+      this->get_parameter(retry_on_penalty_key).as_bool();
+    planning_refinement_retry_on_warning_findings_ =
+      this->get_parameter(retry_on_warning_key).as_bool();
+  }
+
+    /**
+   * @brief Load and initialize the configured planner plugin.
+    *
+    * Planning is pluginized so generation strategies can change independently of
+    * the server lifecycle and persistence code.
+   */
+  void loadPlannerPlugin()
+  {
+    this->declare_parameter<std::string>("planner_plugin", "experience::PlanningPlugin");
+    this->get_parameter("planner_plugin", planner_plugin_name_);
+
+    planner_plugin_ = planner_loader_.createSharedInstance(planner_plugin_name_);
+    planner_plugin_->initialize(shared_from_this());
+    RCLCPP_INFO(this->get_logger(), "Loaded planner plugin: %s", planner_plugin_name_.c_str());
+  }
+
+  /**
+   * @brief Load and initialize the configured behaviour-interface plugin.
+    *
+    * The behaviour interface isolates Fabric-specific parsing from the rest of
+    * the server so other execution backends can be swapped in later.
+   */
+  void loadBehaviourInterfacePlugin()
+  {
+    this->declare_parameter<std::string>("behaviour_interface_plugin", "experience::FabricPlugin");
+    this->get_parameter("behaviour_interface_plugin", behaviour_interface_plugin_name_);
+
+    behaviour_plugin_ = behaviour_loader_.createSharedInstance(behaviour_interface_plugin_name_);
+    behaviour_plugin_->initialize(shared_from_this());
+    RCLCPP_INFO(this->get_logger(), "Loaded behaviour interface plugin: %s", behaviour_interface_plugin_name_.c_str());
+  }
+
+
   /** Vector of plans */
   std::deque<fabric::plan::Plan> plan_queue_;
 
@@ -901,7 +1217,9 @@ protected:
   std::atomic<bool> capabilities_ready_{ false };
   std::atomic<bool> experience_ready_{ false };
 
-  bool require_experience_ready_{ false };
+  bool use_experience_{ false };
+  bool rebuild_experience_{ false };
+
   std::string experience_ready_service_;
   std::atomic<bool> process_thread_running_{ false };
   std::atomic<bool> shutting_down_{ false };
@@ -926,6 +1244,111 @@ protected:
   /** shared pointer for generation plugin */
   std::shared_ptr<fabric::GenerationBase> generation_plugin_;
 
+  /**
+   * @brief Plugin loader for capability metadata adapters.
+   */
+  pluginlib::ClassLoader<experience::MetadataBase> metadata_loader_;
+
+  /**
+   * @brief Shared pointer to the active metadata plugin.
+   */
+  std::shared_ptr<experience::MetadataBase> metadata_plugin_;
+
+  /**
+   * @brief Plugin loader for the core knowledge management plugin.
+   */
+  pluginlib::ClassLoader<experience::CoreBase> core_loader_;
+
+  /**
+   * @brief Plugin loader for fabric interface plugins.
+   */
+  pluginlib::ClassLoader<experience::BehaviourInterfaceBase> behaviour_loader_;
+
+  /**
+   * @brief Plugin loader for planner plugins.
+   */
+  pluginlib::ClassLoader<experience::PlannerBase> planner_loader_;
+
+  /**
+   * @brief Plugin loader for candidate-plan scorer plugins.
+   */
+  pluginlib::ClassLoader<experience::ScorerBase> scorer_loader_;
+
+  /**
+   * @brief Plugin loader for candidate-plan validation plugins.
+   */
+  pluginlib::ClassLoader<experience::ValidationBase> validation_loader_;
+
+  /**
+   * @brief Plugin loader for capability feature estimators.
+   */
+  pluginlib::ClassLoader<experience::EstimateBase> estimator_loader_;
+
+  /**
+   * @brief Shared pointer to the core knowledge management plugin.
+   */
+  std::shared_ptr<experience::CoreBase> core_plugin_;
+
+  /**
+   * @brief Shared pointer to the active fabric interface plugin.
+   */
+  std::shared_ptr<experience::BehaviourInterfaceBase> behaviour_plugin_;
+
+  /**
+   * @brief Shared pointer to the active planner plugin.
+   */
+  std::shared_ptr<experience::PlannerBase> planner_plugin_;
+
+  /**
+   * @brief Shared pointer to the active candidate-plan scorer plugin.
+   */
+  std::shared_ptr<experience::ScorerBase> scorer_plugin_;
+
+  /**
+   * @brief Loaded validation plugins used before candidate scoring.
+   */
+  std::vector<std::shared_ptr<experience::ValidationBase>> validation_plugins_;
+
+  /**
+   * @brief Loaded estimator plugins used to compute RAPFS node features.
+   */
+  std::vector<std::shared_ptr<experience::EstimateBase>> estimator_plugins_;
+
+  /**
+   * @brief Name of the core plugin to load.
+   */
+  std::string core_plugin_name;
+
+  /**
+   * @brief Configured validation plugin class names.
+   */
+  std::vector<std::string> validation_plugin_names_;
+
+  /**
+   * @brief Name of the metadata plugin to load.
+   */
+  std::string metadata_plugin_name_;
+
+  /**
+   * @brief Name of the planner plugin to load.
+   */
+  std::string planner_plugin_name_;
+
+  /**
+   * @brief Name of the scorer plugin to load.
+   */
+  std::string scorer_plugin_name_;
+
+  /**
+   * @brief Name of the fabric interface plugin to load.
+   */
+  std::string behaviour_interface_plugin_name_;
+
+  /**
+   * @brief Names of estimator plugins requested by ROS parameter.
+   */
+  std::vector<std::string> estimator_plugin_names_;
+
   /** Bond id */
   std::string bond_id_;
 
@@ -949,6 +1372,31 @@ protected:
 
   /** service to parse Fabric XML into connection graph data */
   rclcpp::Service<ParsePlan>::SharedPtr parse_plan_server_;
+
+  /**
+   * @brief Debug service for selected plan score explanations.
+   */
+  rclcpp::Service<GetPlanScoreExplanation>::SharedPtr get_plan_score_explanation_service_;
+
+  /**
+   * @brief Service for scoring a supplied plan XML without execution dispatch.
+   */
+  rclcpp::Service<ScorePlan>::SharedPtr score_plan_service_;
+
+  /**
+   * @brief Read service for scorer epoch/version checkpoints.
+   */
+  rclcpp::Service<GetScoringEpoch>::SharedPtr get_scoring_epoch_service_;
+
+  /**
+   * @brief Service for recording external whole-plan feedback.
+   */
+  rclcpp::Service<RecordPlanFeedback>::SharedPtr record_plan_feedback_service_;
+
+  /**
+   * @brief Service for recording scorer epoch/version checkpoints.
+   */
+  rclcpp::Service<RecordScoringEpoch>::SharedPtr record_scoring_epoch_service_;
 
   /** action server to generate a plan */
   rclcpp_action::Server<GeneratePlan>::SharedPtr generate_plan_server_;
