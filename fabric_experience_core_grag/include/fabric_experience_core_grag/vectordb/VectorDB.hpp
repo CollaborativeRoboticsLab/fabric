@@ -11,7 +11,7 @@
 
 #include "fabric_experience_core_grag/llm/llm_client.hpp"
 
-namespace experience
+namespace fabric::experience
 {
 
 /**

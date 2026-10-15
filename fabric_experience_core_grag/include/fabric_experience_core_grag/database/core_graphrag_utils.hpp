@@ -10,7 +10,7 @@
 #include <fabric_base/utils/status_structs.hpp>
 #include <fabric_experience_core_grag/database/structs.hpp>
 
-namespace experience::database::core_graphrag
+namespace fabric::experience::database::core_graphrag
 {
 using EstimatorEvidence = ::fabric::experience::EstimatorEvidence;
 using SystemStatus = ::fabric::status::SystemStatus;
@@ -171,4 +171,4 @@ inline void accumulate_fault_evidence(const BehaviourStatus& capability, SkillRu
       ++data.error_count;
   }
 }
-}  // namespace experience::database::core_graphrag
+}  // namespace fabric::experience::database::core_graphrag

@@ -3,7 +3,7 @@
 #include <string>
 #include <Eigen/Dense>
 
-namespace experience::vectordb
+namespace fabric::experience::vectordb
 {
 /**
  * @brief Data record structure
@@ -31,4 +31,4 @@ struct QueryResult
   float score;
 };
 
-}  // namespace experience::vectordb
+}  // namespace fabric::experience::vectordb

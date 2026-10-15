@@ -17,7 +17,7 @@ The package does not own ROS action wiring, planner prompting, or telemetry inge
 
 The exported plugin class is:
 
-- `experience::RapfsScorerPlugin`
+- `fabric::RapfsScorerPlugin`
 
 It implements the shared scorer contract from:
 

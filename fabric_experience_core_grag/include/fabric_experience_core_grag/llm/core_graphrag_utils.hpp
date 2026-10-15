@@ -6,7 +6,7 @@
 #include <fabric_experience_core_grag/database/core_graphrag_utils.hpp>
 #include <fabric_experience_core_grag/database/structs.hpp>
 
-namespace experience::llm::core_graphrag
+namespace fabric::experience::llm::core_graphrag
 {
 using BehaviourInfo = ::fabric::capability::Descriptor;
 
@@ -37,4 +37,4 @@ inline experience::database::NodeType nodeTypeFromExtractionLabel(const std::str
 
   return experience::database::NodeType::CONTEXT_ENTITY;
 }
-}  // namespace experience::llm::core_graphrag
+}  // namespace fabric::experience::llm::core_graphrag

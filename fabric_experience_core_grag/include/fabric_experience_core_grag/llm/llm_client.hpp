@@ -17,7 +17,7 @@
 #include "fabric_experience_core_grag/llm/prompts.hpp"
 #include "fabric_experience_core_grag/llm/structs.hpp"
 
-namespace experience::llm
+namespace fabric::experience::llm
 {
 class PromptServiceClient
 {
@@ -794,4 +794,4 @@ private:
   rclcpp::Node::SharedPtr node_;
 };
 
-}  // namespace experience::llm
+}  // namespace fabric::experience::llm

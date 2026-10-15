@@ -15,7 +15,7 @@
 #include <fabric_experience_core_grag/graph/clustering.hpp>
 #include <fabric_experience_core_grag/graph/Graph.hpp>
 
-namespace experience
+namespace fabric::experience
 {
 
 class GraphRAG : public Graph

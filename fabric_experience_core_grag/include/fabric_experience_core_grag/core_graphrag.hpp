@@ -25,7 +25,7 @@
 #include <fabric_experience_core_grag/vectordb/VectorDB.hpp>
 #include <fabric_experience_core_grag/vectordb/structs.hpp>
 
-namespace experience
+namespace fabric
 {
 
 using CoreBase = ::fabric::CoreBase;
@@ -637,7 +637,7 @@ public:
       if (capability_node_it == node_ids_by_name.end() || !graph_rag_->has_node(capability_node_it->second))
       {
         RCLCPP_WARN(node_->get_logger(), "Graph is missing node for capability: %s", cap.interface_name.c_str());
-        throw experience::exception("Graph integrity check failed: missing capability node.");
+        throw exception("Graph integrity check failed: missing capability node.");
       }
 
       // Check if all relations are represented as edges in the graph
@@ -649,7 +649,7 @@ public:
         {
           RCLCPP_WARN(node_->get_logger(), "Graph is missing edge for relation: %s --(%s)--> %s",
                       cap.interface_name.c_str(), relation.predicate.c_str(), relation.object.c_str());
-          throw experience::exception("Graph integrity check failed: missing capability edge.");
+          throw exception("Graph integrity check failed: missing capability edge.");
         }
       }
     }
@@ -1292,4 +1292,4 @@ protected:
 class GraphKnowledgeCore : public CoreGraphRag
 {
 };
-}  // namespace experience
+}  // namespace fabric

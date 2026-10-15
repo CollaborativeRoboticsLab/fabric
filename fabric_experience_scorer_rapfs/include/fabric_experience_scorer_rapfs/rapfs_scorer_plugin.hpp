@@ -35,10 +35,10 @@ public:
   using CandidatePlanNode = planning::CandidatePlanNode;
   using CandidatePlanEdge = planning::CandidatePlanEdge;
   using CandidatePlanScore = planning::CandidatePlanScore;
-  using CandidateSkillRequest = experience::CandidateSkillRequest;
-  using EstimatorEvidence = experience::EstimatorEvidence;
-  using EstimateResult = experience::EstimateResult;
-  using SemanticContextBundle = experience::SemanticContextBundle;
+  using CandidateSkillRequest = ::fabric::experience::CandidateSkillRequest;
+  using EstimatorEvidence = ::fabric::experience::EstimatorEvidence;
+  using EstimateResult = ::fabric::experience::EstimateResult;
+  using SemanticContextBundle = ::fabric::experience::SemanticContextBundle;
   enum class NonSuccessTerminalPolicy
   {
     Exclude,

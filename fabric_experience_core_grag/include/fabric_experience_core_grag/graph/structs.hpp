@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace experience::graph
+namespace fabric::experience::graph
 {
 
 /**
@@ -82,4 +82,4 @@ struct Graph
   std::unordered_map<std::string, CommunityInfo> communities;
 };
 
-}  // namespace experience::Graph
+}  // namespace fabric::experience::graph

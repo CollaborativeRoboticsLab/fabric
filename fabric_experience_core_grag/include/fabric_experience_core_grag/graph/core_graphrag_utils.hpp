@@ -14,7 +14,7 @@
 #include <fabric_experience_core_grag/database/structs.hpp>
 #include <fabric_experience_core_grag/graph/GraphRAG.hpp>
 
-namespace experience::graph::core_graphrag
+namespace fabric::experience::graph::core_graphrag
 {
 using Parameter = ::fabric::capability::ParameterInfo;
 using BehaviourInfo = ::fabric::capability::Descriptor;
@@ -384,4 +384,4 @@ inline void refreshGraphNodeFeatures(experience::GraphRAG& graph_rag, experience
   }
   graph_rag.set_graph(std::move(graph));
 }
-}  // namespace experience::graph::core_graphrag
+}  // namespace fabric::experience::graph::core_graphrag

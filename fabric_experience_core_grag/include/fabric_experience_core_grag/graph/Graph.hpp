@@ -11,7 +11,7 @@
 #include <fabric_base/utils/exception.hpp>
 #include <fabric_experience_core_grag/graph/structs.hpp>
 
-namespace experience
+namespace fabric::experience
 {
 
 class Graph

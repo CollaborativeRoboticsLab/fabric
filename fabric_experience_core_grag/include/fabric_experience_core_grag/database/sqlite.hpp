@@ -19,7 +19,7 @@
 #include "fabric_experience_core_grag/graph/structs.hpp"
 #include "fabric_experience_core_grag/vectordb/structs.hpp"
 
-namespace experience::database
+namespace fabric::experience::database
 {
 
 class SQLiteDB
@@ -196,7 +196,7 @@ private:
                                                                        const std::string& context_class);
 };
 
-}  // namespace experience::database
+}  // namespace fabric::experience::database
 
 #include "fabric_experience_core_grag/database/sqlite/private.hpp"
 #include "fabric_experience_core_grag/database/sqlite/schema.hpp"

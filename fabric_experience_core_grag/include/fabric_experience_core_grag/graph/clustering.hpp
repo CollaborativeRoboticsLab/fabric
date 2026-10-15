@@ -14,7 +14,7 @@
 #include <fabric_base/utils/exception.hpp>
 #include <fabric_experience_core_grag/graph/structs.hpp>
 
-namespace experience::clustering
+namespace fabric::experience::clustering
 {
 /**
  * @brief Enumeration of supported clustering algorithms.
@@ -312,4 +312,4 @@ void spectral_clustering(experience::graph::Graph& graph_, int k)
   detail::apply_assignments(graph_, node_ids, assignments);
 }
 
-}  // namespace experience::clustering
+}  // namespace fabric::experience::clustering

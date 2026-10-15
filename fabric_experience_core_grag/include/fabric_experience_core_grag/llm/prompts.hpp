@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-namespace experience::llm
+namespace fabric::experience::llm
 {
 /**
  * @brief A system prompt for extracting entities from text.

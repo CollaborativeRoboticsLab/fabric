@@ -6,7 +6,7 @@
 
 #include <Eigen/Dense>
 
-namespace experience::database::detail
+namespace fabric::experience::database::detail
 {
 inline std::string join(const std::vector<std::string>& vec, const char delim = '\x1F')
 {
@@ -101,4 +101,4 @@ inline Eigen::VectorXf deserialize_vector(const std::string& s)
     v[i] = vals[i];
   return v;
 }
-}  // namespace experience::database::detail
+}  // namespace fabric::experience::database::detail

@@ -42,12 +42,12 @@ public:
   using CandidatePlan = planning::CandidatePlan;
   using CandidatePlanNode = planning::CandidatePlanNode;
   using CandidatePlanEdge = planning::CandidatePlanEdge;
-  using CandidateSkillRequest = experience::CandidateSkillRequest;
-  using CandidateSkillResolution = experience::CandidateSkillResolution;
-  using CandidatePlanSkillAttribution = experience::CandidatePlanSkillAttribution;
-  using CandidatePlanEdgeAttribution = experience::CandidatePlanEdgeAttribution;
-  using SemanticContextBundle = experience::SemanticContextBundle;
-  using SemanticContextItem = experience::SemanticContextItem;
+  using CandidateSkillRequest = ::fabric::experience::CandidateSkillRequest;
+  using CandidateSkillResolution = ::fabric::experience::CandidateSkillResolution;
+  using CandidatePlanSkillAttribution = ::fabric::experience::CandidatePlanSkillAttribution;
+  using CandidatePlanEdgeAttribution = ::fabric::experience::CandidatePlanEdgeAttribution;
+  using SemanticContextBundle = ::fabric::experience::SemanticContextBundle;
+  using SemanticContextItem = ::fabric::experience::SemanticContextItem;
   using Dependency = capability::Relation;
   using SkillInfo = plan::node;
 

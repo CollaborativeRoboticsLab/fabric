@@ -1,6 +1,6 @@
 #pragma once
 
-namespace experience::database
+namespace fabric::experience::database
 {
 inline std::vector<PlanNodeScoreExplanation> SQLiteDB::readPlanNodeScoreExplanations(
     const std::string& planning_request_id, const std::string& candidate_plan_id, const std::string& graph_hash)
@@ -793,4 +793,4 @@ inline std::optional<SkillStatisticsSummary> SQLiteDB::readWinningPlanPriorStati
   sqlite3_finalize(stmt);
   return std::nullopt;
 }
-}  // namespace experience::database
+}  // namespace fabric::experience::database

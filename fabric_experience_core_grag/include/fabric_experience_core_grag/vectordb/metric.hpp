@@ -4,7 +4,7 @@
 #include <algorithm>
 #include "fabric_experience_core_grag/vectordb/structs.hpp"
 
-namespace experience::vectordb
+namespace fabric::experience::vectordb
 {
 enum class MetricType
 {
@@ -102,4 +102,4 @@ std::vector<experience::vectordb::QueryResult> euclidean_query(const Eigen::Matr
   return results;
 }
 
-}  // namespace experience::vectordb
+}  // namespace fabric::experience::vectordb

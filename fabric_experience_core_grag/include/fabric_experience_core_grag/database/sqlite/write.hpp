@@ -1,6 +1,6 @@
 #pragma once
 
-namespace experience::database
+namespace fabric::experience::database
 {
 inline bool SQLiteDB::writeNodeInformation(const NodeInformation& node)
 {
@@ -469,4 +469,4 @@ inline bool SQLiteDB::writePlanNodeScoreExplanation(const PlanNodeScoreExplanati
   sqlite3_bind_text(stmt, 28, data.provenance.c_str(), -1, SQLITE_TRANSIENT);
   return finishWriteStatement(stmt);
 }
-}  // namespace experience::database
+}  // namespace fabric::experience::database

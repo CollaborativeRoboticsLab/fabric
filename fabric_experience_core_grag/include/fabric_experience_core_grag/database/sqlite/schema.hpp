@@ -1,6 +1,6 @@
 #pragma once
 
-namespace experience::database
+namespace fabric::experience::database
 {
 inline bool SQLiteDB::createNodeInformationTable()
 {
@@ -230,4 +230,4 @@ inline bool SQLiteDB::ensureTextColumn(const std::string& table_name, const std:
   alter += ";";
   return sqlite3_exec(db_, alter.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK;
 }
-}  // namespace experience::database
+}  // namespace fabric::experience::database

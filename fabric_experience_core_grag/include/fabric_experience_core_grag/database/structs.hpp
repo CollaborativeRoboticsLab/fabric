@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace experience::database
+namespace fabric::experience::database
 {
 
 /**
@@ -520,4 +520,4 @@ struct StatisticsFallbackSelection
   SkillStatisticsSummary statistics;
 };
 
-};  // namespace experience::database
+};  // namespace fabric::experience::database

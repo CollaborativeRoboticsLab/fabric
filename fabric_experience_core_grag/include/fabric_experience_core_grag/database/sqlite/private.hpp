@@ -1,6 +1,6 @@
 #pragma once
 
-namespace experience::database
+namespace fabric::experience::database
 {
 inline bool SQLiteDB::execStatement(std::string_view sql)
 {
@@ -154,4 +154,4 @@ inline SkillStatisticsSummary SQLiteDB::summaryFromColumns(sqlite3_stmt* stmt, i
   summary.estimator_window = columnText(stmt, start_column + 16);
   return summary;
 }
-}  // namespace experience::database
+}  // namespace fabric::experience::database

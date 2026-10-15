@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace experience::llm
+namespace fabric::experience::llm
 {
 
 struct EmbeddingResult
@@ -26,4 +26,4 @@ struct RelationshipInfo
     std::string relationship;
 };
 
-}  // namespace experience::llm
+}  // namespace fabric::experience::llm
