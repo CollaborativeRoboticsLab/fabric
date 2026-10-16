@@ -7,11 +7,11 @@
 
   <maintainer email="kalanaratnayake95@gmail.com">Kalana Ratnayake</maintainer>
   <maintainer email="kalana.ratnayakemudiyanselage@canberra.edu.au">Kalana Ratnayake</maintainer>
+  
+  <license>MIT</license>
 
   <author email="kalana.ratnayakemudiyanselage@canberra.edu.au">Kalana Ratnayake</author>
   <author email="kalanaratnayake95@gmail.com">Kalana Ratnayake</author>
-  
-  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -25,6 +25,7 @@
   <depend>fabric_msgs</depend>
   <depend>fabric_base</depend>
   <depend>capabilities2_msgs</depend>
+  <depend>supervisor_msgs</depend>
   <depend>yaml-cpp</depend>
 
   <test_depend>ament_lint_auto</test_depend>

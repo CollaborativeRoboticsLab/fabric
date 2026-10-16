@@ -1,0 +1,77 @@
+[
+    {
+        "planning_request_id": "planning_request_demo_001",
+        "candidate_plan_id": "candidate_plan_alpha",
+        "graph_hash": "graph_hash_demo_alpha",
+        "terminal_outcome": "success",
+        "terminal_success": true,
+        "human_judgement": "operator confirmed successful delivery",
+        "generated_plan": {
+            "plan": "<?xml version='1.0' encoding='UTF-8'?>\n<Plan name='candidate_plan_alpha'>\n  <Control type='sequential' name='main_execution'>\n    <Runner interface='capabilities2_runner_nav2/WaypointRunner' provider='capabilities2_runner_nav2/WaypointRunner' x='4.0' y='1.5' />\n    <Runner interface='grasping_capabilities/PickTrayRunner' provider='grasping_capabilities/PickTrayRunner' tray_id='medicine_tray' />\n    <Runner interface='fabric_capabilities/DeliverTrayRunner' provider='fabric_capabilities/DeliverTrayRunner' destination='room_4' />\n  </Control>\n</Plan>",
+            "reasoning": "Direct delivery path with standard pickup and handoff sequence."
+        },
+        "score_components": {
+            "rapfs": 0.81,
+            "success": 0.87,
+            "time": 0.22,
+            "energy": 0.14,
+            "fault": 0.05,
+            "resource": 0.0,
+            "uncertainty": 0.19
+        },
+        "normalizer_version": "calibrated_v1",
+        "estimator_version": "baseline_v2",
+        "weight_version": "baseline_v2",
+        "provenance": "example_feedback_jsonl"
+    },
+    {
+        "planning_request_id": "planning_request_demo_002",
+        "candidate_plan_id": "candidate_plan_beta",
+        "graph_hash": "graph_hash_demo_beta",
+        "terminal_outcome": "partial_success",
+        "terminal_success": false,
+        "human_judgement": "operator accepted degraded fallback after navigation retry",
+        "generated_plan": {
+            "plan": "<?xml version='1.0' encoding='UTF-8'?>\n<Plan name='candidate_plan_beta'>\n  <Control type='recovery' name='delivery_with_retry'>\n    <Control type='sequential' name='initial_attempt'>\n      <Runner interface='capabilities2_runner_nav2/WaypointRunner' provider='capabilities2_runner_nav2/WaypointRunner' x='4.0' y='1.5' />\n      <Runner interface='grasping_capabilities/PickTrayRunner' provider='grasping_capabilities/PickTrayRunner' tray_id='medicine_tray' />\n      <Runner interface='fabric_capabilities/DeliverTrayRunner' provider='fabric_capabilities/DeliverTrayRunner' destination='room_4' />\n    </Control>\n    <Runner interface='capabilities2_runner_nav2/WaypointRunner' provider='capabilities2_runner_nav2/WaypointRunner' x='3.6' y='1.2' />\n  </Control>\n</Plan>",
+            "reasoning": "Adds a recovery waypoint retry to salvage delivery when the first navigation approach degrades."
+        },
+        "score_components": {
+            "rapfs": 0.46,
+            "success": 0.58,
+            "time": 0.63,
+            "energy": 0.31,
+            "fault": 0.2,
+            "resource": 0.0,
+            "uncertainty": 0.37
+        },
+        "normalizer_version": "calibrated_v1",
+        "estimator_version": "baseline_v2",
+        "weight_version": "baseline_v2",
+        "provenance": "example_feedback_jsonl"
+    },
+    {
+        "planning_request_id": "planning_request_demo_003",
+        "candidate_plan_id": "candidate_plan_gamma",
+        "graph_hash": "graph_hash_demo_gamma",
+        "terminal_outcome": "failure",
+        "terminal_success": false,
+        "human_judgement": "task failed because pickup pose was blocked by a pallet",
+        "generated_plan": {
+            "plan": "<?xml version='1.0' encoding='UTF-8'?>\n<Plan name='candidate_plan_gamma'>\n  <Control type='sequential' name='blocked_pickup_attempt'>\n    <Runner interface='capabilities2_runner_nav2/WaypointRunner' provider='capabilities2_runner_nav2/WaypointRunner' x='4.2' y='1.8' />\n    <Runner interface='grasping_capabilities/PickTrayRunner' provider='grasping_capabilities/PickTrayRunner' tray_id='medicine_tray' approach='front' />\n    <Runner interface='fabric_capabilities/DeliverTrayRunner' provider='fabric_capabilities/DeliverTrayRunner' destination='room_4' />\n  </Control>\n</Plan>",
+            "reasoning": "Fastest nominal route, but depends on an unobstructed frontal pickup pose."
+        },
+        "score_components": {
+            "rapfs": 0.33,
+            "success": 0.41,
+            "time": 0.28,
+            "energy": 0.16,
+            "fault": 0.44,
+            "resource": 0.0,
+            "uncertainty": 0.52
+        },
+        "normalizer_version": "calibrated_v1",
+        "estimator_version": "baseline_v2",
+        "weight_version": "baseline_v2",
+        "provenance": "example_feedback_jsonl"
+    }
+]

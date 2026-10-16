@@ -38,7 +38,6 @@ set(msg_files
   "msg/EstimatorOutput.msg"
   "msg/PlanNodeScoreExplanation.msg"
   "msg/PlanScoreExplanation.msg"
-  "msg/Status.msg"
 )
 
 set(action_files

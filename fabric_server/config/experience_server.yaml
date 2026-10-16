@@ -1,0 +1,131 @@
+/**:
+  ros__parameters:
+    core_plugin: "experience::GraphKnowledgeCore"
+    behaviour_interface_plugin: "experience::FabricPlugin"
+    planner_plugin: "experience::PlanningPlugin"
+    scorer_plugin: "experience::RapfsScorerPlugin"
+    rebuild: false
+    consume_feedback: true
+    user_feedback_root_dir: ""
+    dispatch_terminal_success_only: false
+    validation_plugins:
+      - "experience::CompatibilityValidation"
+      - "experience::DependencyValidation"
+      - "experience::DataflowValidation"
+      - "experience::SemanticValidation"
+
+    estimator_plugins:
+      - "experience::SuccessProbabilityPlugin"
+      - "experience::RuntimePlugin"
+      - "experience::EnergyPlugin"
+      - "experience::FaultBurdenPlugin"
+      - "experience::ResourcePlugin"
+      - "experience::UncertaintyPlugin"
+
+    RapfsScorerPlugin:
+      calibration_version: "heldout_eval_v1"
+      normalizer_version: "calibrated_v1"
+      weight_version: "tuned_outcome_alignment_v1"
+      estimator_version: "baseline_v1"
+      non_success_terminal_policy: "count_as_failure"
+      plan_uncertainty_aggregation: "scenario_weighted_mean"
+      default_success_probability: 0.5
+      default_uncertainty: 1.0
+      uncertainty_statistical_weight: 0.40
+      uncertainty_task_ambiguity_weight: 0.15
+      uncertainty_unfamiliarity_weight: 0.25
+      uncertainty_missing_evidence_weight: 0.20
+      uncertainty_weight_locked: true
+      uncertainty_weight_target: ""
+      unknown_unfamiliarity_prior: 0.75
+      
+      estimator_names: ["success", "time", "energy", "fault", "resource", "uncertainty"]
+      estimators:
+        success:
+          type: "experience::SuccessProbabilityPlugin"
+          weight: 0.25
+        time:
+          type: "experience::RuntimePlugin"
+          weight: 0.10
+        energy:
+          type: "experience::EnergyPlugin"
+          weight: 0.00
+        fault:
+          type: "experience::FaultBurdenPlugin"
+          weight: 0.10
+        resource:
+          type: "experience::ResourcePlugin"
+          weight: 0.00
+        uncertainty:
+          type: "experience::UncertaintyPlugin"
+          weight: 0.45
+
+      feasibility:
+        min_success_probability: 0.20
+        max_runtime_seconds: 300.0
+        max_energy_delta_percentage: 50.0
+        max_fault_burden: 1.5
+        max_resource_demand: 1.0
+        max_uncertainty: 0.95
+
+      transforms:
+        runtime_seconds:
+          inputs: [0.0, 30.0, 60.0, 120.0, 300.0]
+          outputs: [0.0, 0.15, 0.35, 0.70, 1.0]
+        energy_delta_percentage:
+          inputs: [0.0, 5.0, 10.0, 25.0, 50.0]
+          outputs: [0.0, 0.15, 0.35, 0.75, 1.0]
+        fault_burden:
+          inputs: [0.0, 0.25, 0.50, 1.0, 2.0]
+          outputs: [0.0, 0.15, 0.35, 0.75, 1.0]
+        resource_demand:
+          inputs: [0.0, 0.25, 0.50, 1.0, 2.0]
+          outputs: [0.0, 0.15, 0.40, 0.75, 1.0]
+        semantic_familiarity:
+          inputs: [0.0, 0.25, 0.50, 0.75, 1.0]
+          outputs: [1.0, 0.80, 0.50, 0.20, 0.0]
+
+    SuccessProbabilityPlugin:
+      alpha: 1.0
+      beta: 1.0
+      use_beta_smoothing: true
+
+    UncertaintyPlugin:
+      alpha: 1.0
+      beta: 1.0
+      credible_interval_z: 1.96
+
+    FaultBurdenPlugin:
+      warning_weight: 1.0
+      error_weight: 3.0
+
+    PlanningPlugin:
+      model_family: "openai"
+      model: "gpt-5.1"
+      use_cache: true
+      use_chat_mode: false
+      max_capability_context: 8
+      semantic_context_mode: "detailed"
+      log_semantic_context_comparison: true
+      persist_prompt_audit: true
+      prompt_audit_dir: "planner_prompt_audit"
+      prompt_audit_include_full_text: false
+      refinement:
+        max_attempts: 2
+        retry_on_penalty_findings: true
+        retry_on_warning_findings: false
+
+    CoreGraphRag:
+      edge:
+        parameter:
+          min_score: 0.35
+          strong_score: 0.65
+          max_weak_dependencies: 2
+
+    CapabilitiesPlugin:
+      services:
+        get_runnable_specs: "/capabilities/get_runnable_specs"
+
+    FabricPlugin:
+      services:
+        parse_plan: "/fabric/plan/parse"

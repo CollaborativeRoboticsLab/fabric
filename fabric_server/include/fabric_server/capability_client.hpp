@@ -321,42 +321,17 @@ public:
   void getRunnableSpecs(std::vector<fabric::capability::Info>& capabilities)
   {
     RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting runnable specifications");
-
-    auto request_specs = std::make_shared<GetRunnableSpecs::Request>();
-
-    bool completed = false;
-    std::mutex mtx;
-    std::condition_variable cv;
-    std::unique_lock<std::mutex> lock(mtx);
     std::unordered_map<std::string, fabric::capability::ProviderInfo> provider_metadata_by_name;
 
-    auto result_specs_future = get_runnable_specs_client_->async_send_request(
-        request_specs, [this, &provider_metadata_by_name, &completed, &cv](GetRunnableSpecsClient::SharedFuture future) {
-          if (!future.valid())
-          {
-            throw fabric::fabric_exception("Failed to get runnable specifications from server");
-          }
-
-          auto response = future.get();
-          if (response->index_of_specs.size() != response->runnable_specs.size())
-          {
-            throw fabric::fabric_exception("Runnable specification response has mismatched index and payload sizes");
-          }
-
-          for (const auto& runnable_spec : response->runnable_specs)
-          {
-            fabric::capability::ProviderInfo provider_info = parse_provider_info(runnable_spec.spec);
-            if (!provider_info.provider.empty())
-            {
-              provider_metadata_by_name[provider_info.provider] = provider_info;
-            }
-          }
-
-          completed = true;
-          cv.notify_all();
-        });
-
-    cv.wait(lock, [&completed]() { return completed; });
+    const auto runnable_specs = fetch_runnable_spec_yaml();
+    for (const auto& runnable_spec : runnable_specs)
+    {
+      fabric::capability::ProviderInfo provider_info = parse_provider_info(runnable_spec);
+      if (!provider_info.provider.empty())
+      {
+        provider_metadata_by_name[provider_info.provider] = provider_info;
+      }
+    }
 
     for (auto& capability : capabilities)
     {
@@ -370,6 +345,20 @@ public:
     }
 
     RCLCPP_INFO(node_->get_logger(), "[Capability client] attached runnable metadata to %d capabilities\n",
+                static_cast<int>(capabilities.size()));
+  }
+
+  void getRunnableSpecs(std::vector<fabric::capability::Descriptor>& capabilities)
+  {
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting runnable capability descriptors");
+
+    const auto runnable_specs = fetch_runnable_spec_yaml();
+    for (const auto& runnable_spec : runnable_specs)
+    {
+      capabilities.push_back(parse_descriptor(runnable_spec));
+    }
+
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] received %d runnable capability descriptors from server\n",
                 static_cast<int>(capabilities.size()));
   }
 
@@ -736,6 +725,26 @@ protected:
     return parameters;
   }
 
+  static std::vector<fabric::capability::Relation> parse_relation_list(const YAML::Node& node)
+  {
+    std::vector<fabric::capability::Relation> relations;
+    if (!node || !node.IsSequence())
+    {
+      return relations;
+    }
+
+    for (const auto& item : node)
+    {
+      fabric::capability::Relation relation;
+      relation.subject = yaml_string_or_empty(item, "subject");
+      relation.predicate = yaml_string_or_empty(item, "predicate");
+      relation.object = yaml_string_or_empty(item, "object");
+      relations.push_back(relation);
+    }
+
+    return relations;
+  }
+
   static fabric::capability::ProviderInfo parse_provider_info(const std::string& yaml_text)
   {
     fabric::capability::ProviderInfo provider_info;
@@ -756,6 +765,31 @@ protected:
     return provider_info;
   }
 
+  static fabric::capability::Descriptor parse_descriptor(const std::string& yaml_text)
+  {
+    fabric::capability::Descriptor descriptor;
+    const YAML::Node root = YAML::Load(yaml_text);
+
+    const YAML::Node interface = root["interface"];
+    descriptor.interface_name = yaml_string_or_empty(interface, "name");
+    descriptor.interface_description = yaml_string_or_empty(interface, "description");
+
+    const YAML::Node provider = root["provider"];
+    descriptor.provider_name = yaml_string_or_empty(provider, "name");
+    descriptor.provider_description = yaml_string_or_empty(provider, "description");
+
+    const YAML::Node definition = root["definition"];
+    descriptor.command = yaml_string_or_empty(definition, "command");
+    descriptor.configuration_parameters = parse_parameter_list(definition["configuration_parameters"]);
+
+    const YAML::Node runtime_parameters = definition["runtime_parameters"];
+    descriptor.runtime_input_parameters = parse_parameter_list(runtime_parameters["input"]);
+    descriptor.runtime_output_parameters = parse_parameter_list(runtime_parameters["output"]);
+
+    descriptor.relations = parse_relation_list(root["relations"]);
+    return descriptor;
+  }
+
   static void add_provider_details(
       fabric::capability::Info& capability,
       const std::string& provider_name,
@@ -773,6 +807,43 @@ protected:
     }
 
     capability.provider_details.push_back(it->second);
+  }
+
+  std::vector<std::string> fetch_runnable_spec_yaml()
+  {
+    auto request_specs = std::make_shared<GetRunnableSpecs::Request>();
+
+    bool completed = false;
+    std::mutex mtx;
+    std::condition_variable cv;
+    std::unique_lock<std::mutex> lock(mtx);
+    std::vector<std::string> runnable_specs;
+
+    auto result_specs_future = get_runnable_specs_client_->async_send_request(
+        request_specs, [this, &runnable_specs, &completed, &cv](GetRunnableSpecsClient::SharedFuture future) {
+          if (!future.valid())
+          {
+            throw fabric::fabric_exception("Failed to get runnable specifications from server");
+          }
+
+          auto response = future.get();
+          if (response->index_of_specs.size() != response->runnable_specs.size())
+          {
+            throw fabric::fabric_exception("Runnable specification response has mismatched index and payload sizes");
+          }
+
+          runnable_specs.reserve(response->runnable_specs.size());
+          for (const auto& runnable_spec : response->runnable_specs)
+          {
+            runnable_specs.push_back(runnable_spec.spec);
+          }
+
+          completed = true;
+          cv.notify_all();
+        });
+
+    cv.wait(lock, [&completed]() { return completed; });
+    return runnable_specs;
   }
 
   /**
