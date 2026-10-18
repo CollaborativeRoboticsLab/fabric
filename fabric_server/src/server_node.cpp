@@ -1,6 +1,6 @@
 #include <fabric_server/server.hpp>
 
-int main(int argc, char** argv)
+int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
 
@@ -9,9 +9,9 @@ int main(int argc, char** argv)
 
   // Initialize the node components after construction
   node->initialize();
-  
+
   rclcpp::spin(node);
-  
+
   rclcpp::shutdown();
   return 0;
 }

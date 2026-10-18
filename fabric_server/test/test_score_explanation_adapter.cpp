@@ -20,16 +20,16 @@ TEST(ScoreExplanationAdapter, PreservesSemanticExplanationFields)
   node_record.proxy_source = "requested_skill";
   node_record.reason = "matched semantic context";
   node_record.semantic_familiarity = 0.75;
-  node_record.semantic_relevant_capabilities = { "demo/DetectObject", "demo/EstimatePose" };
-  node_record.semantic_related_entities = { "apple", "table" };
-  node_record.semantic_dependencies = { "camera_ready", "workspace_clear" };
-  node_record.semantic_plan_patterns = { "detect_then_pick" };
-  node_record.semantic_fault_concepts = { "occlusion" };
-  node_record.semantic_community_summaries = { "vision pipeline summary" };
+  node_record.semantic_relevant_capabilities = {"demo/DetectObject", "demo/EstimatePose"};
+  node_record.semantic_related_entities = {"apple", "table"};
+  node_record.semantic_dependencies = {"camera_ready", "workspace_clear"};
+  node_record.semantic_plan_patterns = {"detect_then_pick"};
+  node_record.semantic_fault_concepts = {"occlusion"};
+  node_record.semantic_community_summaries = {"vision pipeline summary"};
   node_record.estimator_outputs = {
-    fabric::experience::EstimateResult{ "success_probability", 0.8, true, "beta posterior" },
-    fabric::experience::EstimateResult{ "runtime_seconds", 4.2, true, "mean observed runtime" },
-    fabric::experience::EstimateResult{ "uncertainty", 0.1, true, "beta interval width" },
+    fabric::experience::EstimateResult{"success_probability", 0.8, true, "beta posterior"},
+    fabric::experience::EstimateResult{"runtime_seconds", 4.2, true, "mean observed runtime"},
+    fabric::experience::EstimateResult{"uncertainty", 0.1, true, "beta interval width"},
   };
 
   fabric::experience::SelectedPlanScoreExplanationBundle bundle;
@@ -49,7 +49,7 @@ TEST(ScoreExplanationAdapter, PreservesSemanticExplanationFields)
   const auto msg = fabric::server::adapter::toPlanScoreExplanationMsg(bundle);
 
   ASSERT_EQ(msg.node_explanations.size(), 1u);
-  const auto& node_msg = msg.node_explanations.front();
+  const auto & node_msg = msg.node_explanations.front();
   EXPECT_EQ(node_msg.semantic_relevant_capabilities.size(), 2u);
   EXPECT_EQ(node_msg.semantic_related_entities.size(), 2u);
   EXPECT_EQ(node_msg.semantic_dependencies.size(), 2u);

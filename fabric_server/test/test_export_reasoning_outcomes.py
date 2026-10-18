@@ -1,8 +1,8 @@
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
 import json
 import sqlite3
 import sys
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -19,7 +19,7 @@ SPEC.loader.exec_module(MODULE)
 def create_feedback_db(path: Path) -> None:
     connection = sqlite3.connect(path)
     connection.executescript(
-        '''
+        """
         CREATE TABLE plan_feedback_statistics (
             planning_request_id TEXT,
             candidate_plan_id TEXT,
@@ -41,7 +41,7 @@ def create_feedback_db(path: Path) -> None:
             weight_version TEXT,
             provenance TEXT
         );
-        '''
+        """
     )
     connection.execute(
         'INSERT INTO plan_feedback_statistics VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',

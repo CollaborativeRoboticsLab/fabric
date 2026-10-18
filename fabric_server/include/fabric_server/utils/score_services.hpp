@@ -33,15 +33,15 @@ using RecordScoringEpoch = ::fabric_msgs::srv::RecordScoringEpoch;
 using ScorePlan = ::fabric_msgs::srv::ScorePlan;
 
 inline void setGetPlanScoreExplanationUnavailable(
-  GetPlanScoreExplanation::Response& response)
+  GetPlanScoreExplanation::Response & response)
 {
   response.found = false;
   response.node_found = false;
-  response.message = "experience server is waiting for capabilities2 readiness";
+  response.message = "fabric experience services are waiting for capabilities2 readiness";
 }
 
 inline void setGetPlanScoreExplanationNotFound(
-  GetPlanScoreExplanation::Response& response)
+  GetPlanScoreExplanation::Response & response)
 {
   response.found = false;
   response.node_found = false;
@@ -49,17 +49,18 @@ inline void setGetPlanScoreExplanationNotFound(
 }
 
 inline void populateGetPlanScoreExplanationResponse(
-  const SelectedPlanScoreExplanationBundle& bundle,
-  const std::optional<PlanNodeScoreExplanationRecord>& node,
-  GetPlanScoreExplanation::Response& response)
+  const SelectedPlanScoreExplanationBundle & bundle,
+  const std::optional<PlanNodeScoreExplanationRecord> & node,
+  GetPlanScoreExplanation::Response & response)
 {
   response.found = true;
   response.node_found = false;
   response.message = "selected plan score explanation loaded";
   response.plan = fabric::server::adapter::toPlanScoreExplanationMsg(bundle);
 
-  if (!node.has_value())
+  if (!node.has_value()) {
     return;
+  }
 
   response.node_found = true;
   response.node_explanation =
@@ -67,62 +68,65 @@ inline void populateGetPlanScoreExplanationResponse(
 }
 
 inline void setGetPlanScoreExplanationNodeMissing(
-  GetPlanScoreExplanation::Response& response)
+  GetPlanScoreExplanation::Response & response)
 {
   response.node_found = false;
   response.message =
     "selected plan explanation loaded, requested node explanation not found";
 }
 
-inline void setScorePlanUnavailable(ScorePlan::Response& response)
+inline void setScorePlanUnavailable(ScorePlan::Response & response)
 {
   response.scored = false;
   response.node_found = false;
-  response.message = "experience server is waiting for capabilities2 readiness";
+  response.message = "fabric experience services are waiting for capabilities2 readiness";
 }
 
 inline std::optional<std::string> validateScorePlanRequest(
-  const ScorePlan::Request& request)
+  const ScorePlan::Request & request)
 {
-  if (request.task_description.empty())
+  if (request.task_description.empty()) {
     return "task_description is required";
-  if (request.plan_xml.empty())
+  }
+  if (request.plan_xml.empty()) {
     return "plan_xml is required";
+  }
   return std::nullopt;
 }
 
 inline std::optional<PlanNodeScoreExplanationRecord> findNodeExplanation(
-  const SelectedPlanScoreExplanationBundle& bundle,
-  const std::string& candidate_node_id)
+  const SelectedPlanScoreExplanationBundle & bundle,
+  const std::string & candidate_node_id)
 {
-  if (candidate_node_id.empty())
+  if (candidate_node_id.empty()) {
     return std::nullopt;
+  }
 
-  for (const auto& node : bundle.node_explanations)
-  {
-    if (node.candidate_node_id == candidate_node_id)
+  for (const auto & node : bundle.node_explanations) {
+    if (node.candidate_node_id == candidate_node_id) {
       return node;
+    }
   }
   return std::nullopt;
 }
 
 inline void populateScorePlanResponse(
-  const SelectedPlanScoreExplanationBundle& bundle,
-  const PlanningResult& planning_result,
-  const std::string& candidate_node_id,
-  ScorePlan::Response& response)
+  const SelectedPlanScoreExplanationBundle & bundle,
+  const PlanningResult & planning_result,
+  const std::string & candidate_node_id,
+  ScorePlan::Response & response)
 {
   response.plan = fabric::server::adapter::toPlanScoreExplanationMsg(bundle);
   response.scored = !planning_result.candidates.empty();
   response.node_found = false;
-  response.message = response.scored ? "plan scored"
-                                   : "no scoreable candidate extracted from plan";
+  response.message = response.scored ? "plan scored" :
+    "no scoreable candidate extracted from plan";
 
   const auto node = findNodeExplanation(bundle, candidate_node_id);
-  if (!node.has_value())
-  {
-    if (!candidate_node_id.empty())
+  if (!node.has_value()) {
+    if (!candidate_node_id.empty()) {
       response.message = "plan scored, requested node explanation not found";
+    }
     return;
   }
 
@@ -132,37 +136,37 @@ inline void populateScorePlanResponse(
 }
 
 inline void setScorePlanFailure(
-  ScorePlan::Response& response,
-  const std::string& message)
+  ScorePlan::Response & response,
+  const std::string & message)
 {
   response.scored = false;
   response.node_found = false;
   response.message = message;
 }
 
-inline void setGetScoringEpochUnavailable(GetScoringEpoch::Response& response)
+inline void setGetScoringEpochUnavailable(GetScoringEpoch::Response & response)
 {
   response.found = false;
-  response.message = "experience server is waiting for capabilities2 readiness";
+  response.message = "fabric experience services are waiting for capabilities2 readiness";
 }
 
-inline void setGetScoringEpochMissingId(GetScoringEpoch::Response& response)
+inline void setGetScoringEpochMissingId(GetScoringEpoch::Response & response)
 {
   response.found = false;
   response.message = "epoch_id is required";
 }
 
-inline void setGetScoringEpochNotFound(GetScoringEpoch::Response& response)
+inline void setGetScoringEpochNotFound(GetScoringEpoch::Response & response)
 {
   response.found = false;
   response.message = "scoring epoch not found";
 }
 
-template <typename CorePluginT>
+template<typename CorePluginT>
 inline void populateGetScoringEpochResponse(
-  const ScoringEpochRecord& record,
-  CorePluginT& core_plugin,
-  GetScoringEpoch::Response& response)
+  const ScoringEpochRecord & record,
+  CorePluginT & core_plugin,
+  GetScoringEpoch::Response & response)
 {
   response.found = true;
   response.message = "scoring epoch loaded";
@@ -198,15 +202,15 @@ inline void populateGetScoringEpochResponse(
 }
 
 inline void setRecordScoringEpochUnavailable(
-  RecordScoringEpoch::Response& response)
+  RecordScoringEpoch::Response & response)
 {
   response.stored = false;
   response.found_existing = false;
-  response.message = "experience server is waiting for capabilities2 readiness";
+  response.message = "fabric experience services are waiting for capabilities2 readiness";
 }
 
 inline void setRecordScoringEpochMissingId(
-  RecordScoringEpoch::Response& response)
+  RecordScoringEpoch::Response & response)
 {
   response.stored = false;
   response.found_existing = false;
@@ -214,91 +218,98 @@ inline void setRecordScoringEpochMissingId(
 }
 
 inline ScoringEpochRecord buildScoringEpochRecord(
-  const std::optional<ScoringEpochRecord>& existing,
-  const RecordScoringEpoch::Request& request,
+  const std::optional<ScoringEpochRecord> & existing,
+  const RecordScoringEpoch::Request & request,
   const int32_t recorded_at_sec,
   const uint32_t recorded_at_nanosec)
 {
   ScoringEpochRecord record;
-  if (existing.has_value())
+  if (existing.has_value()) {
     record = existing.value();
+  }
 
   record.epoch_id = request.epoch_id;
-  if (!request.strategy_name.empty())
+  if (!request.strategy_name.empty()) {
     record.strategy_name = request.strategy_name;
-  if (!request.calibration_version.empty())
+  }
+  if (!request.calibration_version.empty()) {
     record.calibration_version = request.calibration_version;
-  if (!request.normalizer_version.empty())
+  }
+  if (!request.normalizer_version.empty()) {
     record.normalizer_version = request.normalizer_version;
-  if (!request.estimator_version.empty())
+  }
+  if (!request.estimator_version.empty()) {
     record.estimator_version = request.estimator_version;
-  if (!request.weight_version.empty())
+  }
+  if (!request.weight_version.empty()) {
     record.weight_version = request.weight_version;
+  }
   record.uncertainty_weight_locked = request.uncertainty_weight_locked;
-  if (!request.calibration_summary.empty())
+  if (!request.calibration_summary.empty()) {
     record.calibration_summary = request.calibration_summary;
-  if (!request.selection_bias_summary.empty())
+  }
+  if (!request.selection_bias_summary.empty()) {
     record.selection_bias_summary = request.selection_bias_summary;
+  }
   record.active = request.active;
-  if (request.start_sec != 0 || request.start_nanosec != 0)
-  {
+  if (request.start_sec != 0 || request.start_nanosec != 0) {
     record.start_sec = request.start_sec;
     record.start_nanosec = request.start_nanosec;
   }
-  if (request.end_sec != 0 || request.end_nanosec != 0)
-  {
+  if (request.end_sec != 0 || request.end_nanosec != 0) {
     record.end_sec = request.end_sec;
     record.end_nanosec = request.end_nanosec;
   }
-  record.recorded_at_sec = request.recorded_at_sec != 0
-    ? request.recorded_at_sec
-    : recorded_at_sec;
-  record.recorded_at_nanosec = request.recorded_at_nanosec != 0
-    ? request.recorded_at_nanosec
-    : recorded_at_nanosec;
-  record.provenance = !request.provenance.empty()
-    ? request.provenance
-    : "scoring epoch service";
+  record.recorded_at_sec = request.recorded_at_sec != 0 ?
+    request.recorded_at_sec :
+    recorded_at_sec;
+  record.recorded_at_nanosec = request.recorded_at_nanosec != 0 ?
+    request.recorded_at_nanosec :
+    recorded_at_nanosec;
+  record.provenance = !request.provenance.empty() ?
+    request.provenance :
+    "scoring epoch service";
   return record;
 }
 
 inline void populateRecordScoringEpochResponse(
   const bool found_existing,
   const bool stored,
-  RecordScoringEpoch::Response& response)
+  RecordScoringEpoch::Response & response)
 {
   response.found_existing = found_existing;
   response.stored = stored;
-  response.message = stored ? "scoring epoch stored"
-                            : "failed to store scoring epoch";
+  response.message = stored ? "scoring epoch stored" :
+    "failed to store scoring epoch";
 }
 
 inline void setRecordPlanFeedbackUnavailable(
-  RecordPlanFeedback::Response& response)
+  RecordPlanFeedback::Response & response)
 {
   response.stored = false;
   response.found_existing = false;
-  response.message = "experience server is waiting for capabilities2 readiness";
+  response.message = "fabric experience services are waiting for capabilities2 readiness";
 }
 
 inline std::optional<std::string> validateRecordPlanFeedbackRequest(
-  const RecordPlanFeedback::Request& request)
+  const RecordPlanFeedback::Request & request)
 {
   if (request.planning_request_id.empty() ||
-      request.candidate_plan_id.empty() ||
-      request.graph_hash.empty())
+    request.candidate_plan_id.empty() ||
+    request.graph_hash.empty())
   {
     return "planning_request_id, candidate_plan_id, and graph_hash are required";
   }
 
-  if (request.terminal_outcome.empty())
+  if (request.terminal_outcome.empty()) {
     return "terminal_outcome is required";
+  }
 
   return std::nullopt;
 }
 
 inline PlanNodeScoreExplanationQuery buildPlanFeedbackQuery(
-  const RecordPlanFeedback::Request& request)
+  const RecordPlanFeedback::Request & request)
 {
   return PlanNodeScoreExplanationQuery{
     request.planning_request_id,
@@ -308,53 +319,60 @@ inline PlanNodeScoreExplanationQuery buildPlanFeedbackQuery(
 }
 
 inline PlanFeedbackRecord buildPlanFeedbackRecord(
-  const std::optional<SelectedPlanScoreExplanationBundle>& existing,
-  const RecordPlanFeedback::Request& request,
+  const std::optional<SelectedPlanScoreExplanationBundle> & existing,
+  const RecordPlanFeedback::Request & request,
   const int32_t recorded_at_sec,
   const uint32_t recorded_at_nanosec)
 {
   PlanFeedbackRecord feedback;
-  if (existing.has_value())
+  if (existing.has_value()) {
     feedback = existing->feedback;
+  }
 
   feedback.planning_request_id = request.planning_request_id;
   feedback.candidate_plan_id = request.candidate_plan_id;
   feedback.graph_hash = request.graph_hash;
   feedback.terminal_outcome = request.terminal_outcome;
   feedback.terminal_success = request.terminal_success;
-  if (!request.human_judgement.empty())
+  if (!request.human_judgement.empty()) {
     feedback.human_judgement = request.human_judgement;
-  if (!request.score_components.empty())
+  }
+  if (!request.score_components.empty()) {
     feedback.score_components = request.score_components;
-  if (!request.calibration_version.empty())
+  }
+  if (!request.calibration_version.empty()) {
     feedback.calibration_version = request.calibration_version;
-  if (!request.normalizer_version.empty())
+  }
+  if (!request.normalizer_version.empty()) {
     feedback.normalizer_version = request.normalizer_version;
-  if (!request.estimator_version.empty())
+  }
+  if (!request.estimator_version.empty()) {
     feedback.estimator_version = request.estimator_version;
-  if (!request.weight_version.empty())
+  }
+  if (!request.weight_version.empty()) {
     feedback.weight_version = request.weight_version;
+  }
 
-  feedback.recorded_at_sec = request.recorded_at_sec != 0
-    ? request.recorded_at_sec
-    : recorded_at_sec;
-  feedback.recorded_at_nanosec = request.recorded_at_nanosec != 0
-    ? request.recorded_at_nanosec
-    : recorded_at_nanosec;
-  feedback.provenance = !request.provenance.empty()
-    ? request.provenance
-    : "external plan feedback service";
+  feedback.recorded_at_sec = request.recorded_at_sec != 0 ?
+    request.recorded_at_sec :
+    recorded_at_sec;
+  feedback.recorded_at_nanosec = request.recorded_at_nanosec != 0 ?
+    request.recorded_at_nanosec :
+    recorded_at_nanosec;
+  feedback.provenance = !request.provenance.empty() ?
+    request.provenance :
+    "external plan feedback service";
   return feedback;
 }
 
 inline void populateRecordPlanFeedbackResponse(
   const bool found_existing,
   const bool stored,
-  RecordPlanFeedback::Response& response)
+  RecordPlanFeedback::Response & response)
 {
   response.found_existing = found_existing;
   response.stored = stored;
-  response.message = stored ? "plan feedback stored"
-                            : "failed to store plan feedback";
+  response.message = stored ? "plan feedback stored" :
+    "failed to store plan feedback";
 }
 }  // namespace fabric::server::score_services

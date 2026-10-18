@@ -102,7 +102,10 @@ def load_db_feedback(db_path: Optional[Path]) -> Dict[Tuple[str, str, str], Dict
     return output
 
 
-def build_rows(feedback_root: Path, db_feedback: Dict[Tuple[str, str, str], Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
+def build_rows(
+    feedback_root: Path,
+    db_feedback: Dict[Tuple[str, str, str], Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
     candidate_rows: List[Dict[str, Any]] = []
     reasoning_rows: List[Dict[str, Any]] = []
     outcome_rows: List[Dict[str, Any]] = []

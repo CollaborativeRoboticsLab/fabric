@@ -2,11 +2,9 @@
 
 import argparse
 import json
-import re
 import sqlite3
-from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 NODE_TYPE_LABELS = {

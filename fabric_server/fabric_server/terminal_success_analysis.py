@@ -161,11 +161,11 @@ def classify_terminal_success_label(score: Optional[float], proposal: Dict[str, 
     supports_marginal_band = bool(proposal.get('supports_marginal_band'))
 
     if supports_marginal_band and success_threshold is not None and failure_threshold is not None:
-      if score >= success_threshold:
-          return SUCCESS_LABEL
-      if score <= failure_threshold:
-          return FAILURE_LABEL
-      return MARGINAL_LABEL
+        if score >= success_threshold:
+            return SUCCESS_LABEL
+        if score <= failure_threshold:
+            return FAILURE_LABEL
+        return MARGINAL_LABEL
 
     if best_threshold is None:
         return ''

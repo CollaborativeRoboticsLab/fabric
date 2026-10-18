@@ -160,8 +160,13 @@ if(BUILD_TESTING)
     test/test_verify_plan_score_explanation.py
   )
 
+  ament_add_pytest_test(test_python_entrypoints_smoke
+    test/test_python_entrypoints_smoke.py
+  )
+
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
+  set(ament_cmake_flake8_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/setup.cfg")
   ament_lint_auto_find_test_dependencies()
 endif()
 

@@ -1,14 +1,18 @@
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
 import json
 import sqlite3
 import sys
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PACKAGE_ROOT))
 
-MODULE_PATH = Path(__file__).resolve().parents[1] / 'scripts' / 'export_terminal_success_analysis.py'
+MODULE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / 'scripts'
+    / 'export_terminal_success_analysis.py'
+)
 SPEC = spec_from_file_location('export_terminal_success_analysis', MODULE_PATH)
 assert SPEC is not None
 assert SPEC.loader is not None
@@ -19,7 +23,7 @@ SPEC.loader.exec_module(MODULE)
 def create_feedback_db(path: Path) -> None:
     connection = sqlite3.connect(path)
     connection.executescript(
-        '''
+        """
         CREATE TABLE plan_feedback_statistics (
             planning_request_id TEXT,
             candidate_plan_id TEXT,
@@ -41,7 +45,7 @@ def create_feedback_db(path: Path) -> None:
             weight_version TEXT,
             provenance TEXT
         );
-        '''
+        """
     )
     connection.commit()
     connection.close()
@@ -105,8 +109,15 @@ def test_build_report_proposes_thresholds_from_observed_feedback(tmp_path: Path)
     assert report['summary']['sample_count'] == 4
     assert report['summary']['candidate_threshold_count'] >= 3
     assert report['proposal']['best_single_threshold'] is not None
-    assert report['proposal']['recommended_success_threshold'] >= report['proposal']['recommended_failure_threshold']
+    assert (
+        report['proposal']['recommended_success_threshold']
+        >= report['proposal']['recommended_failure_threshold']
+    )
     assert report['threshold_candidates'][0]['balanced_accuracy'] >= 0.5
     assert report['summary']['calibration_label_version'] == 'terminal_success_calibration_v1'
-    assert report['samples'][0]['calibrated_terminal_success_label'] in {'success', 'failure', 'marginal'}
+    assert report['samples'][0]['calibrated_terminal_success_label'] in {
+        'success',
+        'failure',
+        'marginal',
+    }
     assert report['runtime_policy_update']['applied'] is False

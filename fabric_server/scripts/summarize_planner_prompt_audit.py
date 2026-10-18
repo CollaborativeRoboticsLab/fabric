@@ -18,7 +18,11 @@ def load_json(path: Path) -> Dict[str, Any]:
 def iter_audit_files(audit_root: Path) -> Iterable[Path]:
     if not audit_root.exists():
         return []
-    return sorted(path for path in audit_root.iterdir() if path.is_file() and path.suffix == '.json')
+    return sorted(
+        path
+        for path in audit_root.iterdir()
+        if path.is_file() and path.suffix == '.json'
+    )
 
 
 def iteration_sort_key(item: Tuple[str, Any]) -> Tuple[int, str]:
@@ -158,7 +162,9 @@ def build_report(
             'request_uuid': request_uuid,
             'task_description': task_description,
             'iteration_count': len(request_iteration_rows),
-            'refinement_iteration_count': sum(1 for row in request_iteration_rows if row['phase'] == 'refinement'),
+            'refinement_iteration_count': sum(
+                1 for row in request_iteration_rows if row['phase'] == 'refinement'
+            ),
             'community_signal_iteration_count': sum(
                 1 for row in request_iteration_rows if row['community_has_signal']
             ),
@@ -167,7 +173,9 @@ def build_report(
             ),
             'max_selected_prompt_chars': max_selected_chars,
             'final_selected_prompt_trend': request_iteration_rows[-1]['selected_prompt_trend'],
-            'final_selected_prompt_delta_from_previous': request_iteration_rows[-1]['selected_prompt_delta_from_previous'],
+            'final_selected_prompt_delta_from_previous': request_iteration_rows[-1][
+                'selected_prompt_delta_from_previous'
+            ],
         }
         request_rows.append(request_row)
 
@@ -203,7 +211,10 @@ def assess_community_mode_viability(
             'community_selected_iteration_count': 0,
         }
 
-    community_signal_ratio = summary['community_signal_iterations'] / max(1, summary['iteration_count'])
+    community_signal_ratio = summary['community_signal_iterations'] / max(
+        1,
+        summary['iteration_count'],
+    )
     mean_prompt_reduction_ratio = (
         sum(float(row['prompt_reduction_ratio']) for row in iteration_rows) / len(iteration_rows)
     )
@@ -268,11 +279,15 @@ def main() -> int:
     )
     write_csv(args.out_dir / 'iteration_prompt_audit.csv', report['iteration_prompt_audit'])
     write_csv(args.out_dir / 'request_prompt_audit.csv', report['request_prompt_audit'])
-    write_csv(args.out_dir / 'high_prompt_low_signal_requests.csv', report['high_prompt_low_signal_requests'])
+    write_csv(
+        args.out_dir / 'high_prompt_low_signal_requests.csv',
+        report['high_prompt_low_signal_requests'],
+    )
     print(
-        f"wrote {args.out_dir} requests={report['summary']['request_count']} "
-        f"iterations={report['summary']['iteration_count']} "
-        f"high_prompt_low_signal={report['summary']['high_prompt_low_signal_iterations']}"
+        f'wrote {args.out_dir} requests={report['"'"'summary'"'"']['"'"'request_count'"'"']} '
+        f'iterations={report['"'"'summary'"'"']['"'"'iteration_count'"'"']} '
+        f'high_prompt_low_signal='
+        f'{report['"'"'summary'"'"']['"'"'high_prompt_low_signal_iterations'"'"']}'
     )
     return 0
 

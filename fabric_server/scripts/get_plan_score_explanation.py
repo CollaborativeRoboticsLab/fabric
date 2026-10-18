@@ -7,6 +7,7 @@ from fabric_msgs.srv import GetPlanScoreExplanation
 import rclpy
 from rclpy.node import Node
 
+
 class PlanScoreExplanationClient(Node):
     def __init__(self) -> None:
         super().__init__('plan_score_explanation_client')
@@ -88,9 +89,12 @@ def print_plan(response) -> None:
         )
         print(
             '  available: '
-            f'[{format_bool(node.feature_available[0])}, {format_bool(node.feature_available[1])}, '
-            f'{format_bool(node.feature_available[2])}, {format_bool(node.feature_available[3])}, '
-            f'{format_bool(node.feature_available[4])}, {format_bool(node.feature_available[5])}]'
+            f'[{format_bool(node.feature_available[0])}, '
+            f'{format_bool(node.feature_available[1])}, '
+            f'{format_bool(node.feature_available[2])}, '
+            f'{format_bool(node.feature_available[3])}, '
+            f'{format_bool(node.feature_available[4])}, '
+            f'{format_bool(node.feature_available[5])}]'
         )
 
 
@@ -133,7 +137,9 @@ def print_node(response) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description='Fetch a selected plan score explanation from Fabric.')
+    parser = argparse.ArgumentParser(
+        description='Fetch a selected plan score explanation from Fabric.'
+    )
     parser.add_argument('planning_request_id')
     parser.add_argument('candidate_plan_id')
     parser.add_argument('graph_hash')

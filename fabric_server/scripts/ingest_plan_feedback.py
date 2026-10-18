@@ -9,6 +9,7 @@ from fabric_msgs.srv import RecordPlanFeedback
 import rclpy
 from rclpy.node import Node
 
+
 def serialize_score_components(value) -> str:
     if isinstance(value, (dict, list)):
         return json.dumps(value, separators=(',', ':'))
@@ -71,7 +72,12 @@ def load_records(path: Path) -> list[dict]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description='Submit external plan feedback records from a JSON or JSONL file.')
+    parser = argparse.ArgumentParser(
+        description=(
+            'Submit external plan feedback records from a JSON or '
+            'JSONL file.'
+        )
+    )
     parser.add_argument('input_path')
     parser.add_argument('--timeout', type=float, default=5.0)
     parser.add_argument('--stop-on-error', action='store_true')

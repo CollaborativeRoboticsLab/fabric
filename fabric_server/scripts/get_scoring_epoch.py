@@ -7,10 +7,14 @@ from fabric_msgs.srv import GetScoringEpoch
 import rclpy
 from rclpy.node import Node
 
+
 class ScoringEpochQueryClient(Node):
     def __init__(self) -> None:
         super().__init__('scoring_epoch_query_client')
-        self._client = self.create_client(GetScoringEpoch, '/fabric/experience/get_scoring_epoch')
+        self._client = self.create_client(
+            GetScoringEpoch,
+            '/fabric/experience/get_scoring_epoch',
+        )
 
     def wait(self, timeout_sec: float) -> bool:
         return self._client.wait_for_service(timeout_sec=timeout_sec)
@@ -28,7 +32,9 @@ def format_bool(value: bool) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description='Fetch a stored scoring epoch record from Fabric.')
+    parser = argparse.ArgumentParser(
+        description='Fetch a stored scoring epoch record from Fabric.'
+    )
     parser.add_argument('epoch_id')
     parser.add_argument('--timeout', type=float, default=5.0)
     args = parser.parse_args()

@@ -16,7 +16,8 @@ namespace fabric::server::adapter
  * @param output Internal estimator output.
  * @return fabric_msgs::msg::EstimatorOutput ROS message representation.
  */
-inline fabric_msgs::msg::EstimatorOutput toEstimatorOutputMsg(const fabric::experience::EstimateResult& output)
+inline fabric_msgs::msg::EstimatorOutput toEstimatorOutputMsg(
+  const fabric::experience::EstimateResult & output)
 {
   fabric_msgs::msg::EstimatorOutput msg;
   msg.name = output.name;
@@ -33,7 +34,7 @@ inline fabric_msgs::msg::EstimatorOutput toEstimatorOutputMsg(const fabric::expe
  * @return fabric_msgs::msg::PlanNodeScoreExplanation ROS message representation.
  */
 inline fabric_msgs::msg::PlanNodeScoreExplanation toPlanNodeScoreExplanationMsg(
-  const fabric::experience::PlanNodeScoreExplanationRecord& record)
+  const fabric::experience::PlanNodeScoreExplanationRecord & record)
 {
   fabric_msgs::msg::PlanNodeScoreExplanation msg;
   msg.planning_request_id = record.planning_request_id;
@@ -57,50 +58,38 @@ inline fabric_msgs::msg::PlanNodeScoreExplanation toPlanNodeScoreExplanationMsg(
   msg.semantic_plan_patterns = record.semantic_plan_patterns;
   msg.semantic_fault_concepts = record.semantic_fault_concepts;
   msg.semantic_community_summaries = record.semantic_community_summaries;
-  std::array<double, 6> feature_vector{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-  std::array<bool, 6> feature_available{ false, false, false, false, false, false };
+  std::array<double, 6> feature_vector{0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+  std::array<bool, 6> feature_available{false, false, false, false, false, false};
   msg.recorded_at_sec = record.recorded_at_sec;
   msg.recorded_at_nanosec = record.recorded_at_nanosec;
   msg.provenance = record.provenance;
-  for (const auto& output : record.estimator_outputs)
-  {
-    if (output.name == "success_probability")
-    {
+  for (const auto & output : record.estimator_outputs) {
+    if (output.name == "success_probability") {
       msg.success_probability = output.value;
       msg.success_probability_available = output.available;
       feature_vector[0] = output.value;
       feature_available[0] = output.available;
-    }
-    else if (output.name == "runtime_seconds")
-    {
+    } else if (output.name == "runtime_seconds") {
       msg.expected_runtime_seconds = output.value;
       msg.expected_runtime_seconds_available = output.available;
       feature_vector[1] = output.value;
       feature_available[1] = output.available;
-    }
-    else if (output.name == "energy_delta_percentage")
-    {
+    } else if (output.name == "energy_delta_percentage") {
       msg.expected_energy_delta_percentage = output.value;
       msg.expected_energy_delta_percentage_available = output.available;
       feature_vector[2] = output.value;
       feature_available[2] = output.available;
-    }
-    else if (output.name == "fault_burden")
-    {
+    } else if (output.name == "fault_burden") {
       msg.expected_fault_burden = output.value;
       msg.expected_fault_burden_available = output.available;
       feature_vector[3] = output.value;
       feature_available[3] = output.available;
-    }
-    else if (output.name == "resource_demand")
-    {
+    } else if (output.name == "resource_demand") {
       msg.expected_resource_demand = output.value;
       msg.expected_resource_demand_available = output.available;
       feature_vector[4] = output.value;
       feature_available[4] = output.available;
-    }
-    else if (output.name == "uncertainty")
-    {
+    } else if (output.name == "uncertainty") {
       msg.uncertainty = output.value;
       msg.uncertainty_available = output.available;
       feature_vector[5] = output.value;
@@ -120,7 +109,7 @@ inline fabric_msgs::msg::PlanNodeScoreExplanation toPlanNodeScoreExplanationMsg(
  * @return fabric_msgs::msg::PlanScoreExplanation ROS message representation.
  */
 inline fabric_msgs::msg::PlanScoreExplanation toPlanScoreExplanationMsg(
-  const fabric::experience::SelectedPlanScoreExplanationBundle& bundle)
+  const fabric::experience::SelectedPlanScoreExplanationBundle & bundle)
 {
   fabric_msgs::msg::PlanScoreExplanation msg;
   msg.planning_request_id = bundle.feedback.planning_request_id;
@@ -153,8 +142,9 @@ inline fabric_msgs::msg::PlanScoreExplanation toPlanScoreExplanationMsg(
   msg.recorded_at_sec = bundle.feedback.recorded_at_sec;
   msg.recorded_at_nanosec = bundle.feedback.recorded_at_nanosec;
   msg.provenance = bundle.feedback.provenance;
-  for (const auto& record : bundle.node_explanations)
+  for (const auto & record : bundle.node_explanations) {
     msg.node_explanations.push_back(toPlanNodeScoreExplanationMsg(record));
+  }
   return msg;
 }
 

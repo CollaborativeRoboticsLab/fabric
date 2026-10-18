@@ -108,7 +108,9 @@ def main() -> None:
         node.get_logger().error('feedback request failed')
     else:
         node.get_logger().info(
-            f"stored={response.stored} found_existing={response.found_existing} message={response.message}"
+            f'stored={response.stored} '
+            f'found_existing={response.found_existing} '
+            f'message={response.message}'
         )
     node.destroy_node()
     rclpy.shutdown()

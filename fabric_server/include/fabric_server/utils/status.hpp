@@ -14,12 +14,13 @@
 
 namespace fabric::server::status
 {
-inline ::fabric::status::Time toFabricTime(const builtin_interfaces::msg::Time& time)
+inline ::fabric::status::Time toFabricTime(const builtin_interfaces::msg::Time & time)
 {
-  return ::fabric::status::Time{ time.sec, time.nanosec };
+  return ::fabric::status::Time{time.sec, time.nanosec};
 }
 
-inline ::fabric::status::ExecutionLifecycle toExecutionLifecycle(const supervisor_msgs::msg::CapabilityLifecycle& lifecycle)
+inline ::fabric::status::ExecutionLifecycle toExecutionLifecycle(
+  const supervisor_msgs::msg::CapabilityLifecycle & lifecycle)
 {
   ::fabric::status::ExecutionLifecycle converted;
   converted.last_start_time = toFabricTime(lifecycle.last_start_time);
@@ -32,7 +33,8 @@ inline ::fabric::status::ExecutionLifecycle toExecutionLifecycle(const superviso
   return converted;
 }
 
-inline ::fabric::status::BatteryUsage toBatteryUsage(const supervisor_msgs::msg::CapabilityBatteryUsage& battery)
+inline ::fabric::status::BatteryUsage toBatteryUsage(
+  const supervisor_msgs::msg::CapabilityBatteryUsage & battery)
 {
   ::fabric::status::BatteryUsage converted;
   converted.last_start_percentage = battery.last_start_percentage;
@@ -40,8 +42,7 @@ inline ::fabric::status::BatteryUsage toBatteryUsage(const supervisor_msgs::msg:
   converted.last_delta_percentage = battery.last_delta_percentage;
   converted.cumulative_delta_percentage = battery.cumulative_delta_percentage;
   converted.runs = battery.runs;
-  for (const auto& interval : battery.run_intervals)
-  {
+  for (const auto & interval : battery.run_intervals) {
     ::fabric::status::BatteryRunInterval converted_interval;
     converted_interval.start_time = toFabricTime(interval.start_time);
     converted_interval.stop_time = toFabricTime(interval.stop_time);
@@ -53,7 +54,8 @@ inline ::fabric::status::BatteryUsage toBatteryUsage(const supervisor_msgs::msg:
   return converted;
 }
 
-inline ::fabric::status::RunEvidence toRunEvidence(const supervisor_msgs::msg::CapabilityRunEvidence& run_evidence)
+inline ::fabric::status::RunEvidence toRunEvidence(
+  const supervisor_msgs::msg::CapabilityRunEvidence & run_evidence)
 {
   ::fabric::status::RunEvidence converted;
   converted.runs_started = run_evidence.runs_started;
@@ -67,7 +69,7 @@ inline ::fabric::status::RunEvidence toRunEvidence(const supervisor_msgs::msg::C
   return converted;
 }
 
-inline ::fabric::status::SystemStatus toSystemStatus(const supervisor_msgs::msg::SystemStatus& msg)
+inline ::fabric::status::SystemStatus toSystemStatus(const supervisor_msgs::msg::SystemStatus & msg)
 {
   ::fabric::status::SystemStatus converted;
   converted.header.stamp = toFabricTime(msg.header.stamp);
@@ -78,8 +80,7 @@ inline ::fabric::status::SystemStatus toSystemStatus(const supervisor_msgs::msg:
   converted.graph_hash = msg.graph_hash;
   converted.capability_plan_state = msg.fabric_status;
 
-  for (const auto& capability_status : msg.statuses)
-  {
+  for (const auto & capability_status : msg.statuses) {
     ::fabric::status::CapabilityStatus capability;
     capability.capability_name = capability_status.capability_name;
     capability.instance_id = capability_status.instance_id;
@@ -87,15 +88,17 @@ inline ::fabric::status::SystemStatus toSystemStatus(const supervisor_msgs::msg:
     capability.has_battery_usage = capability_status.has_battery_usage;
     capability.has_run_evidence = capability_status.has_run_evidence;
 
-    if (capability.has_lifecycle)
+    if (capability.has_lifecycle) {
       capability.lifecycle = toExecutionLifecycle(capability_status.lifecycle);
-    if (capability.has_battery_usage)
+    }
+    if (capability.has_battery_usage) {
       capability.battery_usage = toBatteryUsage(capability_status.battery_usage);
-    if (capability.has_run_evidence)
+    }
+    if (capability.has_run_evidence) {
       capability.run_evidence = toRunEvidence(capability_status.run_evidence);
+    }
 
-    for (const auto& node : capability_status.related_nodes)
-    {
+    for (const auto & node : capability_status.related_nodes) {
       ::fabric::status::FabricNodeLifecycle converted_node;
       converted_node.name = node.name;
       converted_node.first_seen = toFabricTime(node.first_seen);
@@ -105,8 +108,7 @@ inline ::fabric::status::SystemStatus toSystemStatus(const supervisor_msgs::msg:
       capability.related_nodes.push_back(converted_node);
     }
 
-    for (const auto& log : capability_status.logs)
-    {
+    for (const auto & log : capability_status.logs) {
       ::fabric::status::LogRecord converted_log;
       converted_log.capability_name = log.capability_name;
       converted_log.timestamp = toFabricTime(log.timestamp);
@@ -123,9 +125,9 @@ inline ::fabric::status::SystemStatus toSystemStatus(const supervisor_msgs::msg:
 }
 
 inline void enqueueSystemStatus(
-  std::mutex& mutex,
-  std::condition_variable& cv,
-  std::deque<::fabric::status::SystemStatus>& records,
+  std::mutex & mutex,
+  std::condition_variable & cv,
+  std::deque<::fabric::status::SystemStatus> & records,
   ::fabric::status::SystemStatus status)
 {
   {
@@ -136,26 +138,27 @@ inline void enqueueSystemStatus(
 }
 
 inline bool waitPopSystemStatus(
-  std::mutex& mutex,
-  std::condition_variable& cv,
-  std::deque<::fabric::status::SystemStatus>& records,
-  const std::atomic<bool>& shutting_down,
-  ::fabric::status::SystemStatus& status)
+  std::mutex & mutex,
+  std::condition_variable & cv,
+  std::deque<::fabric::status::SystemStatus> & records,
+  const std::atomic<bool> & shutting_down,
+  ::fabric::status::SystemStatus & status)
 {
   std::unique_lock<std::mutex> lock(mutex);
   cv.wait(lock, [&records, &shutting_down]() {
-    return !records.empty() || shutting_down.load();
+      return !records.empty() || shutting_down.load();
   });
 
-  if (shutting_down.load())
+  if (shutting_down.load()) {
     return false;
+  }
 
   status = std::move(records.front());
   records.pop_front();
   return true;
 }
 
-inline std::string summarizeSystemStatus(const ::fabric::status::SystemStatus& status)
+inline std::string summarizeSystemStatus(const ::fabric::status::SystemStatus & status)
 {
   std::ostringstream out;
   out << "plan_id=" << status.plan_id
@@ -166,42 +169,47 @@ inline std::string summarizeSystemStatus(const ::fabric::status::SystemStatus& s
   return out.str();
 }
 
-inline std::string summarizeStopGuidance(const supervisor_msgs::msg::SystemStatus& msg)
+inline std::string summarizeStopGuidance(const supervisor_msgs::msg::SystemStatus & msg)
 {
   bool saw_capability_evidence = false;
   bool any_active = false;
   bool any_incomplete = false;
 
-  for (const auto& capability_status : msg.statuses)
-  {
+  for (const auto & capability_status : msg.statuses) {
     const bool has_lifecycle = capability_status.has_lifecycle;
     const bool has_run_evidence = capability_status.has_run_evidence;
-    if (!has_lifecycle && !has_run_evidence)
+    if (!has_lifecycle && !has_run_evidence) {
       continue;
+    }
 
     saw_capability_evidence = true;
     any_active = any_active || (has_lifecycle && capability_status.lifecycle.is_active);
     any_incomplete = any_incomplete ||
-                     (has_run_evidence && capability_status.run_evidence.runs_started > capability_status.run_evidence.runs_completed) ||
-                     (has_lifecycle && capability_status.lifecycle.has_start && !capability_status.lifecycle.has_stop &&
-                      (!has_run_evidence || capability_status.run_evidence.runs_completed == 0));
+      (has_run_evidence &&
+      capability_status.run_evidence.runs_started >
+      capability_status.run_evidence.runs_completed) ||
+      (has_lifecycle && capability_status.lifecycle.has_start &&
+      !capability_status.lifecycle.has_stop &&
+      (!has_run_evidence || capability_status.run_evidence.runs_completed == 0));
   }
 
-  if (any_active || any_incomplete)
+  if (any_active || any_incomplete) {
     return "DO NOT STOP";
-  if (saw_capability_evidence)
+  }
+  if (saw_capability_evidence) {
     return "SAFE TO STOP";
+  }
   return "UNKNOWN";
 }
 
-inline bool shouldExposeRejectedList(const ::fabric::plan::Plan& plan)
+inline bool shouldExposeRejectedList(const ::fabric::plan::Plan & plan)
 {
   return plan.status == ::fabric::plan::Status::VALIDATION_FAILED ||
          plan.status == ::fabric::plan::Status::PARSE_FAILED;
 }
 
 inline fabric_msgs::msg::FabricStatus toFabricStatusMsg(
-  const ::fabric::plan::Plan& plan)
+  const ::fabric::plan::Plan & plan)
 {
   fabric_msgs::msg::FabricStatus status_msg;
 
@@ -210,8 +218,7 @@ inline fabric_msgs::msg::FabricStatus toFabricStatusMsg(
   status_msg.metadata.candidate_plan_id = plan.metadata.candidate_plan_id;
   status_msg.metadata.graph_hash = plan.metadata.graph_hash;
 
-  switch (plan.status)
-  {
+  switch (plan.status) {
     case ::fabric::plan::Status::UNKNOWN:
       status_msg.code = fabric_msgs::msg::FabricStatus::UNKNOWN;
       break;

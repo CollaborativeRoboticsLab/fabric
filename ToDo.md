@@ -6,18 +6,18 @@ Goal: finish folding the Experience runtime into Fabric without keeping brittle 
 
 Current code inspection already shows the main breakpoints:
 
-- `fabric_server/CMakeLists.txt` has been rewritten into one coherent package definition and `fabric_server` now compiles again; remaining package work is narrower dependency/test auditing, not foundation repair.
-- The copied Experience Python package and scripts have already been migrated substantially toward Fabric-owned imports and `/fabric/experience/...` endpoints, but smoke validation and leftover naming/test cleanup still remain.
-- `fabric_server/include/fabric_server/server.hpp` still owns the high-level Fabric and Experience runtime, plugin loading, plan generation, scoring, and feedback persistence, but several support-heavy slices have already been extracted into helper headers under `include/fabric_server/utils/`.
-- `fabric_server/launch/fabric.launch.py` still includes `experience_server.launch.py` and Supervisor parameters, so launch ownership has not actually been consolidated yet.
+- `fabric_server/CMakeLists.txt` has been rewritten into one coherent package definition and `fabric_server` now compiles/tests again; remaining package work is now narrower dependency auditing rather than foundation repair.
+- The copied Experience Python package and scripts have already been migrated substantially toward Fabric-owned imports and `/fabric/experience/...` endpoints; direct smoke/wrapper pytest coverage passes, and the package flake8/uncrustify gates are now clean under the intended local flake8 config.
+- `fabric_server/include/fabric_server/server.hpp` still owns the high-level Fabric and Experience runtime, plugin loading, plan generation, scoring, and feedback persistence, but several support-heavy slices have already been extracted into helper headers under `include/fabric_server/utils/`, and the integrated generation path has been narrowed behind smaller private helpers.
+- `fabric_server/launch/fabric.launch.py` is now the single Fabric-owned launch entry point; `experience_server.launch.py` and the external readiness shim have been removed, Supervisor is launched directly from Fabric launch, and Experience enablement now comes from merged `fabric.yaml` parameters.
 - Fabric runtime feedback still depends on `supervisor_msgs/msg/SystemStatus`; the conversion and status-shaping helpers have been narrowed into `utils/status.hpp`, but the runtime dependency itself is still present.
 - `capabilities2` already exposes the authoritative capability event stream and snapshot service (`/capabilities/get_event_snapshot`), so moving raw capability-run monitoring ownership toward `capabilities2` is viable.
 - `fabric_base/include/fabric_base/utils/status_structs.hpp` already provides a Fabric-owned status model close to the Supervisor aggregation shape, so the migration can port logic onto an existing Fabric type surface instead of inventing a new schema from scratch.
 
 Validated current state:
 
-- `colcon build --packages-select fabric_server` is passing again after the packaging repair and current `server.hpp` decomposition slices.
-- Score explanation, scoring epoch, plan feedback, feedback persistence, planning helpers, and plan-status shaping have already been pulled out of the hottest parts of `server.hpp`.
+- `colcon build --packages-up-to fabric_server` and `colcon test --packages-select fabric_server` are passing again after the packaging repair, lint/test cleanup, and current `server.hpp` decomposition slices.
+- Score explanation, scoring epoch, plan feedback, feedback persistence, planning helpers, plan-status shaping, and the first integrated generation/selection helper slices have already been pulled out of the hottest parts of `server.hpp`.
 
 
 ## Stage 5: Fabric Server Foundation Repair
@@ -31,7 +31,7 @@ Goal: make `fabric_server` build and package cleanly as the primary integrated r
 - [x] Define a single clear build story for the Fabric executable/component and the integrated Experience support code.
 - [x] Replace stale `experience_*` package references with the actual Fabric-side packages now present in this repo (`fabric_experience_*`, `fabric_validator`, `fabric_parser_xml`, etc.) where appropriate.
 - [x] Install the Python package and scripts only once from the unified package definition.
-- [ ] Fix test target dependencies and header include paths that still reference `experience_server`.
+- [x] Fix test target dependencies and header include paths that still reference `experience_server`.
 - [x] Update `package.xml` to match the real integrated dependency graph.
 
 ### Python Utilities Migrated From Experience
@@ -39,15 +39,15 @@ Goal: make `fabric_server` build and package cleanly as the primary integrated r
 - [x] Update `fabric_server/__init__.py` to export Fabric-owned modules instead of importing from `experience_server`.
 - [x] Update copied Python modules to use intra-package `fabric_server` imports.
 - [x] Update ROS service names in copied scripts to Fabric-owned endpoints under `/fabric/experience/...`.
-- [ ] Audit command-line help text, package names, and output text so they refer to Fabric rather than Experience where Fabric is now the runtime owner.
-- [ ] Fix Python tests that still assume the old Experience package/module layout.
+- [x] Audit command-line help text, package names, and output text so they refer to Fabric rather than Experience where Fabric is now the runtime owner.
+- [x] Fix Python tests that still assume the old Experience package/module layout.
 
 ### Immediate Validation
 
 - [x] Keep running `colcon build --packages-select fabric_server` after each packaging slice until the package compiles.
-- [ ] Add a focused smoke check for the copied Python entry points after imports and service names are updated.
+- [x] Add a focused smoke check for the copied Python entry points after imports and service names are updated.
 
-Evidence: `colcon build --packages-select fabric_server` is currently passing after the unified `CMakeLists.txt` repair, package manifest/schema fixes, and the latest `server.hpp` extraction slices.
+Evidence: `colcon build --packages-up-to fabric_server` and `colcon test --packages-select fabric_server` are currently passing after the unified `CMakeLists.txt` repair, package manifest/schema fixes, flake8/uncrustify cleanup, and the latest `server.hpp` extraction slices. Direct pytest coverage for the copied wrapper/entry-point scripts is also passing.
 
 Likely local surface:
 
@@ -72,8 +72,8 @@ Goal: keep `fabric_server` responsible for ROS 2 interfaces, main processing thr
 	- high-level plan execution orchestration
 - [x] Move pure support code into helper headers under `include/fabric_server/utils/`.
 - [x] Prefer extracting support logic by concern: planning helpers, feedback persistence helpers, status/telemetry adapters, file/path helpers, and explanation/score adapters.
-- [ ] Remove legacy Experience naming inside the Fabric runtime where the code is now Fabric-owned.
-- [ ] Reduce cross-cutting direct access to shared state by giving each worker flow a narrower helper surface.
+- [x] Remove legacy Experience naming inside the Fabric runtime where the code is now Fabric-owned.
+- [x] Reduce cross-cutting direct access to shared state by giving each worker flow a narrower helper surface.
 
 Completed decomposition slices so far:
 
@@ -83,6 +83,10 @@ Completed decomposition slices so far:
 - [x] Extract Supervisor-status conversion and plan-status shaping helpers into `include/fabric_server/utils/status.hpp`.
 - [x] Split `initialize()` in `server.hpp` into smaller setup methods while keeping the top-level orchestration in `server.hpp`.
 - [x] Split plan-generation support into smaller private helper methods while keeping `executePlanGeneration()` as the orchestration entry point.
+- [x] Split integrated planning/scoring/persistence selection support into smaller private helper methods while keeping `handleIntegratedPlanGeneration()` as the orchestration entry point.
+- [x] Split integrated result-completion support into a private helper so `handleIntegratedPlanGeneration()` no longer assembles the ROS action result inline.
+- [x] Rename Fabric-owned integrated runtime setup/generation helpers away from legacy external Experience-server phrasing inside `server.hpp`.
+- [x] Narrow queue/completion shared-state access behind helper methods in `server.hpp` instead of open-coding plan-queue and completion mutations across callbacks and worker flows.
 
 ### Experience Runtime Isolation Inside Fabric
 
@@ -104,24 +108,22 @@ Goal: make Fabric the single launch/config entry point for the integrated stack.
 
 ### Launch Consolidation
 
-- [ ] Merge the intent of `experience_server.launch.py` into `fabric.launch.py`.
-- [ ] Remove the need for `fabric.launch.py` to include `experience_server.launch.py`.
-- [ ] Replace launch arguments that still treat Experience as a separate stack with Fabric-owned toggles for optional subsystems.
-- [ ] Decide whether a compatibility launch file should remain temporarily as a thin wrapper that delegates to Fabric launch.
+- [x] Merge the intent of `experience_server.launch.py` into `fabric.launch.py`.
+- [x] Remove the need for `fabric.launch.py` to include `experience_server.launch.py`.
+- [x] Replace launch arguments that still treat Experience as a separate stack with Fabric-owned toggles for optional subsystems.
+- [x] Decide whether a compatibility launch file should remain temporarily as a thin wrapper that delegates to Fabric launch.
 
 ### Configuration Consolidation
 
-- [ ] Merge `config/experience_server.yaml` into Fabric-owned configuration layout.
-- [ ] Keep Fabric defaults in `config/fabric.yaml` or a small set of Fabric-owned config files, not separate Experience-owned runtime configs.
-- [ ] Normalize plugin class names, parameter namespaces, and default model/scoring/refinement settings under the Fabric package.
-- [ ] Remove package-share lookups that still point at `experience_server` when Fabric now ships the runtime.
+- [x] Merge `config/experience_server.yaml` into Fabric-owned configuration layout.
+- [x] Keep Fabric defaults in `config/fabric.yaml` or a small set of Fabric-owned config files, not separate Experience-owned runtime configs.
+- [x] Normalize plugin class names, parameter namespaces, and default model/scoring/refinement settings under the Fabric package.
+- [x] Remove package-share lookups that still point at `experience_server` when Fabric now ships the runtime.
 
 Likely local surface:
 
 - `fabric_server/launch/fabric.launch.py`
-- `fabric_server/launch/experience_server.launch.py`
 - `fabric_server/config/fabric.yaml`
-- `fabric_server/config/experience_server.yaml`
 
 
 ## Stage 8: Monitoring Ownership Migration
@@ -201,7 +203,8 @@ Goal: validate the integrated Fabric-owned stack after the structural refactor, 
 ### Build/Test Gates
 
 - [x] `colcon build --packages-select fabric_server`
-- [ ] `colcon test --packages-select fabric_server`
+- [x] `colcon test --packages-select fabric_server`
+- [x] Clear remaining `flake8` and `uncrustify` package-test failures in `fabric_server`.
 - [ ] Build any directly affected Fabric Experience plugin packages after interface or class-name changes.
 - [ ] Run launch smoke tests for the unified Fabric launch/config flow.
 

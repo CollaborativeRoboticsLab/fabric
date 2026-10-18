@@ -84,8 +84,8 @@ def print_node(response) -> None:
     print(f'reason: {node.reason}')
     print(
         'x_i: '
-        f"[{node.feature_vector[0]}, {node.feature_vector[1]}, {node.feature_vector[2]}, "
-        f"{node.feature_vector[3]}, {node.feature_vector[4]}, {node.feature_vector[5]}]"
+        f'[{node.feature_vector[0]}, {node.feature_vector[1]}, {node.feature_vector[2]}, '
+        f'{node.feature_vector[3]}, {node.feature_vector[4]}, {node.feature_vector[5]}]'
     )
 
 
@@ -157,14 +157,14 @@ def main() -> int:
 
         exit_code = 0
         for index, plan_path in enumerate(plan_paths, start=1):
-            plan_xml = plan_path.read_text(encoding="utf-8")
+            plan_xml = plan_path.read_text(encoding='utf-8')
             planning_request_id = args.planning_request_id
             candidate_plan_id = args.candidate_plan_id
             if len(plan_paths) > 1:
                 if planning_request_id:
-                    planning_request_id = f"{planning_request_id}_{index}"
+                    planning_request_id = f'{planning_request_id}_{index}'
                 if candidate_plan_id:
-                    candidate_plan_id = f"{candidate_plan_id}_{index}"
+                    candidate_plan_id = f'{candidate_plan_id}_{index}'
 
             response = node.request(
                 args.task_description,
