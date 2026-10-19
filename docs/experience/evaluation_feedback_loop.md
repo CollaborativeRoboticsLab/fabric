@@ -50,7 +50,7 @@ After sourcing the workspace, you can score a saved Fabric XML plan against the 
 ros2 run experience_server replay_plan_score.py "pick up the object and place it on the table" /path/to/plan.xml
 ```
 
-This calls the `experience/plan/score` service, which parses the supplied XML, runs the normal Experience validation and RAPFS scoring path, and returns a `PlanScoreExplanation`-shaped response entirely in memory. It does not submit the plan to Fabric, does not wait for supervisor telemetry, and does not require any execution feedback.
+This calls the `experience/plan/score` service, which parses the supplied XML, runs the normal Experience validation and RAPFS scoring path, and returns a `PlanScoreExplanation`-shaped response entirely in memory. It does not submit the plan to Fabric, does not wait for Fabric runtime telemetry, and does not require any execution feedback.
 
 The replay script accepts two optional flags that are only for experiment bookkeeping:
 
@@ -91,7 +91,7 @@ After sourcing the workspace, you can attach an external outcome label and optio
 ros2 run experience_server record_plan_feedback.py <planning_request_id> <candidate_plan_id> <graph_hash> success --terminal-success --human-judgement "operator confirmed goal completion"
 ```
 
-The service merges that feedback onto any existing selected-plan score row, preserving previously stored score components, versions, and supervisor-derived execution metrics.
+The service merges that feedback onto any existing selected-plan score row, preserving previously stored score components, versions, and Fabric-derived execution metrics.
 
 For batch-oriented evaluation harnesses, you can submit a JSON or JSONL file of feedback records with:
 

@@ -9,7 +9,7 @@ The design rule is: **meaning and measurement stay separate.** A capability can 
 
 ## 1. Semantic Graph — Meaning
 
-The semantic graph stores capability nodes, task entities, context entities, plan patterns, fault concepts, and relationships between them. It is built from capability descriptions, declared capability relations, runtime parameter schemas, supervisor context, external documents, task text, logs, and prior plans.
+The semantic graph stores capability nodes, task entities, context entities, plan patterns, fault concepts, and relationships between them. It is built from capability descriptions, declared capability relations, runtime parameter schemas, Fabric runtime context, external documents, task text, logs, and prior plans.
 
 It stores nodes such as:
 
@@ -69,4 +69,4 @@ This separation matters. Semantic relevance is not reliability. A capability can
 
 ## Current Gap
 
-The current supervisor data supports success, time, energy, and fault estimates reasonably well. It does not yet include quantitative CPU, memory, network, storage, or actuator measurements. The scorer already exposes resource cost and feasibility hooks, but until that telemetry is added those terms are only weakly informed and missing resource data still increases uncertainty.
+The current Fabric runtime telemetry supports success, time, energy, and fault estimates reasonably well. It does not yet include quantitative CPU, memory, network, storage, or actuator measurements. The scorer already exposes resource cost and feasibility hooks, but until that telemetry is added those terms are only weakly informed and missing resource data still increases uncertainty.

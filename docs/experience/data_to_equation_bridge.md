@@ -15,15 +15,10 @@ what each term means.)
 
 Those numbers have to come from somewhere. The division of labor is:
 
-- The **supervisor** watches the running system and publishes raw observations
-  (a `SystemStatus` message on the `system_status` topic, one entry per
-  capability).
-- The **experience** side subscribes, accumulates history, and computes the
-  actual statistics.
+- The **Fabric runtime** observes execution and publishes or assembles raw runtime evidence using Fabric-owned telemetry paths.
+- The **experience** side subscribes, accumulates history, and computes the actual statistics.
 
-Rule of thumb: **the supervisor reports facts; the experience layer does the
-math.** The supervisor should never publish pre-computed planning scores,
-because that would hard-code modeling decisions in the wrong component.
+Rule of thumb: **Fabric reports facts; the experience layer does the math.** The telemetry layer should never publish pre-computed planning scores, because that would hard-code modeling decisions in the wrong component.
 
 ## What the Current Message Already Supports
 
@@ -73,7 +68,7 @@ Keep each per-capability entry centered on three evidence blocks:
 Counters like `runs_started`, `runs_completed`, `runs_succeeded`,
 `runs_failed`, `runs_aborted`, `runs_timed_out`, plus the last outcome label.
 
-This block is now implemented. In the current supervisor semantics:
+This block is now implemented. In the current Fabric telemetry semantics:
 
 - `TRIGGERED` means a run started,
 - `SUCCEEDED` means a successful completion,
@@ -109,9 +104,7 @@ disk byte counts, actuator effort. The experience side can then either keep
 $r_i$ as a vector (one number per resource, needed for feasibility checks) or
 collapse it into a single weighted scalar for ranking.
 
-Caveat: this data does not exist yet — collecting it means adding resource
-monitors on the supervisor side and correlating their output with which
-capabilities were active.
+Caveat: this data does not exist yet. Collecting it means adding resource telemetry on the Fabric side and correlating that output with which capabilities were active.
 
 ### 3. Estimation evidence → enables $u_i$
 
@@ -131,7 +124,7 @@ $u_i$. Three numbers per quantity buy the whole uncertainty machinery.
 
 ### Optional: per-run records
 
-Instead of only running totals, the supervisor could publish one record per
+Instead of only running totals, the Fabric runtime could publish one record per
 completed run (start, stop, outcome, duration, energy delta, faults). More
 message traffic, but maximum flexibility: the experience side could then
 recompute anything with new definitions, use sliding windows, or do temporal
@@ -145,4 +138,4 @@ analyses. This is the "keep the raw logs" option.
 3. Let the experience server accumulate history and compute all six terms
    itself.
 
-Supervisor observes; experience infers. Each component stays replaceable.
+Fabric observes; experience infers. Each component stays replaceable.

@@ -43,5 +43,5 @@ internal structs defined in [metadata.hpp](../experience_base/include/experience
 - Fabric owns submission semantics and the `/fabric/plan/submit` service.
 - `experience_interface_fabric` translates Fabric parse results into internal
 	plan structs.
-- Supervisor carries Fabric-owned plan metadata forward in `SystemStatus`.
+- Fabric runtime telemetry carries Fabric-owned plan metadata forward in `SystemStatus`.
 - Experience owns plan evaluation, attribution, fallback, and plan feedback.

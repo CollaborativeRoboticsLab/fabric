@@ -25,7 +25,7 @@ For each planning request:
 7. Optional proxy fallbacks such as semantic-neighbor aggregates and winning-plan priors remain available, but they are no longer part of the default candidate scoring path.
 8. Estimators convert evidence into $p_i,t_i,e_i,f_i,\mathbf{r}_i,u_i$.
 9. Fabric can submit the selected plan together with `planning_request_id`, `candidate_plan_id`, and `graph_hash` as `FabricMetaData`.
-10. Supervisor propagates those metadata fields in `SystemStatus`, letting Experience attach terminal outcomes to the selected candidate plan without a separate registration step.
+10. Fabric propagates those metadata fields in `SystemStatus`, letting Experience attach terminal outcomes to the selected candidate plan without a separate registration step.
 11. Experience persists a selected-node explanation record containing the chosen evidence key, estimator window, fallback level, explanation text, estimator outputs, and a fixed RAPFS-aligned feature vector for each selected node.
 12. RAPFS aggregates those node estimates over the original Fabric XML control tree, applies hard feasibility thresholds, and ranks the surviving plans.
 

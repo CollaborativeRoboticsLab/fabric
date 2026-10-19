@@ -20,7 +20,7 @@ flowchart LR
 	H[Estimator plugins] --> G
 	G --> I[Selected candidate plan]
 	I --> J[Fabric submit]
-	J --> K[Supervisor status stream]
+	J --> K[Fabric runtime status stream]
 	K --> B
 	B --> D
 	B --> L[Explanation and attribution records]
@@ -241,11 +241,11 @@ Related docs:
 - [Fabric To Internal Structs](fabric_to_internal_structs.md)
 - [External Input](external_input.md)
 
-## Stage 9: Supervisor Publishes Runtime Evidence
+## Stage 9: Fabric Publishes And Enriches Runtime Evidence
 
-During and after execution, supervisor collects Fabric plan state and capability execution evidence, joins them by `plan_id`, and publishes `SystemStatus` messages.
+During and after execution, Fabric collects plan state and capability execution evidence, joins them by `plan_id`, and emits Fabric-owned `SystemStatus` snapshots.
 
-Experience subscribes to those messages and converts them into internal runtime records.
+Experience subscribes to those snapshots and converts them into internal runtime records.
 
 This stage is where plan execution becomes empirical evidence.
 
@@ -260,7 +260,6 @@ It provides:
 
 Primary packages:
 
-- [experience_interface_supervisor](../experience_interface_supervisor)
 - [experience_server](../experience_server)
 - [experience_core_grag](../experience_core_grag)
 
@@ -390,9 +389,9 @@ candidate_plan_id = cp_a17
 graph_hash = 3e7f2c91
 ```
 
-These fields move through Fabric status and then supervisor `SystemStatus` messages.
+These fields move through `/fabric/status` and then into Fabric-owned `SystemStatus` snapshots.
 
-### 5. Supervisor publishes terminal execution evidence
+### 5. Fabric publishes terminal execution evidence
 
 Assume execution finishes with:
 
@@ -458,7 +457,7 @@ The current implementation is intentionally split by responsibility.
 | Server orchestration | [experience_server](../experience_server) | ROS entrypoints, plugin loading, plan/explanation services, runtime ingestion |
 | Shared contracts | [experience_base](../experience_base) | Base interfaces and internal planning/runtime structs |
 | Capability metadata | [experience_interface_capabilities](../experience_interface_capabilities) | Runnable capability discovery and normalization |
-| Runtime telemetry adapter | [experience_interface_supervisor](../experience_interface_supervisor) | Convert supervisor status into Experience runtime structures |
+| Runtime telemetry adapter | `fabric_server` + Experience runtime ingestion | Convert Fabric-owned runtime evidence into Experience runtime structures |
 | Core knowledge | [experience_core_grag](../experience_core_grag) | Semantic/statistical knowledge, retrieval, identity resolution, evidence lookup |
 | Planning | [experience_planner](../experience_planner) | Candidate plan generation and refinement |
 | Feature estimation | [experience_estimator](../experience_estimator) | Convert evidence into node-level estimate outputs |
@@ -474,7 +473,7 @@ The current server boundary is still the right one for local decision making:
 - validators reject malformed or unsatisfied candidates,
 - the scorer applies RAPFS and feasibility thresholds,
 - the server returns one selected candidate together with explanation metadata,
-- supervisor feedback updates the evidence store after execution.
+- Fabric runtime feedback updates the evidence store after execution.
 
 To support budget-driven decomposition without breaking the plugin design, add a mission-staging layer that reuses those same boundaries instead of replacing them.
 
@@ -501,7 +500,7 @@ Recommended shape:
 2. Extend the planning request model with optional mission metadata such as remaining budget, mission phase, prior completed segments, and resumability constraints.
 3. Let the planner continue to produce ordinary candidate plans, but allow it to optionally target a requested segment or subgoal instead of the full mission.
 4. Preserve validators and scorers exactly as they are so each segment is still checked and ranked using the existing RAPFS pipeline.
-5. Carry forward mission context and prior segment identifiers in the metadata so supervisor outcomes can be joined both per-segment and per-mission.
+5. Carry forward mission context and prior segment identifiers in the metadata so Fabric outcomes can be joined both per-segment and per-mission.
 6. Insert support actions such as charging through the same plan generation boundary rather than by hard-coding them into the scorer.
 
 This keeps RAPFS local, interpretable, and reusable. It also avoids pushing temporal scheduling concerns into plugin interfaces that currently operate on one candidate set at a time.

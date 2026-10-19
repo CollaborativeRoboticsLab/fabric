@@ -18,7 +18,7 @@ The main inputs are:
 
 | Input | Where it goes | Why |
 |---|---|---|
-| Supervisor `SystemStatus` messages | statistical graph and selected semantic fields | update runtime evidence, context, and fault concepts |
+| Fabric `SystemStatus` snapshots | statistical graph and selected semantic fields | update runtime evidence, context, and fault concepts |
 | Capability metadata | semantic graph and vector index | find capabilities that match a task and preserve how the local system realizes them |
 | `related_nodes[]` | semantic graph | record dependency or interaction context |
 | Log source and description | semantic graph | support fault search and explanations |
@@ -29,10 +29,11 @@ The main inputs are:
 | Prior plan graphs | both graphs | learn plan relationships and outcomes |
 | External task context and plan feedback | both graphs | condition estimates and calibrate whole-plan success |
 
-In the current implementation, the supervisor publishes
-`supervisor_msgs/msg/SystemStatus` on the `system_status` topic. The experience
-server subscribes to that topic, converts the message into its internal
-`SystemStatus` structure, and owns the accumulation and estimation rules.
+In the current implementation, `fabric_server` assembles Fabric-owned
+`fabric::status::SystemStatus` snapshots from capability events, execution
+status, logs, diagnostics, and optional battery telemetry. The experience
+server consumes that Fabric-owned runtime evidence and owns the accumulation
+and estimation rules.
 
 The next semantic ingestion step is to internalize capabilities2 metadata
 handling behind a dedicated capabilities interface plugin. That plugin should
@@ -43,31 +44,31 @@ and `implementation_name`.
 ## Runtime Evidence Identity Flow
 
 Fabric plan status and capability execution events are observed as parallel
-streams and joined in the supervisor by `plan_id`.
+streams and joined in Fabric by `plan_id`.
 
 ```mermaid
 flowchart TD
 	subgraph Fabric[Fabric plan/status stream]
 		FP[Fabric plan]
 		FP --> FIDS[plan_id\nnode instance_id]
-		FIDS --> FM[Supervisor FabricMonitor]
+		FIDS --> FM[Fabric ExecutionStatusMonitor]
 		FM --> FS[plan_id -> status]
 	end
 
 	subgraph Capabilities[Capabilities event stream]
 		CE[capabilities2 events]
 		CE --> CIDS[plan_id\nsource.instance_id or trigger_id\ncapability_name]
-		CIDS --> CM[Supervisor CapabilityMonitor]
+		CIDS --> CM[Fabric CapabilityEventMonitor]
 		CM --> CT[capability execution facts]
 	end
 
-	FS --> SS[Supervisor SystemStatus grouped by plan_id]
+	FS --> SS[Fabric SystemStatus grouped by plan_id]
 	CT --> SS
 	SS --> ES[Experience SystemStatus]
 	ES --> SG[Statistical graph]
 ```
 
-The supervisor skill tracking key is:
+The Fabric capability tracking key is:
 
 ```text
 plan_id + "/" + instance_id + "/" + skill_name
@@ -76,12 +77,12 @@ plan_id + "/" + instance_id + "/" + skill_name
 Experience normalizes each key segment before using it as a storage ID. The
 original skill name is still stored with the row for display and traceability.
 
-`CapabilityMonitor` records capability-side execution evidence using `plan_id`,
+`CapabilityEventMonitor` records capability-side execution evidence using `plan_id`,
 `instance_id`, and `capability_name`, where `plan_id` comes from the emitted
-capability event connection ownership. `FabricMonitor` records plan-side state
-using `plan_id` and `fabric_status`. `SupervisorServer` is the join point: it
-groups capability records by `plan_id`, attaches the matching Fabric status,
-and publishes one `SystemStatus` per plan group. The Experience-side internal
+capability event connection ownership. `ExecutionStatusMonitor` records plan-side state
+using `plan_id` and `fabric_status`. `fabric_server` is the join point: it
+groups capability records by `plan_id`, attaches the matching Fabric execution status,
+and emits one Fabric-owned `SystemStatus` snapshot per plan group. The Experience-side internal
 runtime model stores that plan state as `behaviour_plan_state`.
 
 Rows whose capability events do not carry a `plan_id` remain in an unknown-plan
@@ -167,7 +168,7 @@ completion, and `TERMINATED` marks cancellation or external stop. `STARTED`,
 `STOPPED`, `DISCONNECTED`, and `UNDEFINED` are lifecycle/provenance states, not
 successful task outcomes by themselves.
 
-The current supervisor data does not yet include real CPU, memory, network,
+The current Fabric telemetry data does not yet include real CPU, memory, network,
 storage, or actuator measurements. Until that exists, resource demand is marked
 missing rather than guessed from `related_nodes[]`.
 

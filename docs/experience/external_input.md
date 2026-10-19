@@ -1,7 +1,7 @@
 # External Input And Plan Feedback
 
-External input is useful information that does **not** come from the supervisor
-telemetry stream. It can include the user's task request, environment reports,
+External input is useful information that does **not** come from the Fabric
+runtime telemetry stream. It can include the user's task request, environment reports,
 retrieved documents, operator judgement, or a label after execution saying
 whether the whole plan actually worked.
 
