@@ -1,127 +1,31 @@
 #pragma once
 
 #include <atomic>
+#include <cstddef>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 
 #include <fabric_base/utils/plan_structs.hpp>
 #include <fabric_base/utils/status_structs.hpp>
 #include <fabric_msgs/msg/fabric_status.hpp>
-#include <supervisor_msgs/msg/system_status.hpp>
 
 namespace fabric::server::status
 {
-inline ::fabric::status::Time toFabricTime(const builtin_interfaces::msg::Time & time)
+struct TelemetryRecord
 {
-  return ::fabric::status::Time{time.sec, time.nanosec};
-}
+  ::fabric::status::Time timestamp;
+  std::string source;
+  std::string description;
+  uint8_t label{0};
+};
 
-inline ::fabric::status::ExecutionLifecycle toExecutionLifecycle(
-  const supervisor_msgs::msg::CapabilityLifecycle & lifecycle)
+inline int64_t timeToNanoseconds(const ::fabric::status::Time & time)
 {
-  ::fabric::status::ExecutionLifecycle converted;
-  converted.last_start_time = toFabricTime(lifecycle.last_start_time);
-  converted.last_stop_time = toFabricTime(lifecycle.last_stop_time);
-  converted.has_start = lifecycle.has_start;
-  converted.has_stop = lifecycle.has_stop;
-  converted.is_active = lifecycle.is_active;
-  converted.started_this_cycle = lifecycle.started_this_cycle;
-  converted.stopped_this_cycle = lifecycle.stopped_this_cycle;
-  return converted;
-}
-
-inline ::fabric::status::BatteryUsage toBatteryUsage(
-  const supervisor_msgs::msg::CapabilityBatteryUsage & battery)
-{
-  ::fabric::status::BatteryUsage converted;
-  converted.last_start_percentage = battery.last_start_percentage;
-  converted.last_stop_percentage = battery.last_stop_percentage;
-  converted.last_delta_percentage = battery.last_delta_percentage;
-  converted.cumulative_delta_percentage = battery.cumulative_delta_percentage;
-  converted.runs = battery.runs;
-  for (const auto & interval : battery.run_intervals) {
-    ::fabric::status::BatteryRunInterval converted_interval;
-    converted_interval.start_time = toFabricTime(interval.start_time);
-    converted_interval.stop_time = toFabricTime(interval.stop_time);
-    converted_interval.start_percentage = interval.start_percentage;
-    converted_interval.stop_percentage = interval.stop_percentage;
-    converted_interval.delta_percentage = interval.delta_percentage;
-    converted.run_intervals.push_back(converted_interval);
-  }
-  return converted;
-}
-
-inline ::fabric::status::RunEvidence toRunEvidence(
-  const supervisor_msgs::msg::CapabilityRunEvidence & run_evidence)
-{
-  ::fabric::status::RunEvidence converted;
-  converted.runs_started = run_evidence.runs_started;
-  converted.runs_completed = run_evidence.runs_completed;
-  converted.runs_succeeded = run_evidence.runs_succeeded;
-  converted.runs_failed = run_evidence.runs_failed;
-  converted.runs_aborted = run_evidence.runs_aborted;
-  converted.runs_timed_out = run_evidence.runs_timed_out;
-  converted.last_outcome_time = toFabricTime(run_evidence.last_outcome_time);
-  converted.last_outcome_label = run_evidence.last_outcome_label;
-  return converted;
-}
-
-inline ::fabric::status::SystemStatus toSystemStatus(const supervisor_msgs::msg::SystemStatus & msg)
-{
-  ::fabric::status::SystemStatus converted;
-  converted.header.stamp = toFabricTime(msg.header.stamp);
-  converted.header.frame_id = msg.header.frame_id;
-  converted.plan_id = msg.plan_id;
-  converted.planning_request_id = msg.planning_request_id;
-  converted.candidate_plan_id = msg.candidate_plan_id;
-  converted.graph_hash = msg.graph_hash;
-  converted.capability_plan_state = msg.fabric_status;
-
-  for (const auto & capability_status : msg.statuses) {
-    ::fabric::status::CapabilityStatus capability;
-    capability.capability_name = capability_status.capability_name;
-    capability.instance_id = capability_status.instance_id;
-    capability.has_lifecycle = capability_status.has_lifecycle;
-    capability.has_battery_usage = capability_status.has_battery_usage;
-    capability.has_run_evidence = capability_status.has_run_evidence;
-
-    if (capability.has_lifecycle) {
-      capability.lifecycle = toExecutionLifecycle(capability_status.lifecycle);
-    }
-    if (capability.has_battery_usage) {
-      capability.battery_usage = toBatteryUsage(capability_status.battery_usage);
-    }
-    if (capability.has_run_evidence) {
-      capability.run_evidence = toRunEvidence(capability_status.run_evidence);
-    }
-
-    for (const auto & node : capability_status.related_nodes) {
-      ::fabric::status::FabricNodeLifecycle converted_node;
-      converted_node.name = node.name;
-      converted_node.first_seen = toFabricTime(node.first_seen);
-      converted_node.last_seen = toFabricTime(node.last_seen);
-      converted_node.has_first = node.has_first;
-      converted_node.has_last = node.has_last;
-      capability.related_nodes.push_back(converted_node);
-    }
-
-    for (const auto & log : capability_status.logs) {
-      ::fabric::status::LogRecord converted_log;
-      converted_log.capability_name = log.capability_name;
-      converted_log.timestamp = toFabricTime(log.timestamp);
-      converted_log.source = log.source;
-      converted_log.description = log.description;
-      converted_log.label = log.label;
-      capability.log_records.push_back(converted_log);
-    }
-
-    converted.capabilities.push_back(capability);
-  }
-
-  return converted;
+  return static_cast<int64_t>(time.sec) * 1000000000LL + static_cast<int64_t>(time.nanosec);
 }
 
 inline void enqueueSystemStatus(
@@ -167,39 +71,6 @@ inline std::string summarizeSystemStatus(const ::fabric::status::SystemStatus & 
       << " graph_hash=" << status.graph_hash
       << " capabilities=" << status.capabilities.size();
   return out.str();
-}
-
-inline std::string summarizeStopGuidance(const supervisor_msgs::msg::SystemStatus & msg)
-{
-  bool saw_capability_evidence = false;
-  bool any_active = false;
-  bool any_incomplete = false;
-
-  for (const auto & capability_status : msg.statuses) {
-    const bool has_lifecycle = capability_status.has_lifecycle;
-    const bool has_run_evidence = capability_status.has_run_evidence;
-    if (!has_lifecycle && !has_run_evidence) {
-      continue;
-    }
-
-    saw_capability_evidence = true;
-    any_active = any_active || (has_lifecycle && capability_status.lifecycle.is_active);
-    any_incomplete = any_incomplete ||
-      (has_run_evidence &&
-      capability_status.run_evidence.runs_started >
-      capability_status.run_evidence.runs_completed) ||
-      (has_lifecycle && capability_status.lifecycle.has_start &&
-      !capability_status.lifecycle.has_stop &&
-      (!has_run_evidence || capability_status.run_evidence.runs_completed == 0));
-  }
-
-  if (any_active || any_incomplete) {
-    return "DO NOT STOP";
-  }
-  if (saw_capability_evidence) {
-    return "SAFE TO STOP";
-  }
-  return "UNKNOWN";
 }
 
 inline bool shouldExposeRejectedList(const ::fabric::plan::Plan & plan)
@@ -270,5 +141,232 @@ inline fabric_msgs::msg::FabricStatus toFabricStatusMsg(
   }
 
   return status_msg;
+}
+
+inline void mergeExecutionStatus(
+  ::fabric::status::SystemStatus & status,
+  const ::fabric::status::SystemStatus & execution_status)
+{
+  if (execution_status.plan_id.empty()) {
+    return;
+  }
+
+  status.plan_id = execution_status.plan_id;
+  status.planning_request_id = execution_status.planning_request_id;
+  status.candidate_plan_id = execution_status.candidate_plan_id;
+  status.graph_hash = execution_status.graph_hash;
+  status.bond_id = execution_status.bond_id;
+  status.capability_plan_state = execution_status.capability_plan_state;
+  status.header.stamp = execution_status.header.stamp;
+}
+
+enum class ShutdownSafetyState
+{
+  SAFE_TO_KILL,
+  DO_NOT_KILL,
+  UNKNOWN,
+};
+
+struct ShutdownSafetySummary
+{
+  ShutdownSafetyState state{ShutdownSafetyState::UNKNOWN};
+  size_t tracked_capabilities{0};
+  size_t active_capabilities{0};
+  size_t incomplete_capabilities{0};
+  size_t terminal_capabilities{0};
+  std::string reason;
+};
+
+inline bool hasPublishableCapabilityEvidence(const ::fabric::status::CapabilityStatus & capability)
+{
+  const auto & lifecycle = capability.lifecycle;
+  const auto & run = capability.run_evidence;
+
+  return lifecycle.is_active || lifecycle.has_start || lifecycle.has_stop ||
+         lifecycle.started_this_cycle || lifecycle.stopped_this_cycle ||
+         run.runs_started > 0 || run.runs_completed > 0 || run.runs_succeeded > 0 ||
+         run.runs_failed > 0 || run.runs_aborted > 0 || run.runs_timed_out > 0 ||
+         !run.last_outcome_label.empty();
+}
+
+inline bool hasTerminalCapabilityEvidence(const ::fabric::status::CapabilityStatus & capability)
+{
+  const auto & lifecycle = capability.lifecycle;
+  const auto & run = capability.run_evidence;
+
+  return lifecycle.has_stop || lifecycle.stopped_this_cycle || run.runs_completed > 0 ||
+         run.runs_succeeded > 0 || run.runs_failed > 0 || run.runs_aborted > 0 ||
+         run.runs_timed_out > 0 || !run.last_outcome_label.empty();
+}
+
+inline bool hasIncompleteCapabilityEvidence(const ::fabric::status::CapabilityStatus & capability)
+{
+  const auto & lifecycle = capability.lifecycle;
+  const auto & run = capability.run_evidence;
+
+  if (lifecycle.is_active) {
+    return true;
+  }
+
+  if (run.runs_started > run.runs_completed) {
+    return true;
+  }
+
+  return (lifecycle.has_start || lifecycle.started_this_cycle) &&
+         !hasTerminalCapabilityEvidence(capability);
+}
+
+inline ShutdownSafetySummary assessShutdownSafety(const ::fabric::status::SystemStatus & status)
+{
+  ShutdownSafetySummary summary;
+
+  for (const auto & capability : status.capabilities) {
+    if (!hasPublishableCapabilityEvidence(capability)) {
+      continue;
+    }
+
+    ++summary.tracked_capabilities;
+    if (capability.has_lifecycle && capability.lifecycle.is_active) {
+      ++summary.active_capabilities;
+    }
+    if (hasIncompleteCapabilityEvidence(capability)) {
+      ++summary.incomplete_capabilities;
+    }
+    if (hasTerminalCapabilityEvidence(capability)) {
+      ++summary.terminal_capabilities;
+    }
+  }
+
+  if (summary.tracked_capabilities == 0) {
+    summary.state = ShutdownSafetyState::UNKNOWN;
+    summary.reason = "no capability evidence observed yet";
+    return summary;
+  }
+
+  if (summary.active_capabilities > 0) {
+    summary.state = ShutdownSafetyState::DO_NOT_KILL;
+    summary.reason = "one or more capabilities are still active";
+    return summary;
+  }
+
+  if (summary.incomplete_capabilities > 0) {
+    summary.state = ShutdownSafetyState::DO_NOT_KILL;
+    summary.reason = "one or more capabilities have started without terminal evidence";
+    return summary;
+  }
+
+  summary.state = ShutdownSafetyState::SAFE_TO_KILL;
+  summary.reason = "all tracked capabilities are inactive and terminal or stopped";
+  return summary;
+}
+
+inline const char * shutdownSafetyLabel(const ShutdownSafetyState state)
+{
+  switch (state) {
+    case ShutdownSafetyState::SAFE_TO_KILL:
+      return "SAFE_TO_KILL";
+    case ShutdownSafetyState::DO_NOT_KILL:
+      return "DO_NOT_KILL";
+    case ShutdownSafetyState::UNKNOWN:
+    default:
+      return "UNKNOWN";
+  }
+}
+
+inline bool telemetryRecordAppliesToCapability(
+  const TelemetryRecord & record,
+  const ::fabric::status::CapabilityStatus & capability,
+  const int64_t now_ns)
+{
+  if (!capability.has_lifecycle || !capability.lifecycle.has_start) {
+    return false;
+  }
+
+  const int64_t record_ns = timeToNanoseconds(record.timestamp);
+  const int64_t start_ns = timeToNanoseconds(capability.lifecycle.last_start_time);
+  const int64_t end_ns = capability.lifecycle.has_stop ?
+    timeToNanoseconds(capability.lifecycle.last_stop_time) : now_ns;
+
+  return record_ns >= start_ns && record_ns <= end_ns;
+}
+
+inline void correlateTelemetryRecords(
+  ::fabric::status::CapabilityStatus & capability,
+  const std::deque<TelemetryRecord> & telemetry_records,
+  const int64_t now_ns)
+{
+  std::unordered_map<std::string, ::fabric::status::FabricNodeLifecycle> related_nodes;
+
+  for (const auto & record : telemetry_records) {
+    if (!telemetryRecordAppliesToCapability(record, capability, now_ns)) {
+      continue;
+    }
+
+    capability.log_records.push_back(::fabric::status::LogRecord{
+        capability.capability_name,
+        record.timestamp,
+        record.source,
+        record.description,
+        record.label,
+    });
+
+    auto & node = related_nodes[record.source];
+    node.name = record.source;
+    if (!node.has_first ||
+      timeToNanoseconds(record.timestamp) < timeToNanoseconds(node.first_seen))
+    {
+      node.first_seen = record.timestamp;
+      node.has_first = true;
+    }
+    if (!node.has_last ||
+      timeToNanoseconds(record.timestamp) > timeToNanoseconds(node.last_seen))
+    {
+      node.last_seen = record.timestamp;
+      node.has_last = true;
+    }
+  }
+
+  for (const auto & entry : related_nodes) {
+    capability.related_nodes.push_back(entry.second);
+  }
+}
+
+inline void updateCapabilityBatteryUsage(
+  ::fabric::status::BatteryUsage & usage,
+  const ::fabric::status::CapabilityStatus & capability,
+  const double battery_percentage)
+{
+  if (!capability.has_lifecycle) {
+    return;
+  }
+
+  const auto & lifecycle = capability.lifecycle;
+  if (lifecycle.started_this_cycle) {
+    usage.last_start_percentage = battery_percentage;
+  }
+
+  if (!lifecycle.stopped_this_cycle) {
+    return;
+  }
+
+  usage.last_stop_percentage = battery_percentage;
+
+  ::fabric::status::BatteryRunInterval interval;
+  interval.start_time = lifecycle.last_start_time;
+  interval.stop_time = lifecycle.last_stop_time;
+  interval.start_percentage = usage.last_start_percentage;
+  interval.stop_percentage = usage.last_stop_percentage;
+
+  if (usage.last_start_percentage >= 0.0 && usage.last_stop_percentage >= 0.0) {
+    const double delta = usage.last_start_percentage - usage.last_stop_percentage;
+    interval.delta_percentage = delta;
+    usage.last_delta_percentage = delta;
+    if (delta > 0.0) {
+      usage.cumulative_delta_percentage += delta;
+    }
+    usage.runs += 1;
+  }
+
+  usage.run_intervals.push_back(interval);
 }
 }  // namespace fabric::server::status

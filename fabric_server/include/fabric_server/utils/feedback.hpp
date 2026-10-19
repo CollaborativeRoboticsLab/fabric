@@ -508,7 +508,7 @@ inline void recordTerminalPlanFeedback(
       pending.candidate.score.weight_version,
       status.header.stamp.sec,
       status.header.stamp.nanosec,
-      "terminal feedback inferred from supervisor SystemStatus",
+      "terminal feedback inferred from Fabric SystemStatus",
   });
 
   for (const auto & node : pending.candidate.nodes) {

@@ -17,7 +17,6 @@ find_package(fabric_base REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(nlohmann_json REQUIRED)
-find_package(prompt_msgs REQUIRED)
 
 find_package(PkgConfig)
 pkg_check_modules(UUID REQUIRED uuid)
@@ -45,7 +44,6 @@ ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   pluginlib
   fabric_base
-  prompt_msgs
 )
 
 pluginlib_export_plugin_description_file(fabric_base plugins.xml)
@@ -69,7 +67,6 @@ if(BUILD_TESTING)
     ament_target_dependencies(test_core_graphrag_utils
       rclcpp
       fabric_base
-      prompt_msgs
     )
     target_link_libraries(test_core_graphrag_utils
       ${PROJECT_NAME}

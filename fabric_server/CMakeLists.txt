@@ -10,6 +10,7 @@ find_package(ament_cmake_python REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 find_package(bondcpp REQUIRED)
 find_package(capabilities2_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 find_package(fabric_base REQUIRED)
 find_package(fabric_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -17,8 +18,9 @@ find_package(PkgConfig REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_components REQUIRED)
+find_package(rcl_interfaces REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
-find_package(supervisor_msgs REQUIRED)
 find_package(tinyxml2_vendor REQUIRED)
 find_package(TinyXML2 REQUIRED)
 find_package(yaml-cpp REQUIRED)
@@ -36,14 +38,16 @@ set(FABRIC_SERVER_DEPENDENCIES
   ament_index_cpp
   bondcpp
   capabilities2_msgs
+  diagnostic_msgs
   fabric_base
   fabric_msgs
   pluginlib
   rclcpp
   rclcpp_action
   rclcpp_components
+  rcl_interfaces
+  sensor_msgs
   std_srvs
-  supervisor_msgs
   TinyXML2
 )
 

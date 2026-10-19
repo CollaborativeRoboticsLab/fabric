@@ -8,7 +8,45 @@
       - "fabric::CompatibilityValidation"
 
     parsing_plugin : fabric::XMLParser
+    llm_analysis_plugin: fabric::PromptToolsLlmAnalysis
     generation_plugin: fabric::PromptToolsGenerator
+
+    telemetry:
+      monitor_plugins:
+        - "fabric::ExecutionStatusMonitor"
+        - "fabric::CapabilityEventMonitor"
+        - "fabric::RosoutMonitor"
+        - "fabric::RosDiagnosticsMonitor"
+      monitor_poll_frequency_hz: 2.0
+      enable_battery_monitoring: true
+      battery_topic: "/battery_state"
+
+    ExecutionStatusMonitor:
+      topic: "/fabric/status"
+      frequency: 1.0
+
+    CapabilityEventMonitor:
+      topic: ""
+      frequency: 1.0
+      service_name: "/capabilities/get_event_snapshot"
+      service_wait_timeout_sec: -1
+      max_events: 100
+
+    RosoutMonitor:
+      topic: "/rosout"
+      frequency: 1.0
+
+    RosDiagnosticsMonitor:
+      topic: "/diagnostics"
+      frequency: 1.0
+
+    PromptToolsLlmAnalysis:
+      service_wait_timeout_sec: 10
+      request_timeout_sec: 90
+      services:
+        prompt: "/prompt/prompt"
+        embedding: "/prompt/embedding"
+        tokenize: "/prompt/tokenizer"
 
     PromptToolsGenerator:
       model_family: openai

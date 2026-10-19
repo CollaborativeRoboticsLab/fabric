@@ -1,7 +1,11 @@
 #pragma once
+#include <memory>
 #include <string>
 #include <vector>
+
 #include <rclcpp/rclcpp.hpp>
+
+#include <fabric_base/llm_analysis_base.hpp>
 #include <fabric_base/utils/plan_structs.hpp>
 #include <fabric_base/utils/xml_helper.hpp>
 
@@ -31,6 +35,20 @@ public:
   }
 
   /**
+   * @brief Provide an optional shared LLM-analysis plugin to the generator.
+   *
+   * Generators can use this to delegate prompt completion, embedding, or
+   * tokenization work to a shared model-service implementation instead of
+   * hard-coding PromptTools-specific wiring.
+   *
+   * @param analysis_plugin Shared analysis plugin instance.
+   */
+  virtual void configureAnalysis(const std::shared_ptr<LlmAnalysisBase>& analysis_plugin)
+  {
+    analysis_plugin_ = analysis_plugin;
+  }
+
+  /**
    * @brief Check the compatibility of the given plan with the given parser.
    *
    * @param plan The plan to check for compatibility.
@@ -55,6 +73,11 @@ protected:
    * @brief Shared pointer to the ROS2 node.
    */
   rclcpp::Node::SharedPtr node_;
+
+  /**
+   * @brief Optional shared LLM-analysis plugin available to generators.
+   */
+  std::shared_ptr<LlmAnalysisBase> analysis_plugin_;
 
   /**
    * @brief Name of the generation plugin.

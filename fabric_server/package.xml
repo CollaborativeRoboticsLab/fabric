@@ -25,8 +25,11 @@
   <depend>fabric_msgs</depend>
   <depend>fabric_base</depend>
   <depend>capabilities2_msgs</depend>
-  <depend>supervisor_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>rcl_interfaces</depend>
+  <depend>sensor_msgs</depend>
   <depend>yaml-cpp</depend>
+  <exec_depend>fabric_monitor</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

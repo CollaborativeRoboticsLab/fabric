@@ -1,11 +1,13 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <optional>
 #include <vector>
 
 #include <rclcpp/rclcpp.hpp>
 
+#include <fabric_base/llm_analysis_base.hpp>
 #include <fabric_base/utils/experience_structs.hpp>
 #include <fabric_base/utils/metadata_structs.hpp>
 #include <fabric_base/utils/plan_structs.hpp>
@@ -33,6 +35,11 @@ public:
   virtual void initialize(const rclcpp::Node::SharedPtr& node)
   {
     initialize_base(node, "CoreBasePlugin");
+  }
+
+  virtual void configureAnalysis(const std::shared_ptr<LlmAnalysisBase>& analysis_plugin)
+  {
+    analysis_plugin_ = analysis_plugin;
   }
 
   /**
@@ -242,6 +249,11 @@ protected:
    * @brief Shared pointer to the ROS2 node.
    */
   rclcpp::Node::SharedPtr node_;
+
+  /**
+   * @brief Optional shared LLM-analysis plugin available to core implementations.
+   */
+  std::shared_ptr<LlmAnalysisBase> analysis_plugin_;
 
   /**
    * @brief Name of the storage plugin.

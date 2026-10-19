@@ -27,7 +27,8 @@ public:
    * @param plugin_name Name of the embedding plugin to use for parameter retrieval.
    * @param metric_type Metric type for similarity calculations.
    */
-  VectorDB(rclcpp::Node::SharedPtr node, std::string plugin_name, experience::vectordb::MetricType metric_type)
+  VectorDB(rclcpp::Node::SharedPtr node, std::string plugin_name, experience::vectordb::MetricType metric_type,
+           const std::shared_ptr<experience::llm::PromptServiceClient>& embedding_client)
   {
     node_ = node;
     metric_type_ = metric_type;
@@ -37,8 +38,12 @@ public:
 
     node_->get_parameter(plugin_name + ".embedding_dim", embedding_dim_);
 
-    // Initialize embedding client
-    embedding_client_ = std::make_shared<experience::llm::PromptServiceClient>(node_, "embedding_plugin");
+    embedding_client_ = embedding_client;
+
+    if (!embedding_client_)
+    {
+      throw fabric::fabric_exception("VectorDB requires a configured LLM analysis client.");
+    }
 
     RCLCPP_INFO(node_->get_logger(), "VectorDB initialized with embedding_dim=%d", embedding_dim_);
   }

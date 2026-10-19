@@ -1,5 +1,6 @@
 #pragma once
 
+#include <fabric_base/utils/monitoring_structs.hpp>
 #include <fabric_base/utils/plan_structs.hpp>
 #include <fabric_base/utils/status_structs.hpp>
 
@@ -22,5 +23,9 @@ using FabricNodeLifecycle = status::FabricNodeLifecycle;
 using LogRecord = status::LogRecord;
 using CapabilityStatus = status::CapabilityStatus;
 using SystemStatus = status::SystemStatus;
+using MonitoringStatus = monitor::MonitoringStatus;
+using ComponentStatus = monitor::ComponentStatus;
+using LoggingData = monitor::LoggingData;
+using DiagnosticData = monitor::DiagnosticData;
 
 }  // namespace fabric

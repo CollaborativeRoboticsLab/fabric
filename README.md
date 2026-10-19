@@ -53,7 +53,9 @@ The [fabric_server/plans/default.xml](./fabric_server/plans/default.xml) file is
 
 The [fabric_server/config/fabric.yaml](./fabric_server/config/fabric.yaml) file configures the parser plugin, validation plugin, and capability client settings. The plan path itself is provided by the launch file.
 
-By default, `fabric.launch.py` starts Fabric together with `capabilities2_server`, `supervisor_server`, and `prompt_bridge`.
+By default, `fabric.launch.py` starts Fabric together with `capabilities2_server` and `prompt_bridge`.
+
+Battery monitoring is configured directly in `fabric.yaml` under `telemetry.enable_battery_monitoring` and `telemetry.battery_topic`.
 
 - `start_prompt_tools:=false` disables `prompt_bridge` when prompt-based plan generation is not needed.
 

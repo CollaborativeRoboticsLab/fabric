@@ -3,6 +3,11 @@
 ## Overview
 Fabric tracks plan lifecycle internally with `fabric::plan::Status` and exposes it through `fabric_msgs/msg/FabricStatus`, keyed by `plan_id`.
 
+This plan-level status is distinct from Fabric's richer runtime evidence model in `fabric::status::SystemStatus`. In the merged runtime:
+
+- `fabric_msgs/msg/FabricStatus` is the public execution-status interface on `/fabric/status`,
+- `fabric::status::SystemStatus` is the internal capability-centric evidence model used for telemetry joins, scoring updates, and feedback persistence.
+
 ## Status Lifecycle
 The current server code uses the following statuses during normal processing:
 
@@ -59,7 +64,11 @@ In the current implementation, `rejected_list` is populated by parser syntax che
 
 ## Status Conversion
 
-When responding to a status request, the server maps `PlanStatus` to `fabric_msgs/msg/FabricStatus` in `status_msg()`.
+When responding to a status request or publishing execution updates, the server maps `fabric::plan::Status` to `fabric_msgs/msg/FabricStatus` in `fabric_server/include/fabric_server/utils/status.hpp`.
+
+## Relationship to Runtime Evidence
+
+The current Fabric runtime also runs an `ExecutionStatusMonitor` that subscribes to `/fabric/status` and converts the published `FabricStatus` messages back into internal execution snapshots. Those plan-level snapshots are then merged with capability evidence from `CapabilityEventMonitor` before scoring-core updates and terminal feedback persistence.
 
 ## Extensibility
 

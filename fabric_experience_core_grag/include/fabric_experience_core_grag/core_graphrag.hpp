@@ -82,8 +82,16 @@ public:
     edge_parameter_max_weak_dependencies_ =
         node_->get_parameter(plugin_name_ + ".edge.parameter.max_weak_dependencies").as_int();
 
+    if (!analysis_plugin_)
+    {
+      throw exception("CoreGraphRag requires a configured LLM analysis plugin.");
+    }
+
+    llmclient_ = std::make_shared<experience::llm::PromptServiceClient>(node_, "core_graphrag", analysis_plugin_);
+    RCLCPP_INFO(node_->get_logger(), "Initialized shared analysis client for CoreGraphRag.");
+
     vector_db_ =
-        std::make_shared<experience::VectorDB>(node_, "core_graphrag", experience::vectordb::MetricType::COSINE);
+      std::make_shared<experience::VectorDB>(node_, "core_graphrag", experience::vectordb::MetricType::COSINE, llmclient_);
     RCLCPP_INFO(node_->get_logger(), "Initialized VectorDB for CoreGraphRag.");
 
     graph_rag_ = std::make_shared<experience::GraphRAG>(node_);
@@ -107,9 +115,6 @@ public:
     inform_db_->createPlanSkillEdgeAttributionTable();
     inform_db_->createPlanNodeScoreExplanationTable();
     RCLCPP_INFO(node_->get_logger(), "Initialized SQLiteDB for CoreGraphRag.");
-
-    llmclient_ = std::make_shared<experience::llm::PromptServiceClient>(node_, "core_graphrag");
-    RCLCPP_INFO(node_->get_logger(), "Initialized prompt service client for CoreGraphRag.");
   }
 
   /**

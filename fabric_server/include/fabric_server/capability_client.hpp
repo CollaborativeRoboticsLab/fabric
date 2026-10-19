@@ -19,6 +19,7 @@
 #include <capabilities2_msgs/srv/establish_bond.hpp>
 #include <capabilities2_msgs/srv/get_interfaces.hpp>
 #include <capabilities2_msgs/srv/get_semantic_interfaces.hpp>
+#include <capabilities2_msgs/srv/get_event_snapshot.hpp>
 #include <capabilities2_msgs/srv/get_providers.hpp>
 #include <capabilities2_msgs/srv/get_runnable_specs.hpp>
 #include <capabilities2_msgs/srv/use_capability.hpp>
@@ -41,6 +42,7 @@ class CapabilityClient
 public:
   using GetInterfaces = capabilities2_msgs::srv::GetInterfaces;
   using GetSemanticInterfaces = capabilities2_msgs::srv::GetSemanticInterfaces;
+  using GetEventSnapshot = capabilities2_msgs::srv::GetEventSnapshot;
   using GetProviders = capabilities2_msgs::srv::GetProviders;
   using GetRunnableSpecs = capabilities2_msgs::srv::GetRunnableSpecs;
   using EstablishBond = capabilities2_msgs::srv::EstablishBond;
@@ -54,6 +56,7 @@ public:
 
   using GetInterfacesClient = rclcpp::Client<GetInterfaces>;
   using GetSemanticInterfacesClient = rclcpp::Client<GetSemanticInterfaces>;
+  using GetEventSnapshotClient = rclcpp::Client<GetEventSnapshot>;
   using GetProvidersClient = rclcpp::Client<GetProviders>;
   using GetRunnableSpecsClient = rclcpp::Client<GetRunnableSpecs>;
   using EstablishBondClient = rclcpp::Client<EstablishBond>;
@@ -62,6 +65,16 @@ public:
   using ConnectCapabilityClient = rclcpp::Client<ConnectCapability>;
   using TriggerCapabilityClient = rclcpp::Client<TriggerCapability>;
   using ReadyClient = rclcpp::Client<Ready>;
+
+  struct CapabilityEventSnapshot
+  {
+    builtin_interfaces::msg::Time stamp;
+    uint64_t oldest_sequence{0};
+    uint64_t latest_sequence{0};
+    uint32_t max_events{0};
+    bool truncated{false};
+    std::vector<capabilities2_msgs::msg::CapabilityEventStamped> events;
+  };
 
   CapabilityClient()
   {
@@ -109,6 +122,8 @@ public:
         "/capabilities/get_interfaces");
     node_->declare_parameter<std::string>("capability_client.services.get_semantic_interfaces",
         "/capabilities/get_semantic_interfaces");
+    node_->declare_parameter<std::string>("capability_client.services.get_event_snapshot",
+      "/capabilities/get_event_snapshot");
     node_->declare_parameter<std::string>("capability_client.services.get_providers",
         "/capabilities/get_providers");
     node_->declare_parameter<std::string>("capability_client.services.get_runnable_specs",
@@ -129,6 +144,7 @@ public:
     node_->get_parameter("capability_client.services.get_interfaces", get_interfaces_);
     node_->get_parameter("capability_client.services.get_semantic_interfaces",
         get_semantic_interfaces_);
+    node_->get_parameter("capability_client.services.get_event_snapshot", get_event_snapshot_);
     node_->get_parameter("capability_client.services.get_providers", get_providers_);
     node_->get_parameter("capability_client.services.get_runnable_specs", get_runnable_specs_);
     node_->get_parameter("capability_client.services.establish_bond", establish_bond_);
@@ -140,6 +156,7 @@ public:
 
     get_interfaces_client_ = node_->create_client<GetInterfaces>(get_interfaces_);
     get_sem_interf_client_ = node_->create_client<GetSemanticInterfaces>(get_semantic_interfaces_);
+    get_event_snapshot_client_ = node_->create_client<GetEventSnapshot>(get_event_snapshot_);
     get_providers_client_ = node_->create_client<GetProviders>(get_providers_);
     get_runnable_specs_client_ = node_->create_client<GetRunnableSpecs>(get_runnable_specs_);
     establish_bond_client_ = node_->create_client<EstablishBond>(establish_bond_);
@@ -168,6 +185,7 @@ public:
 
     wait_for_service(get_interfaces_client_, get_interfaces_, effective_timeout_sec);
     wait_for_service(get_sem_interf_client_, get_semantic_interfaces_, effective_timeout_sec);
+    wait_for_service(get_event_snapshot_client_, get_event_snapshot_, effective_timeout_sec);
     wait_for_service(get_providers_client_, get_providers_, effective_timeout_sec);
     wait_for_service(get_runnable_specs_client_, get_runnable_specs_, effective_timeout_sec);
     wait_for_service(establish_bond_client_, establish_bond_, effective_timeout_sec);
@@ -184,6 +202,50 @@ public:
   void wait_till_ready(int timeout_sec = std::numeric_limits<int>::min())
   {
     wait_until_ready(timeout_sec);
+  }
+
+  CapabilityEventSnapshot getEventSnapshot(uint64_t after_sequence = 0, uint32_t max_events = 0)
+  {
+    RCLCPP_INFO(node_->get_logger(),
+        "[Capability client] requesting event snapshot after_sequence=%llu max_events=%u",
+        static_cast<unsigned long long>(after_sequence), static_cast<unsigned int>(max_events));
+
+    auto request = std::make_shared<GetEventSnapshot::Request>();
+    request->after_sequence = after_sequence;
+    request->max_events = max_events;
+
+    bool completed = false;
+    std::mutex mtx;
+    std::condition_variable cv;
+    std::unique_lock<std::mutex> lock(mtx);
+    CapabilityEventSnapshot snapshot;
+
+    auto future = get_event_snapshot_client_->async_send_request(
+      request,
+      [this, &completed, &cv, &snapshot](GetEventSnapshotClient::SharedFuture future_response) {
+        if (!future_response.valid()) {
+          throw fabric::fabric_exception("Failed to get event snapshot from capabilities2 server");
+        }
+
+        const auto response = future_response.get();
+        snapshot.stamp = response->header.stamp;
+        snapshot.oldest_sequence = response->oldest_sequence;
+        snapshot.latest_sequence = response->latest_sequence;
+        snapshot.max_events = response->max_events;
+        snapshot.truncated = response->truncated;
+        snapshot.events = response->events;
+
+        completed = true;
+        cv.notify_all();
+      });
+
+    cv.wait(lock, [&completed]() {return completed;});
+
+    RCLCPP_INFO(node_->get_logger(),
+        "[Capability client] received event snapshot latest_sequence=%llu events=%zu truncated=%s",
+        static_cast<unsigned long long>(snapshot.latest_sequence), snapshot.events.size(),
+        snapshot.truncated ? "true" : "false");
+    return snapshot;
   }
 
   /**
@@ -941,6 +1003,7 @@ protected:
    */
   std::string get_interfaces_;
   std::string get_semantic_interfaces_;
+  std::string get_event_snapshot_;
   std::string get_providers_;
   std::string get_runnable_specs_;
   std::string establish_bond_;
@@ -963,6 +1026,9 @@ protected:
 
   /** Get semantic interfaces from capabilities server */
   GetSemanticInterfacesClient::SharedPtr get_sem_interf_client_;
+
+  /** Get capability event snapshots from capabilities server */
+  GetEventSnapshotClient::SharedPtr get_event_snapshot_client_;
 
   /** Get providers from capabilities server */
   GetProvidersClient::SharedPtr get_providers_client_;
