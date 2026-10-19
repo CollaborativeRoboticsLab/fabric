@@ -95,7 +95,7 @@ overconfident point estimates.
 
 Separate counters for failed / aborted / timed-out runs let the experience
 layer choose its own definition of "failure" later without changing the
-supervisor.
+Fabric telemetry layer.
 
 ### 2. Resource evidence → enables $r_i$
 
