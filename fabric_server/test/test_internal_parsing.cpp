@@ -1,3 +1,5 @@
+#include <future>
+
 #include <gtest/gtest.h>
 
 #include <fabric_parser_xml/xml_parser_plugin.hpp>
@@ -68,4 +70,62 @@ TEST_F(InternalParsingTest, KeepsConsecutivePlansIndependent)
   for (const auto & connection : result.connections) {
     EXPECT_NE(connection.source.interface, "demo/First");
   }
+}
+
+TEST_F(InternalParsingTest, PreservesTypedRunnerParameters)
+{
+  auto result = parser_.parsePlanDefinition(
+    "<Plan><Runner interface=\"demo/Move\" provider=\"demo/Provider\" "
+    "speed=\"0.5\" attempts=\"3\" enabled=\"true\" target=\"dock\"/></Plan>");
+  ASSERT_TRUE(result.success) << result.error;
+  bool found_runner = false;
+  for (auto & connection : result.connections) {
+    if (connection.source.interface == "demo/Move") {
+      auto & parameters = connection.source.parameters;
+      EXPECT_DOUBLE_EQ(std::any_cast<double>(parameters.get_value("speed", 0.0)), 0.5);
+      EXPECT_EQ(std::any_cast<int>(parameters.get_value("attempts", 0)), 3);
+      EXPECT_TRUE(std::any_cast<bool>(parameters.get_value("enabled", false)));
+      EXPECT_EQ(std::any_cast<std::string>(parameters.get_value("target", std::string())), "dock");
+      found_runner = true;
+    }
+  }
+  EXPECT_TRUE(found_runner);
+}
+
+TEST_F(InternalParsingTest, SerializesPlanningAndDispatchParsing)
+{
+  auto planning = std::async(std::launch::async, [this]() {
+      for (int attempt = 0; attempt < 5; ++attempt) {
+        const auto result = parser_.parsePlanDefinition(
+          "<Plan><Runner interface=\"demo/Planning\" provider=\"demo/Provider\"/></Plan>");
+        if (!result.success || result.connections.empty()) {
+          return false;
+        }
+        for (const auto & connection : result.connections) {
+          if (connection.source.interface == "demo/Dispatch") {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+  auto dispatch = std::async(std::launch::async, [this]() {
+      for (int attempt = 0; attempt < 5; ++attempt) {
+        fabric::plan::Plan plan;
+        plan.plan_id = "dispatch-plan";
+        plan.plan = "<Plan><Runner interface=\"demo/Dispatch\" provider=\"demo/Provider\"/></Plan>";
+        parser_.parsePlan(plan);
+        if (plan.connections.empty()) {
+          return false;
+        }
+        for (const auto & entry : plan.connections) {
+          if (entry.second.source.interface == "demo/Planning") {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+  EXPECT_TRUE(planning.get());
+  EXPECT_TRUE(dispatch.get());
 }

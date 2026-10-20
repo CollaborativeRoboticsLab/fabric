@@ -23,7 +23,7 @@ The practical rule is simple:
 | Parameter | Description | Current Default / Notes |
 | --- | --- | --- |
 | `core_plugin` | Selects the knowledge core implementation. | `experience::GraphKnowledgeCore`. Change this only when swapping the core storage or retrieval backend. |
-| `behaviour_interface_plugin` | Selects the Fabric-facing behavior interface used for parsing or submitting plans. | `experience::FabricPlugin` |
+| `parsing_plugin` | Selects Fabric's parser, shared internally by planning, scoring, and dispatch. This parameter is not under `experience`. | `fabric::XMLParser`; no behavior-interface plugin is needed. |
 | `planner_plugin` | Selects the planner plugin responsible for prompt generation and plan refinement. | `experience::PlanningPlugin` |
 | `scorer_plugin` | Selects the candidate-plan scorer implementation. | `experience::RapfsScorerPlugin` |
 
