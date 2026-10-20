@@ -130,10 +130,33 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
+  find_package(fabric_parser_xml REQUIRED)
+
+  ament_add_gtest(test_capability_metadata test/test_capability_metadata.cpp TIMEOUT 30)
+  if(TARGET test_capability_metadata)
+    ament_target_dependencies(test_capability_metadata
+      ${FABRIC_SERVER_DEPENDENCIES})
+    target_link_libraries(test_capability_metadata yaml-cpp)
+  endif()
+
+  ament_add_gtest(test_internal_parsing test/test_internal_parsing.cpp)
+  if(TARGET test_internal_parsing)
+    ament_target_dependencies(test_internal_parsing fabric_base fabric_parser_xml rclcpp TinyXML2)
+  endif()
 
   ament_add_gtest(test_score_explanation_adapter test/test_score_explanation_adapter.cpp)
   if(TARGET test_score_explanation_adapter)
     ament_target_dependencies(test_score_explanation_adapter
+      fabric_base
+      fabric_msgs
+      rclcpp
+    )
+  endif()
+
+  ament_add_gtest(test_resource_telemetry test/test_resource_telemetry.cpp)
+  if(TARGET test_resource_telemetry)
+    ament_target_dependencies(test_resource_telemetry
+      capabilities2_msgs
       fabric_base
       fabric_msgs
       rclcpp

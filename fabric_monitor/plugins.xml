@@ -9,6 +9,11 @@
             A Fabric-native plugin that polls capabilities2 event snapshots and reconstructs capability runtime evidence.
         </description>
     </class>
+    <class type="fabric::ResourceMonitor" base_class_type="fabric::MonitorBase">
+        <description>
+            A Fabric-native plugin that collects launch proxy CPU, memory, uptime, and per-process resource snapshots.
+        </description>
+    </class>
     <class type="fabric::RosoutMonitor" base_class_type="fabric::MonitorBase">
         <description>
             A Fabric-native plugin that monitors ROS 2 log messages and summarizes per-node health.

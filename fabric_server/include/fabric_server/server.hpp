@@ -44,8 +44,6 @@
 #include <fabric_base/validation_base.hpp>
 #include <fabric_base/parser_base.hpp>
 #include <fabric_base/generation_base.hpp>
-#include <fabric_base/behaviour_interface_base.hpp>
-#include <fabric_base/metadata_base.hpp>
 #include <fabric_base/planner_base.hpp>
 #include <fabric_base/scorer_base.hpp>
 #include <fabric_base/validation_base.hpp>
@@ -139,9 +137,7 @@ public:
     , generation_loader_("fabric_base", "fabric::GenerationBase")
     , llm_analysis_loader_("fabric_base", "fabric::LlmAnalysisBase")
     , monitor_loader_("fabric_base", "fabric::MonitorBase")
-    , metadata_loader_("fabric_base", "fabric::MetadataBase")
     , core_loader_("fabric_base", "fabric::CoreBase")
-    , behaviour_loader_("fabric_base", "fabric::BehaviourInterfaceBase")
     , planner_loader_("fabric_base", "fabric::PlannerBase")
     , scorer_loader_("fabric_base", "fabric::ScorerBase")
     , validation_loader_("fabric_base", "fabric::ValidationBase")
@@ -205,7 +201,6 @@ public:
     initializeLlmAnalysisPlugin();
     initializeMonitorPlugins();
     initializeGenerationPlugin();
-    initializeFabricExperienceRuntime();
     initializeCapabilityClient();
     queueStarterPlan();
 
@@ -242,7 +237,7 @@ protected:
         RCLCPP_INFO(this->get_logger(), "[server] Parsing the fabric plan.");
         setCurrentPlanStatus(fabric::plan::Status::PARSING);
 
-        parsing_plugin_->parse(current_plan_);
+        parsing_plugin_->parsePlan(current_plan_);
       } catch (const fabric::fabric_exception & e) {
         RCLCPP_ERROR(this->get_logger(), "[server] Fabric plan parsing failed with error: %s",
             e.what());
@@ -392,9 +387,11 @@ protected:
       capability_client_->wait_until_ready();
       capabilities_ready_.store(true);
       if (use_experience_) {
+        initializeFabricExperienceRuntime();
         RCLCPP_INFO(this->get_logger(),
             "[server] Capabilities2 is ready. Integrated Fabric experience services are available.");
         experience_ready_.store(true);
+        system_status_process_thread_ = std::thread(&Fabric::processingSystemStatus, this);
       }
 
       startup_complete_.store(true);
@@ -672,7 +669,6 @@ protected:
     }
 
     loadPlannerPlugin();
-    loadBehaviourInterfacePlugin();
     loadValidationPlugins();
     loadPlanningRefinementConfig();
     loadEstimatorPlugins();
@@ -704,7 +700,6 @@ protected:
   {
     startMonitorPlugins();
     startup_thread_ = std::thread(&Fabric::wait_for_capabilities_ready, this);
-    system_status_process_thread_ = std::thread(&Fabric::processingSystemStatus, this);
     monitor_ingestion_thread_ = std::thread(&Fabric::processMonitorTelemetry, this);
   }
 
@@ -733,6 +728,13 @@ protected:
 
   void ingestMonitorPayload(const std::string & monitor_name, const std::any & data)
   {
+    if (const auto * snapshots =
+      std::any_cast<std::vector<capabilities2_msgs::msg::LaunchResourceList>>(&data))
+    {
+      telemetry_aggregator_.ingestResourceSnapshots(*snapshots);
+      return;
+    }
+
     try {
       telemetry_aggregator_.ingestMonitorStatuses(
         monitor_name,
@@ -754,7 +756,7 @@ protected:
         this->now().nanoseconds(),
         enable_battery_monitoring_,
         battery_snapshot ? battery_snapshot->percentage : -1.0);
-      if (!capability_statuses.empty()) {
+      if (use_experience_ && !capability_statuses.empty()) {
         for (auto & status : capability_statuses) {
           fabric::server::status::enqueueSystemStatus(
             system_status_mutex_, system_status_cv_, system_status_records_, std::move(status));
@@ -854,6 +856,11 @@ protected:
   {
     (void)uuid;
 
+    if (!startup_complete_.load()) {
+      RCLCPP_WARN(this->get_logger(), "[server] Rejecting generation request before startup completes");
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+
     if (goal->task.empty()) {
       RCLCPP_WARN(this->get_logger(), "[server] Rejecting generation request with empty task");
       return rclcpp_action::GoalResponse::REJECT;
@@ -928,7 +935,7 @@ protected:
   std::vector<PlanningResult> generateAndValidateCandidatePlans(const PlanningRequest & request)
   {
     PlanningResult planning_result = planner_plugin_->plan(request, capabilities_, *core_plugin_,
-        *behaviour_plugin_);
+      *parsing_plugin_);
     std::vector<PlanningResult> generation_results;
 
     validatePlanningResult(request, planning_result);
@@ -946,7 +953,7 @@ protected:
         refinement_attempt,
       };
       planning_result = planner_plugin_->refinePlan(refinement_request, capabilities_,
-          *core_plugin_, *behaviour_plugin_);
+          *core_plugin_, *parsing_plugin_);
       validatePlanningResult(request, planning_result);
       generation_results.push_back(planning_result);
     }
@@ -1148,7 +1155,7 @@ protected:
     plan.plan_id = "fabric_parse_request";
 
     try {
-      parsing_plugin_->parse(plan);
+      parsing_plugin_->parsePlan(plan);
       response->success = true;
       response->error.clear();
       for (const auto & [connection_id, connection] : plan.connections) {
@@ -1584,27 +1591,6 @@ protected:
   }
 
   /**
-   * @brief Load and initialize the configured behaviour-interface plugin.
-   *
-   * The behaviour interface isolates Fabric-specific parsing from the rest of
-   * the server so other execution backends can be swapped in later.
-   */
-  void loadBehaviourInterfacePlugin()
-  {
-    this->declare_parameter<std::string>(
-      fabric::server::experience_runtime::parameterName("behaviour_interface_plugin"),
-      "experience::FabricPlugin");
-    this->get_parameter(fabric::server::experience_runtime::parameterName(
-      "behaviour_interface_plugin"),
-        behaviour_interface_plugin_name_);
-
-    behaviour_plugin_ = behaviour_loader_.createSharedInstance(behaviour_interface_plugin_name_);
-    behaviour_plugin_->initialize(shared_from_this());
-    RCLCPP_INFO(this->get_logger(), "Loaded behaviour interface plugin: %s",
-        behaviour_interface_plugin_name_.c_str());
-  }
-
-  /**
    * @brief Run ordered validation plugins over parsed candidate plans.
    *
    * @param request Planning request associated with the candidates.
@@ -1630,9 +1616,10 @@ protected:
       return;
     }
 
-    metadata_plugin_->wait_until_ready();
-    metadata_plugin_->collect(capabilities_);
-    RCLCPP_INFO(this->get_logger(), "Received runnable capability metadata from metadata plugin.");
+    std::vector<fabric::capability::Descriptor> capabilities;
+    capability_client_->getRunnableSpecs(capabilities);
+    capabilities_ = std::move(capabilities);
+    RCLCPP_INFO(this->get_logger(), "Received runnable capability metadata from capabilities2.");
   }
 
   bool shouldRefinePlanningResult(const PlanningResult & planning_result) const
@@ -1687,7 +1674,7 @@ protected:
     const PlanningRequest & request,
     const std::string & candidate_plan_id, const std::string & plan_xml) const
   {
-    return fabric::server::planning::parseCandidatePlanForScoring(*core_plugin_, *behaviour_plugin_,
+    return fabric::server::planning::parseCandidatePlanForScoring(*core_plugin_, *parsing_plugin_,
         request, candidate_plan_id, plan_xml);
   }
 
@@ -2019,24 +2006,9 @@ protected:
   std::shared_ptr<fabric::LlmAnalysisBase> llm_analysis_plugin_;
 
   /**
-   * @brief Plugin loader for capability metadata adapters.
-   */
-  pluginlib::ClassLoader<fabric::MetadataBase> metadata_loader_;
-
-  /**
-   * @brief Shared pointer to the active metadata plugin.
-   */
-  std::shared_ptr<fabric::MetadataBase> metadata_plugin_;
-
-  /**
    * @brief Plugin loader for the core knowledge management plugin.
    */
   pluginlib::ClassLoader<fabric::CoreBase> core_loader_;
-
-  /**
-   * @brief Plugin loader for fabric interface plugins.
-   */
-  pluginlib::ClassLoader<fabric::BehaviourInterfaceBase> behaviour_loader_;
 
   /**
    * @brief Plugin loader for planner plugins.
@@ -2063,11 +2035,6 @@ protected:
    */
   std::shared_ptr<fabric::CoreBase> core_plugin_;
   std::vector<std::shared_ptr<fabric::MonitorBase>> monitor_plugins_;
-
-  /**
-   * @brief Shared pointer to the active fabric interface plugin.
-   */
-  std::shared_ptr<fabric::BehaviourInterfaceBase> behaviour_plugin_;
 
   /**
    * @brief Shared pointer to the active planner plugin.
@@ -2101,11 +2068,6 @@ protected:
   std::vector<std::string> validation_plugin_names_;
 
   /**
-   * @brief Name of the metadata plugin to load.
-   */
-  std::string metadata_plugin_name_;
-
-  /**
    * @brief Name of the planner plugin to load.
    */
   std::string planner_plugin_name_;
@@ -2114,11 +2076,6 @@ protected:
    * @brief Name of the scorer plugin to load.
    */
   std::string scorer_plugin_name_;
-
-  /**
-   * @brief Name of the fabric interface plugin to load.
-   */
-  std::string behaviour_interface_plugin_name_;
 
   /**
    * @brief Names of estimator plugins requested by ROS parameter.

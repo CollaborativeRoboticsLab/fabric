@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include <capabilities2_msgs/msg/launch_resource_list.hpp>
 #include <fabric_base/utils/monitoring_structs.hpp>
 #include <fabric_base/utils/status_structs.hpp>
 #include <fabric_server/utils/status.hpp>
@@ -18,14 +19,14 @@ namespace fabric::server::telemetry
 using SystemStatus = ::fabric::status::SystemStatus;
 using TelemetryRecord = ::fabric::server::status::TelemetryRecord;
 
-inline uint8_t labelForMonitoringStatus(const ::fabric::MonitoringStatus status)
+inline uint8_t labelForMonitoringStatus(const ::fabric::monitor::MonitoringStatus status)
 {
   switch (status) {
-    case ::fabric::MonitoringStatus::SUSPICIOUS:
+    case ::fabric::monitor::MonitoringStatus::SUSPICIOUS:
       return 1;
-    case ::fabric::MonitoringStatus::FAULTY:
+    case ::fabric::monitor::MonitoringStatus::FAULTY:
       return 2;
-    case ::fabric::MonitoringStatus::NORMAL:
+    case ::fabric::monitor::MonitoringStatus::NORMAL:
     default:
       return 0;
   }
@@ -41,6 +42,50 @@ inline std::string capabilityExecutionKey(
 class Aggregator
 {
 public:
+  void ingestResourceSnapshots(
+    const std::vector<capabilities2_msgs::msg::LaunchResourceList> & snapshots)
+  {
+    if (snapshots.empty()) {
+      return;
+    }
+
+    const auto & snapshot = snapshots.back();
+    ::fabric::status::ResourceUsage usage;
+    usage.header.stamp.sec = snapshot.header.stamp.sec;
+    usage.header.stamp.nanosec = snapshot.header.stamp.nanosec;
+    usage.header.frame_id = snapshot.header.frame_id;
+    usage.active_launch_count = snapshot.active_launch_count;
+    usage.main_process_count = snapshot.main_process_count;
+    usage.child_process_count = snapshot.child_process_count;
+    usage.resource_count = snapshot.resource_count;
+    usage.total_cpu_usage_percent = snapshot.total_cpu_usage_percent;
+    usage.total_peak_sampled_cpu_usage_percent = snapshot.total_peak_sampled_cpu_usage_percent;
+    usage.total_time_above_80pct_peak_sampled_cpu_sec =
+      snapshot.total_time_above_80pct_peak_sampled_cpu_sec;
+    usage.total_memory_rss_bytes = snapshot.total_memory_rss_bytes;
+    usage.total_peak_memory_rss_bytes = snapshot.total_peak_memory_rss_bytes;
+    usage.total_time_above_90pct_peak_rss_sec = snapshot.total_time_above_90pct_peak_rss_sec;
+    usage.total_memory_vms_bytes = snapshot.total_memory_vms_bytes;
+    usage.total_peak_memory_vms_bytes = snapshot.total_peak_memory_vms_bytes;
+    usage.total_time_above_90pct_peak_vms_sec = snapshot.total_time_above_90pct_peak_vms_sec;
+    usage.resources.reserve(snapshot.resources.size());
+    for (const auto & resource : snapshot.resources) {
+      usage.resources.push_back(::fabric::status::ProcessResourceUsage{
+          resource.key, resource.reference_name, resource.launch_id, resource.state,
+          resource.resolved_launch_file_path, resource.process_name, resource.pid,
+          resource.parent_pid, resource.is_main_process, resource.launch_uptime_sec,
+          resource.process_uptime_sec, resource.cpu_usage_percent,
+          resource.peak_sampled_cpu_usage_percent, resource.time_above_80pct_peak_sampled_cpu_sec,
+          resource.memory_rss_bytes, resource.peak_memory_rss_bytes,
+          resource.time_above_90pct_peak_rss_sec, resource.memory_vms_bytes,
+          resource.peak_memory_vms_bytes, resource.time_above_90pct_peak_vms_sec});
+    }
+
+    std::lock_guard<std::mutex> lock(resource_usage_mutex_);
+    resource_usage_ = std::move(usage);
+    has_resource_usage_ = true;
+  }
+
   void configureRetentionSeconds(const int retention_seconds)
   {
     retention_seconds_ = retention_seconds > 0 ? retention_seconds : 300;
@@ -55,7 +100,7 @@ public:
 
   void ingestMonitorStatuses(
     const std::string & monitor_name,
-    const std::map<std::string, ::fabric::ComponentStatus> & statuses,
+    const std::map<std::string, ::fabric::monitor::ComponentStatus> & statuses,
     const int64_t now_ns)
   {
     for (const auto & entry : statuses) {
@@ -90,6 +135,11 @@ public:
 
       enrichCapabilitySystemStatus(status, now_ns, enable_battery_monitoring, battery_percentage);
       maybeMergeExecutionStatus(status);
+      {
+        std::lock_guard<std::mutex> lock(resource_usage_mutex_);
+        status.has_resource_usage = has_resource_usage_;
+        status.resource_usage = resource_usage_;
+      }
       capability_statuses.push_back(std::move(status));
     }
 
@@ -202,6 +252,9 @@ private:
   }
 
   int retention_seconds_{300};
+  std::mutex resource_usage_mutex_;
+  bool has_resource_usage_{false};
+  ::fabric::status::ResourceUsage resource_usage_;
   std::mutex telemetry_records_mutex_;
   std::deque<TelemetryRecord> telemetry_records_;
   std::mutex execution_status_mutex_;

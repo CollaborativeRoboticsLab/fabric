@@ -19,7 +19,7 @@
 #include <prompt_msgs/msg/model_option.hpp>
 #include <prompt_msgs/srv/prompt.hpp>
 
-#include <fabric_base/behaviour_interface_base.hpp>
+#include <fabric_base/parser_base.hpp>
 #include <fabric_base/planner_base.hpp>
 
 namespace fabric
@@ -38,7 +38,6 @@ public:
   using PlanningResult = planning::Result;
   using BehaviourInfo = capability::Descriptor;
   using BehaviourPlanDefinition = capability::PlanDefinition;
-  using BehaviourInterfaceBase = CapabilityInterfaceBase;
   using CandidatePlan = planning::CandidatePlan;
   using CandidatePlanNode = planning::CandidatePlanNode;
   using CandidatePlanEdge = planning::CandidatePlanEdge;
@@ -99,9 +98,8 @@ public:
    *
    */
   PlanningResult plan(const PlanningRequest& request, const std::vector<BehaviourInfo>& capabilities, CoreBase& core,
-                      InterfaceBase& interface) override
+                      ParserBase& parser) override
   {
-    auto& behaviour_interface = dynamic_cast<BehaviourInterfaceBase&>(interface);
     const auto task_semantic_context = core.retrieveSemanticContext(
       request.task_description, "", static_cast<size_t>(std::max(2, max_capability_context_ * 2)));
     const auto ranked_capabilities = selectCandidateCapabilities(request.task_description, capabilities, task_semantic_context);
@@ -125,7 +123,7 @@ public:
     std::string critique;
     try
     {
-      const auto parsed_draft = behaviour_interface.parseBehaviourPlan(draft_plan);
+      const auto parsed_draft = parser.parsePlanDefinition(draft_plan);
       if (!parsed_draft.success)
         throw std::runtime_error(parsed_draft.error);
       critique = critiquePlan(parsed_draft, generation_context);
@@ -136,14 +134,13 @@ public:
     }
 
     return refinePlanningResult(request, generation_context, task_semantic_context, semantic_mode == "community",
-                  draft_plan, critique, core, behaviour_interface, 2, "refinement", 0);
+                  draft_plan, critique, core, parser, 2, "refinement", 0);
   }
 
   PlanningResult refinePlan(const PlanningRefinementRequest& refinement_request,
                             const std::vector<BehaviourInfo>& capabilities, CoreBase& core,
-                            InterfaceBase& interface) override
+                            ParserBase& parser) override
   {
-    auto& behaviour_interface = dynamic_cast<BehaviourInterfaceBase&>(interface);
     const auto& request = refinement_request.request;
     const auto task_semantic_context = core.retrieveSemanticContext(
       request.task_description, "", static_cast<size_t>(std::max(2, max_capability_context_ * 2)));
@@ -153,7 +150,7 @@ public:
     const bool use_community_context = normalizedSemanticContextMode(semantic_context_mode_) == "community";
     return refinePlanningResult(request, generation_context, task_semantic_context, use_community_context,
                   sanitizePlanXml(refinement_request.draft_plan), refinement_request.critique, core,
-                  behaviour_interface, std::max(2, refinement_request.attempt_index + 2),
+                  parser, std::max(2, refinement_request.attempt_index + 2),
                   "refinement", refinement_request.attempt_index);
   }
 
@@ -392,7 +389,7 @@ protected:
                                       const SemanticContextBundle& task_semantic_context,
                                       const bool use_community_context, const std::string& draft_plan,
                                       const std::string& critique, CoreBase& core,
-                                      BehaviourInterfaceBase& behaviour_interface,
+                                      ParserBase& parser,
                                       const int prompt_iteration = 2,
                                       const std::string& prompt_phase = "refinement",
                                       const int refinement_attempt_index = 0) const
@@ -424,7 +421,7 @@ protected:
                     promptRequestUuid(request), request.flush));
 
     CandidatePlan candidate = parseCandidatePlan(request, sanitizePlanXml(final_plan_response.plan), generation_context,
-                                                 core, behaviour_interface);
+                                                 core, parser);
     candidate.reasoning = final_plan_response.reasoning;
     persistCandidateAttribution(request, candidate, core);
     result.candidates.push_back(candidate);
@@ -812,14 +809,14 @@ protected:
    * @param plan_xml Sanitized plan XML.
    * @param context Capability evidence context used during generation.
    * @param core Core plugin used to resolve skill evidence.
-   * @param behaviour_interface Behaviour interface used to parse the XML plan.
+  * @param parser Fabric parser used to parse the XML plan.
    * @return CandidatePlan Parsed candidate plan.
    */
   CandidatePlan parseCandidatePlan(const PlanningRequest& request, const std::string& plan_xml,
                                    const std::vector<CapabilityGenerationContext>& context, CoreBase& core,
-                                   BehaviourInterfaceBase& behaviour_interface) const
+                                   ParserBase& parser) const
   {
-    const auto parsed_plan = behaviour_interface.parseBehaviourPlan(plan_xml);
+    const auto parsed_plan = parser.parsePlanDefinition(plan_xml);
     if (!parsed_plan.success)
       throw std::runtime_error(parsed_plan.error);
 

@@ -1,7 +1,9 @@
 #pragma once
+#include <mutex>
 #include <string>
 #include <vector>
 #include <rclcpp/rclcpp.hpp>
+#include <fabric_base/utils/metadata_structs.hpp>
 #include <fabric_base/utils/plan_structs.hpp>
 #include <fabric_base/utils/xml_helper.hpp>
 
@@ -46,6 +48,35 @@ public:
    */
   virtual void parse(fabric::plan::Plan& plan) = 0;
 
+  void parsePlan(fabric::plan::Plan& plan)
+  {
+    std::lock_guard<std::mutex> lock(parse_mutex_);
+    parse(plan);
+  }
+
+  fabric::capability::PlanDefinition parsePlanDefinition(const std::string& plan_xml)
+  {
+    fabric::capability::PlanDefinition result;
+    fabric::plan::Plan plan;
+    plan.plan = plan_xml;
+    plan.plan_id = "fabric_parse_request";
+    try
+    {
+      parsePlan(plan);
+      for (const auto& entry : plan.connections)
+      {
+        result.connections.push_back(entry.second);
+      }
+      result.success = true;
+    }
+    catch (const std::exception& exception)
+    {
+      result.connections.clear();
+      result.error = exception.what();
+    }
+    return result;
+  }
+
   /**
    * @brief Check the compatibility of the given plan with the given parser.
    *
@@ -76,6 +107,9 @@ protected:
    * @brief Name of the validation plugin.
    */
   std::string plugin_name_;
+
+private:
+  std::mutex parse_mutex_;
 };
 
 }  // namespace fabric

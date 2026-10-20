@@ -286,7 +286,9 @@ Goal: validate the integrated Fabric-owned stack after the structural refactor, 
 
 ### Resource Telemetry
 
-- [ ] Add a telemetry source for quantitative resource measurements.
+- [x] Add a telemetry source for quantitative resource measurements: `fabric::ResourceMonitor` in `fabric_monitor/include/fabric_monitor/resource_monitor.hpp` consumes launch-proxy CPU/memory/process snapshots and feeds Fabric-native plan telemetry.
+- [x] Validate resource monitor subscription, plugin loading, field preservation, and native telemetry conversion with focused tests.
+- [ ] Run a live launch-proxy resource smoke test and validate launch/reference-to-capability attribution, including shared processes and terminal samples.
 - [ ] Estimate per-capability resource distributions after telemetry exists.
 - [ ] Activate resource-cost scoring and peak-resource feasibility only after resource telemetry has been validated.
 

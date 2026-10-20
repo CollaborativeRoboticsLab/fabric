@@ -13,6 +13,7 @@
 
     telemetry:
       monitor_plugins:
+        - "fabric::ResourceMonitor"
         - "fabric::ExecutionStatusMonitor"
         - "fabric::CapabilityEventMonitor"
         - "fabric::RosoutMonitor"
@@ -20,6 +21,10 @@
       monitor_poll_frequency_hz: 2.0
       enable_battery_monitoring: true
       battery_topic: "/battery_state"
+
+    ResourceMonitor:
+      topic: "/capabilities2_launch_proxy/resources"
+      frequency: 1.0
 
     ExecutionStatusMonitor:
       topic: "/fabric/status"
@@ -57,7 +62,6 @@
     experience:
       enabled: true
       core_plugin: "fabric::GraphKnowledgeCore"
-      behaviour_interface_plugin: "experience::FabricPlugin"
       planner_plugin: "fabric::PlanningPlugin"
       scorer_plugin: "fabric::RapfsScorerPlugin"
       rebuild: false

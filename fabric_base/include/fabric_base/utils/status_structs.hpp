@@ -97,6 +97,49 @@ struct CapabilityStatus
   std::vector<LogRecord> log_records;
 };
 
+struct ProcessResourceUsage
+{
+  std::string key;
+  std::string reference_name;
+  std::string launch_id;
+  std::string state;
+  std::string resolved_launch_file_path;
+  std::string process_name;
+  int64_t pid = 0;
+  int64_t parent_pid = 0;
+  bool is_main_process = false;
+  float launch_uptime_sec = 0.0f;
+  float process_uptime_sec = 0.0f;
+  float cpu_usage_percent = 0.0f;
+  float peak_sampled_cpu_usage_percent = 0.0f;
+  float time_above_80pct_peak_sampled_cpu_sec = 0.0f;
+  uint64_t memory_rss_bytes = 0;
+  uint64_t peak_memory_rss_bytes = 0;
+  float time_above_90pct_peak_rss_sec = 0.0f;
+  uint64_t memory_vms_bytes = 0;
+  uint64_t peak_memory_vms_bytes = 0;
+  float time_above_90pct_peak_vms_sec = 0.0f;
+};
+
+struct ResourceUsage
+{
+  Header header;
+  uint32_t active_launch_count = 0;
+  uint32_t main_process_count = 0;
+  uint32_t child_process_count = 0;
+  uint32_t resource_count = 0;
+  float total_cpu_usage_percent = 0.0f;
+  float total_peak_sampled_cpu_usage_percent = 0.0f;
+  float total_time_above_80pct_peak_sampled_cpu_sec = 0.0f;
+  uint64_t total_memory_rss_bytes = 0;
+  uint64_t total_peak_memory_rss_bytes = 0;
+  float total_time_above_90pct_peak_rss_sec = 0.0f;
+  uint64_t total_memory_vms_bytes = 0;
+  uint64_t total_peak_memory_vms_bytes = 0;
+  float total_time_above_90pct_peak_vms_sec = 0.0f;
+  std::vector<ProcessResourceUsage> resources;
+};
+
 struct SystemStatus
 {
   Header header;
@@ -107,6 +150,8 @@ struct SystemStatus
   std::string bond_id;
   uint8_t capability_plan_state = 0;
   std::vector<CapabilityStatus> capabilities;
+  bool has_resource_usage = false;
+  ResourceUsage resource_usage;
 };
 }  // namespace status
 

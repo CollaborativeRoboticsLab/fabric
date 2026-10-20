@@ -4,7 +4,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include <fabric_base/interface_base.hpp>
+#include <fabric_base/parser_base.hpp>
 #include <fabric_base/core_base.hpp>
 #include <fabric_base/utils/planning_structs.hpp>
 
@@ -41,11 +41,11 @@ public:
    * @param request The planning request containing task description and other parameters.
    * @param capabilities Support data for evaluation as a vector of fabric::capability::Descriptor
    * @param core Reference to the CoreBase plugin for accessing knowledge and evidence.
-   * @param interface Reference to the InterfaceBase plugin for accessing behaviour-plan parsing.
+  * @param parser Reference to the active Fabric plan parser.
    *
    */
   virtual fabric::planning::Result plan(const fabric::planning::Request& request, const std::vector<fabric::capability::Descriptor>& capabilities,
-                                        CoreBase& core, InterfaceBase& interface) = 0;
+                                        CoreBase& core, ParserBase& parser) = 0;
 
   /**
    * @brief Refine or replan from an existing draft and critique.
@@ -56,13 +56,13 @@ public:
    * @param refinement_request The refinement request containing the draft plan and critique.
    * @param capabilities Support data for evaluation as a vector of fabric::capability::Descriptor
    * @param core Reference to the CoreBase plugin for accessing knowledge and evidence.
-   * @param interface Reference to the InterfaceBase plugin for accessing behaviour-plan parsing.
+  * @param parser Reference to the active Fabric plan parser.
    */
   virtual fabric::planning::Result refinePlan(const fabric::planning::RefinementRequest& refinement_request,
                                               const std::vector<fabric::capability::Descriptor>& capabilities, CoreBase& core,
-                                              InterfaceBase& interface)
+                                              ParserBase& parser)
   {
-    return plan(refinement_request.request, capabilities, core, interface);
+    return plan(refinement_request.request, capabilities, core, parser);
   }
 
 protected:

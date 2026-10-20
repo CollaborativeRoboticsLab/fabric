@@ -6,7 +6,7 @@
 #include <string>
 #include <unordered_map>
 
-#include <fabric_base/behaviour_interface_base.hpp>
+#include <fabric_base/parser_base.hpp>
 #include <fabric_base/core_base.hpp>
 #include <fabric_base/utils/planning_structs.hpp>
 
@@ -163,12 +163,12 @@ inline void appendParsedCandidateEdge(
 
 inline CandidatePlan parseCandidatePlanForScoring(
   ::fabric::CoreBase & core_plugin,
-  ::fabric::BehaviourInterfaceBase & behaviour_plugin,
+  ::fabric::ParserBase & parser,
   const PlanningRequest & request,
   const std::string & candidate_plan_id,
   const std::string & plan_xml)
 {
-  const auto parsed_plan = behaviour_plugin.parseBehaviourPlan(plan_xml);
+  const auto parsed_plan = parser.parsePlanDefinition(plan_xml);
   if (!parsed_plan.success) {
     throw std::runtime_error(parsed_plan.error.empty() ? "plan parsing failed" : parsed_plan.error);
   }

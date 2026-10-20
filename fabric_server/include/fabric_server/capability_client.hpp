@@ -895,36 +895,18 @@ protected:
   std::vector<std::string> fetch_runnable_spec_yaml()
   {
     auto request_specs = std::make_shared<GetRunnableSpecs::Request>();
-
-    bool completed = false;
-    std::mutex mtx;
-    std::condition_variable cv;
-    std::unique_lock<std::mutex> lock(mtx);
     std::vector<std::string> runnable_specs;
+    auto future = get_runnable_specs_client_->async_send_request(request_specs);
+    const auto response = future.get();
+    if (response->index_of_specs.size() != response->runnable_specs.size()) {
+      throw fabric::fabric_exception(
+              "Runnable specification response has mismatched index and payload sizes");
+    }
 
-    auto result_specs_future = get_runnable_specs_client_->async_send_request(
-        request_specs,
-      [this, &runnable_specs, &completed, &cv](GetRunnableSpecsClient::SharedFuture future) {
-        if (!future.valid()) {
-          throw fabric::fabric_exception("Failed to get runnable specifications from server");
-        }
-
-        auto response = future.get();
-        if (response->index_of_specs.size() != response->runnable_specs.size()) {
-          throw fabric::fabric_exception(
-            "Runnable specification response has mismatched index and payload sizes");
-        }
-
-        runnable_specs.reserve(response->runnable_specs.size());
-        for (const auto & runnable_spec : response->runnable_specs) {
-          runnable_specs.push_back(runnable_spec.spec);
-        }
-
-        completed = true;
-        cv.notify_all();
-        });
-
-    cv.wait(lock, [&completed]() {return completed;});
+    runnable_specs.reserve(response->runnable_specs.size());
+    for (const auto & runnable_spec : response->runnable_specs) {
+      runnable_specs.push_back(runnable_spec.spec);
+    }
     return runnable_specs;
   }
 
@@ -967,26 +949,8 @@ protected:
 
     auto request_ready = std::make_shared<Ready::Request>();
 
-    bool completed = false;
-    bool ready = false;
-    std::mutex mtx;
-    std::condition_variable cv;
-    std::unique_lock<std::mutex> lock(mtx);
-
-    auto result_ready_future = ready_client_->async_send_request(
-        request_ready, [this, &completed, &ready, &cv](ReadyClient::SharedFuture future) {
-        if (!future.valid()) {
-          throw fabric::fabric_exception("Capabilities2 readiness probe failed");
-        }
-
-        ready = future.get()->success;
-        completed = true;
-        cv.notify_all();
-        });
-
-    cv.wait(lock, [&completed]() {return completed;});
-
-    if (!ready) {
+    auto future = ready_client_->async_send_request(request_ready);
+    if (!future.get()->success) {
       throw fabric::fabric_exception("Capabilities2 server reported not ready");
     }
   }
