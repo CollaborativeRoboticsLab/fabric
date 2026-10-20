@@ -3,7 +3,7 @@ import json
 import sys
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
-SERVER_PACKAGE_ROOT = Path(__file__).resolve().parents[2] / 'experience_server'
+SERVER_PACKAGE_ROOT = Path(__file__).resolve().parents[2] / 'fabric_server'
 sys.path.insert(0, str(PACKAGE_ROOT))
 sys.path.insert(0, str(SERVER_PACKAGE_ROOT))
 
@@ -82,8 +82,30 @@ def test_run_focused_checks_runs_build_then_ctest(monkeypatch, tmp_path: Path):
 
     report = automation.run_focused_checks(workspace_root, extra_colcon_args=['--symlink-install'])
 
-    assert calls[0][0][:3] == ['colcon', 'build', '--packages-up-to']
-    assert '--symlink-install' in calls[0][0]
+    expected_packages = [
+        'fabric_experience_validator',
+        'fabric_experience_estimator',
+        'fabric_experience_scorer_rapfs',
+        'fabric_server',
+    ]
+    assert calls[0][0] == [
+        'colcon', 'build', '--packages-up-to', *expected_packages, '--symlink-install',
+    ]
+    expected_targets = [
+        ('fabric_experience_validator', 'test_validation_plugins'),
+        ('fabric_experience_estimator', 'test_estimator_plugins'),
+        ('fabric_experience_scorer_rapfs', 'test_rapfs_scorer_plugin'),
+        ('fabric_server', 'test_export_retrieval_prompt_audit'),
+        ('fabric_server', 'test_export_prompt_decision_support'),
+        ('fabric_server', 'test_summarize_planner_prompt_audit'),
+        ('fabric_server', 'test_export_reasoning_outcomes'),
+        ('fabric_server', 'test_export_terminal_success_analysis'),
+        ('fabric_server', 'test_verify_plan_score_explanation'),
+    ]
+    assert [command for command, _ in calls[1:]] == [
+        ['ctest', '--output-on-failure', '--test-dir', f'build/{package}', '-R', target]
+        for package, target in expected_targets
+    ]
     assert len(report['tests']) == len(automation.DEFAULT_CHECK_TARGETS)
     assert report['test_count'] == len(automation.DEFAULT_CHECK_TARGETS)
 

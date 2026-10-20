@@ -28,7 +28,7 @@ The package now uses Qt through `python_qt_binding`, which matches the ROS GUI e
 From the colcon workspace root:
 
 ```bash
-colcon build --packages-select fabric_experience_inspector
+colcon build --packages-up-to fabric_experience_inspector
 source install/setup.bash
 ```
 
@@ -110,7 +110,8 @@ Inside the GUI you can:
 - Run terminal-success threshold analysis directly from the docked `Analysis Jobs` panel
 - Inspect the selected row in the detail pane without querying the database manually
 
-The GUI reads the SQLite database directly. It does not require the Experience server to be running.
+The GUI reads the SQLite database directly. It uses the Fabric-owned Python helpers
+from `fabric_server` and does not require the Fabric server to be running.
 
 Optional plugin arguments can also be passed through `rqt`:
 
@@ -156,17 +157,17 @@ You can:
 - Parse the XML into a structural graph containing `Plan`, `Control`, and `Runner` nodes
 - Inspect control-structure edges such as sequential success transitions, parallel branches, and recovery links
 - Optionally paste or load a score JSON payload to overlay plan-level and node-level scoring fields when you already have them
-- Call the live `experience/plan/score` service directly from the tab when the Experience server is running
+- Call the live `/fabric/experience/score` service directly from the tab when the Fabric server is running
 
 Important limitation:
 
 - The sandbox parses plan structure locally, but it does not run the full RAPFS scoring stack by itself.
-- Real score components still come from the existing Experience scoring path, such as the live `experience/plan/score` service or exported score artifacts.
+- Real score components still come from the integrated Fabric Experience scoring path, such as the live `/fabric/experience/score` service or exported score artifacts.
 - When no score JSON is provided, the sandbox intentionally shows only structural information.
 
 ### Live Scoring From The Sandbox
 
-When the Experience server is running and the workspace has been sourced, the `Score via Service` action can call the live `experience/plan/score` service.
+When the Fabric server is running and the workspace has been sourced, the `Score via Service` action can call the live `/fabric/experience/score` service.
 
 Provide:
 
@@ -176,7 +177,8 @@ Provide:
 
 The returned score response is loaded back into the score-overlay editor automatically and applied to the parsed sandbox graph.
 
-If the score service, `rclpy`, or `experience_msgs` is unavailable, the inspector keeps the offline sandbox state intact and reports the failure without overwriting the current overlay.
+Live scoring uses `fabric_msgs/srv/ScorePlan` at `/fabric/experience/score`.
+If the score service, `rclpy`, or `fabric_msgs` is unavailable, the inspector keeps the offline sandbox state intact and reports the failure without overwriting the current overlay.
 
 ## Retrieval Prompt Audit Export
 
@@ -264,7 +266,7 @@ ros2 run fabric_experience_inspector run_focused_checks.py --workspace-root /hom
 Run the offline threshold-analysis export directly when you want candidate RAPFS cut points from saved plan outcomes:
 
 ```bash
-ros2 run experience_server export_terminal_success_analysis.py \
+ros2 run fabric_server export_terminal_success_analysis.py \
   /path/to/feedback_root \
   --db /path/to/core_graphrag.sqlite3 \
   --out-dir /tmp/terminal_success_analysis

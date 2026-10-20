@@ -191,6 +191,50 @@ inline int computePlanLogCount(const ::fabric::status::SystemStatus & status, co
   return count;
 }
 
+inline std::string terminalOutcomeFromRunEvidence(const ::fabric::status::SystemStatus & status)
+{
+  bool saw_success = false;
+  bool saw_completed = false;
+  for (const auto & capability : status.capabilities) {
+    if (!capability.has_run_evidence) {
+      continue;
+    }
+
+    const auto & evidence = capability.run_evidence;
+    if (evidence.runs_failed > 0) {
+      return "failed";
+    }
+    if (evidence.runs_timed_out > 0) {
+      return "timed_out";
+    }
+    if (evidence.runs_aborted > 0) {
+      return "cancelled";
+    }
+    if (evidence.runs_completed > 0) {
+      saw_completed = true;
+    }
+    if (evidence.runs_succeeded > 0 || evidence.last_outcome_label == "succeeded") {
+      saw_success = true;
+    }
+  }
+
+  if (saw_completed && saw_success) {
+    return "completed";
+  }
+
+  if (status.capability_plan_state == 13) {
+    return "completed";
+  }
+
+  return "cancelled";
+}
+
+inline bool terminalSuccessFromRunEvidence(const ::fabric::status::SystemStatus & status)
+{
+  const std::string outcome = terminalOutcomeFromRunEvidence(status);
+  return outcome == "completed" || outcome == "succeeded";
+}
+
 inline std::string combineCalibrationSummary(
   const std::string & notes, const ::fabric::experience::PlanFeedbackCalibrationSummary & summary)
 {
@@ -471,8 +515,8 @@ inline void recordTerminalPlanFeedback(
   const PendingGeneratedPlan & pending,
   const SystemStatus & status)
 {
-  const bool terminal_success = status.capability_plan_state == 13;
-  const std::string terminal_outcome = terminal_success ? "completed" : "cancelled";
+  const bool terminal_success = terminalSuccessFromRunEvidence(status);
+  const std::string terminal_outcome = terminalOutcomeFromRunEvidence(status);
   const double runtime_seconds = computePlanRuntimeSeconds(status);
   const double energy_delta_percentage = computePlanEnergyDelta(status);
   const int warning_count = computePlanLogCount(status, 1);

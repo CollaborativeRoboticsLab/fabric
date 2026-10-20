@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 import builtins
+from types import SimpleNamespace
 
 import pytest
 
@@ -85,7 +86,7 @@ def test_live_score_client_missing_dependencies(monkeypatch):
     real_import = builtins.__import__
 
     def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name in {'rclpy', 'rclpy.node', 'experience_msgs.srv'}:
+        if name in {'rclpy', 'rclpy.node', 'fabric_msgs.srv'}:
             raise ModuleNotFoundError(name)
         return real_import(name, globals, locals, fromlist, level)
 
@@ -93,3 +94,40 @@ def test_live_score_client_missing_dependencies(monkeypatch):
 
     with pytest.raises(RuntimeError, match='live scoring unavailable'):
         LiveScorePlanClient()
+
+
+def test_live_score_client_uses_fabric_service(monkeypatch):
+    calls = []
+    response = object()
+
+    class FakeScorePlan:
+        class Request:
+            pass
+
+    class FakeNode:
+        def __init__(self, name):
+            self.name = name
+
+        def create_client(self, service_type, service_name):
+            calls.append((service_type, service_name))
+            return SimpleNamespace(
+                wait_for_service=lambda timeout_sec: True,
+                call_async=lambda request: SimpleNamespace(result=lambda: response),
+            )
+
+        def destroy_node(self):
+            pass
+
+    monkeypatch.setitem(sys.modules, 'rclpy', SimpleNamespace(
+        ok=lambda: True,
+        spin_until_future_complete=lambda *args, **kwargs: None,
+    ))
+    monkeypatch.setitem(sys.modules, 'rclpy.node', SimpleNamespace(Node=FakeNode))
+    monkeypatch.setitem(sys.modules, 'fabric_msgs.srv', SimpleNamespace(ScorePlan=FakeScorePlan))
+
+    client = LiveScorePlanClient()
+    try:
+        assert calls == [(FakeScorePlan, '/fabric/experience/score')]
+        assert client.request('pick object', '<Plan />') is response
+    finally:
+        client.close()

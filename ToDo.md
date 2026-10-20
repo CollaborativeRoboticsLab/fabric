@@ -11,12 +11,16 @@ Current code inspection already shows the main breakpoints:
 - `fabric_server/include/fabric_server/server.hpp` still owns the high-level Fabric and Experience runtime, plugin loading, plan generation, scoring, and feedback persistence, but several support-heavy slices have already been extracted into helper headers under `include/fabric_server/utils/`, and the integrated generation path has been narrowed behind smaller private helpers.
 - `fabric_server/launch/fabric.launch.py` is now the single Fabric-owned launch entry point; `experience_server.launch.py` and the external readiness shim have been removed, Supervisor is launched directly from Fabric launch, and Experience enablement now comes from merged `fabric.yaml` parameters.
 - Fabric runtime feedback now uses Fabric-owned `status_structs.hpp` `SystemStatus` snapshots; remaining work is focused on parity and ownership cleanup rather than Supervisor message replacement.
+- Fabric telemetry aggregation has been pulled out of `server.hpp` into `include/fabric_server/utils/telemetry.hpp`; execution-status merge, log/diagnostic correlation, and per-capability battery intervals now live behind a Fabric-owned helper.
+- Terminal feedback persistence now derives terminal outcome/success from Fabric capability run evidence, so failed, timed-out, and aborted runs are no longer collapsed into a generic cancelled outcome.
 - `capabilities2` already exposes the authoritative capability event stream and snapshot service (`/capabilities/get_event_snapshot`), so moving raw capability-run monitoring ownership toward `capabilities2` is viable.
 - `fabric_base/include/fabric_base/utils/status_structs.hpp` already provides a Fabric-owned status model close to the Supervisor aggregation shape, so the migration can port logic onto an existing Fabric type surface instead of inventing a new schema from scratch.
+- `fabric_experience_inspector` has unrelated in-progress changes migrating imports/dependencies from `experience_server`/`experience_msgs` to `fabric_server`/`fabric_msgs`; its live scoring endpoint has been aligned with the Fabric server's active `/fabric/experience/score` service.
 
 Validated current state:
 
 - `colcon build --packages-up-to fabric_server` and `colcon test --packages-select fabric_server` are passing again after the packaging repair, lint/test cleanup, and current `server.hpp` decomposition slices.
+- Latest focused validation after telemetry/helper extraction: `colcon build --packages-select fabric_server`, `colcon test --packages-select fabric_server`, and `colcon test-result --test-result-base build/fabric_server --verbose` pass with 82 tests, 0 failures, 13 skipped.
 - Score explanation, scoring epoch, plan feedback, feedback persistence, planning helpers, plan-status shaping, and the first integrated generation/selection helper slices have already been pulled out of the hottest parts of `server.hpp`.
 
 
@@ -87,6 +91,8 @@ Completed decomposition slices so far:
 - [x] Split integrated result-completion support into a private helper so `handleIntegratedPlanGeneration()` no longer assembles the ROS action result inline.
 - [x] Rename Fabric-owned integrated runtime setup/generation helpers away from legacy external Experience-server phrasing inside `server.hpp`.
 - [x] Narrow queue/completion shared-state access behind helper methods in `server.hpp` instead of open-coding plan-queue and completion mutations across callbacks and worker flows.
+- [x] Extract telemetry aggregation, execution-status merge, log/diagnostic correlation, and battery interval bookkeeping into `include/fabric_server/utils/telemetry.hpp`.
+- [x] Extract Fabric Experience runtime parameter-name and persisted-core helpers into `include/fabric_server/utils/experience_runtime.hpp`.
 
 ### Experience Runtime Isolation Inside Fabric
 
@@ -203,6 +209,7 @@ Initial Fabric monitoring destinations:
 	- terminal feedback persistence
 	- stop-safety guidance
 	- execution/log fault correlation
+- [x] Terminal feedback persistence now derives terminal outcome/success from Fabric-owned capability run evidence instead of collapsing all non-completed terminal states to cancelled.
 - [ ] Decide which of the current Supervisor helper code should move unchanged into Fabric utilities versus which should be redesigned around Fabric threads/plugins.
 
 Specific aggregation direction:
@@ -247,6 +254,7 @@ Goal: validate the integrated Fabric-owned stack after the structural refactor, 
 - [x] `colcon test --packages-select fabric_server`
 - [x] Clear remaining `flake8` and `uncrustify` package-test failures in `fabric_server`.
 - [x] Build any directly affected Fabric Experience plugin packages after interface or class-name changes.
+- [ ] Clear remaining `fabric_experience_inspector` package flake8 failures before using it as an integration gate; the live scoring endpoint is fixed, but `colcon test --packages-select fabric_experience_inspector` still fails style checks.
 - [ ] Run launch smoke tests for the unified Fabric launch/config flow.
 - [ ] Run a runtime smoke test with a real or replayed `/battery_state` publisher to verify Fabric battery telemetry and per-capability battery intervals after Supervisor removal.
 
@@ -256,6 +264,7 @@ Goal: validate the integrated Fabric-owned stack after the structural refactor, 
 - [ ] Validate the end-to-end explanation path from plan generation to node score explanation under Fabric-owned services.
 - [ ] Validate parameter/order plan checks still reject malformed plans after the runtime refactor.
 - [ ] Validate terminal feedback persistence still records enough evidence for RAPFS analysis after Supervisor removal.
+- [x] Reconcile `fabric_experience_inspector` live scoring migration with the active Fabric score service name (`/fabric/experience/score`).
 
 ### Policy/Analysis Validation After Integration Stabilizes
 

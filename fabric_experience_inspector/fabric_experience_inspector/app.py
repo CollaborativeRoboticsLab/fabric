@@ -11,9 +11,9 @@ from python_qt_binding import QtCore, QtWidgets
 
 from fabric_experience_inspector.audits import export_planner_prompt_audit_summary, export_retrieval_prompt_audit
 from fabric_experience_inspector.automation import run_focused_checks, run_offline_functional_workflow
-from experience_server.prompt_decision_support import build_prompt_decision_support_report
-from experience_server.terminal_success_analysis import build_report as build_terminal_success_analysis_report
-from experience_server.terminal_success_analysis import export_terminal_success_analysis
+from fabric_server.prompt_decision_support import build_prompt_decision_support_report
+from fabric_server.terminal_success_analysis import build_report as build_terminal_success_analysis_report
+from fabric_server.terminal_success_analysis import export_terminal_success_analysis
 from fabric_experience_inspector.storage import InspectorDatabase, TableSnapshot, format_cell, load_generated_plan_index, load_prompt_audit_snapshot
 from fabric_experience_inspector.graph_plot_3d import save_graph_plot
 from fabric_experience_inspector.plan_sandbox import build_plan_sandbox_graph, build_tuning_proposal, parse_optional_json
@@ -1016,7 +1016,8 @@ class InspectorWidget(QtWidgets.QWidget):
             QtWidgets.QMessageBox.critical(
                 self,
                 'Experience Inspector',
-                f'Live scoring failed: {exc}\n\nMake sure the workspace is sourced and the experience/plan/score service is running.',
+                f'Live scoring failed: {exc}\n\n'
+                'Make sure the workspace is sourced and the /fabric/experience/score service is running.',
             )
             return
         self.plan_score_edit.setPlainText(json.dumps(payload, indent=2, sort_keys=True))

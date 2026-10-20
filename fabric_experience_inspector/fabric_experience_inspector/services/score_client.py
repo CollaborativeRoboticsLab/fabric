@@ -8,10 +8,10 @@ class LiveScorePlanClient:
 		try:
 			import rclpy
 			from rclpy.node import Node
-			from experience_msgs.srv import ScorePlan
+			from fabric_msgs.srv import ScorePlan
 		except (ImportError, ModuleNotFoundError) as exc:
 			raise RuntimeError(
-				'live scoring unavailable: missing ROS score client dependencies (rclpy and experience_msgs)'
+				'live scoring unavailable: missing ROS score client dependencies (rclpy and fabric_msgs)'
 			) from exc
 
 		self._rclpy = rclpy
@@ -25,7 +25,7 @@ class LiveScorePlanClient:
 
 		self._node = _ScoreNode()
 		self._ScorePlan = ScorePlan
-		self._client = self._node.create_client(ScorePlan, 'experience/plan/score')
+		self._client = self._node.create_client(ScorePlan, '/fabric/experience/score')
 
 	def request(
 		self,
@@ -36,7 +36,7 @@ class LiveScorePlanClient:
 		candidate_node_id: str = '',
 	):
 		if not self._client.wait_for_service(timeout_sec=self._timeout_sec):
-			raise RuntimeError('service experience/plan/score not available')
+			raise RuntimeError('service /fabric/experience/score not available')
 		request = self._ScorePlan.Request()
 		request.task_description = task_description
 		request.plan_xml = plan_xml

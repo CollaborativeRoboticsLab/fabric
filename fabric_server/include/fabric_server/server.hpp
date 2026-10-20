@@ -52,11 +52,13 @@
 
 #include <fabric_server/capability_client.hpp>
 #include <fabric_server/bond_client.hpp>
+#include <fabric_server/utils/experience_runtime.hpp>
 #include <fabric_server/utils/feedback.hpp>
 #include <fabric_server/utils/planning.hpp>
 #include <fabric_server/utils/score_services.hpp>
 #include <fabric_server/utils/score_explanation_adapter.hpp>
 #include <fabric_server/utils/status.hpp>
+#include <fabric_server/utils/telemetry.hpp>
 
 #include <fabric_msgs/srv/submit_fabric_plan.hpp>
 #include <fabric_msgs/srv/cancel_fabric_plan.hpp>
@@ -440,6 +442,7 @@ protected:
       this->get_parameter("telemetry.retention_seconds").as_int();
     telemetry_retention_seconds_ = telemetry_retention_seconds >
       0 ? telemetry_retention_seconds : 300;
+    telemetry_aggregator_.configureRetentionSeconds(telemetry_retention_seconds_);
 
     this->declare_parameter<double>("telemetry.monitor_poll_frequency_hz", 2.0);
     monitor_poll_frequency_hz_ = this->get_parameter(
@@ -633,10 +636,12 @@ protected:
     RCLCPP_INFO(this->get_logger(), "[server] Loading knowledge core plugin: %s",
         core_plugin_name.c_str());
 
-    const bool should_attempt_persisted_load = !rebuild_experience_ && hasPersistedCoreDb();
+    const bool should_attempt_persisted_load = !rebuild_experience_ &&
+      fabric::server::experience_runtime::hasPersistedCoreDb(core_db_path_);
 
     if (rebuild_experience_) {
-      removePersistedCoreDbIfSupported();
+      fabric::server::experience_runtime::removePersistedCoreDbIfSupported(
+        this->get_logger(), core_plugin_name, core_db_path_);
     }
 
     core_plugin_ = core_loader_.createSharedInstance(core_plugin_name);
@@ -726,156 +731,34 @@ protected:
     }
   }
 
-  void rememberTelemetryRecord(TelemetryRecord record)
-  {
-    std::lock_guard<std::mutex> lock(telemetry_records_mutex_);
-    telemetry_records_.push_back(std::move(record));
-    pruneTelemetryRecordsLocked();
-  }
-
-  static uint8_t telemetryLabelForMonitoringStatus(const fabric::MonitoringStatus status)
-  {
-    switch (status) {
-      case fabric::MonitoringStatus::SUSPICIOUS:
-        return 1;
-      case fabric::MonitoringStatus::FAULTY:
-        return 2;
-      case fabric::MonitoringStatus::NORMAL:
-      default:
-        return 0;
-    }
-  }
-
-  void ingestMonitorStatuses(
-    const std::string & monitor_name,
-    const std::map<std::string, fabric::ComponentStatus> & statuses)
-  {
-    for (const auto & entry : statuses) {
-      const auto label = telemetryLabelForMonitoringStatus(entry.second.status);
-      if (label == 0 || entry.second.description.empty()) {
-        continue;
-      }
-
-      rememberTelemetryRecord(TelemetryRecord{
-          entry.second.timestamp,
-          entry.first,
-          monitor_name + ": " + entry.second.description,
-          label,
-      });
-    }
-  }
-
-  void enrichCapabilitySystemStatus(SystemStatus & status)
-  {
-    std::deque<TelemetryRecord> telemetry_records;
-    {
-      std::lock_guard<std::mutex> lock(telemetry_records_mutex_);
-      pruneTelemetryRecordsLocked();
-      telemetry_records = telemetry_records_;
-    }
-
-    BatteryState::SharedPtr battery_snapshot;
-    if (enable_battery_monitoring_) {
-      std::lock_guard<std::mutex> battery_lock(battery_mutex_);
-      battery_snapshot = last_battery_msg_;
-    }
-
-    const double battery_percentage = battery_snapshot ? battery_snapshot->percentage : -1.0;
-
-    const int64_t now_ns = this->now().nanoseconds();
-    for (auto & capability : status.capabilities) {
-      capability.related_nodes.clear();
-      capability.log_records.clear();
-      fabric::server::status::correlateTelemetryRecords(capability, telemetry_records, now_ns);
-      maybeUpdateCapabilityBatteryUsage(status.plan_id, capability, battery_percentage);
-    }
-  }
-
-  static std::string capabilityExecutionKey(
-    const std::string & plan_id,
-    const fabric::status::CapabilityStatus & capability)
-  {
-    return plan_id + "/" + capability.instance_id + "/" + capability.capability_name;
-  }
-
-  void maybeUpdateCapabilityBatteryUsage(
-    const std::string & plan_id,
-    fabric::status::CapabilityStatus & capability,
-    const double battery_percentage)
-  {
-    if (!enable_battery_monitoring_) {
-      capability.has_battery_usage = false;
-      return;
-    }
-
-    capability.has_battery_usage = true;
-    std::lock_guard<std::mutex> lock(capability_battery_mutex_);
-    auto & usage = capability_battery_usage_by_key_[capabilityExecutionKey(plan_id, capability)];
-    fabric::server::status::updateCapabilityBatteryUsage(usage, capability, battery_percentage);
-    capability.battery_usage = usage;
-  }
-
-  void cacheExecutionSystemStatuses(std::vector<SystemStatus> statuses)
-  {
-    std::lock_guard<std::mutex> lock(execution_status_mutex_);
-    for (auto & status : statuses) {
-      if (status.plan_id.empty()) {
-        continue;
-      }
-      execution_status_by_plan_[status.plan_id] = std::move(status);
-    }
-  }
-
-  void maybeMergeExecutionStatus(SystemStatus & status)
-  {
-    if (status.plan_id.empty()) {
-      return;
-    }
-
-    std::lock_guard<std::mutex> lock(execution_status_mutex_);
-    const auto it = execution_status_by_plan_.find(status.plan_id);
-    if (it == execution_status_by_plan_.end()) {
-      return;
-    }
-
-    fabric::server::status::mergeExecutionStatus(status, it->second);
-  }
-
-  void enqueueCapabilitySystemStatuses(std::vector<SystemStatus> statuses)
-  {
-    for (auto & status : statuses) {
-      enrichCapabilitySystemStatus(status);
-      maybeMergeExecutionStatus(status);
-      fabric::server::status::enqueueSystemStatus(
-        system_status_mutex_, system_status_cv_, system_status_records_, std::move(status));
-    }
-  }
-
   void ingestMonitorPayload(const std::string & monitor_name, const std::any & data)
   {
     try {
-      ingestMonitorStatuses(
+      telemetry_aggregator_.ingestMonitorStatuses(
         monitor_name,
-        std::any_cast<std::map<std::string, fabric::ComponentStatus>>(data));
+        std::any_cast<std::map<std::string, fabric::ComponentStatus>>(data),
+        this->now().nanoseconds());
       return;
     } catch (const std::bad_any_cast &) {
     }
 
     try {
-      auto statuses = std::any_cast<std::vector<SystemStatus>>(data);
-      std::vector<SystemStatus> capability_statuses;
-      capability_statuses.reserve(statuses.size());
-
-      for (auto & status : statuses) {
-        if (status.capabilities.empty()) {
-          cacheExecutionSystemStatuses(std::vector<SystemStatus>{std::move(status)});
-          continue;
-        }
-        capability_statuses.push_back(std::move(status));
+      BatteryState::SharedPtr battery_snapshot;
+      if (enable_battery_monitoring_) {
+        std::lock_guard<std::mutex> battery_lock(battery_mutex_);
+        battery_snapshot = last_battery_msg_;
       }
 
+      auto capability_statuses = telemetry_aggregator_.ingestSystemStatuses(
+        std::any_cast<std::vector<SystemStatus>>(data),
+        this->now().nanoseconds(),
+        enable_battery_monitoring_,
+        battery_snapshot ? battery_snapshot->percentage : -1.0);
       if (!capability_statuses.empty()) {
-        enqueueCapabilitySystemStatuses(std::move(capability_statuses));
+        for (auto & status : capability_statuses) {
+          fabric::server::status::enqueueSystemStatus(
+            system_status_mutex_, system_status_cv_, system_status_records_, std::move(status));
+        }
       }
       return;
     } catch (const std::bad_any_cast &) {
@@ -907,17 +790,6 @@ protected:
     }
   }
 
-  void pruneTelemetryRecordsLocked()
-  {
-    const int64_t cutoff = this->now().nanoseconds() -
-      static_cast<int64_t>(telemetry_retention_seconds_) * 1000000000LL;
-
-    while (!telemetry_records_.empty() &&
-      fabric::server::status::timeToNanoseconds(telemetry_records_.front().timestamp) < cutoff)
-    {
-      telemetry_records_.pop_front();
-    }
-  }
   void maybe_start_process_thread()
   {
     if (!capabilities_ready_.load() || shutting_down_.load()) {
@@ -1365,7 +1237,7 @@ protected:
         return;
       }
 
-      maybeMergeExecutionStatus(status);
+      telemetry_aggregator_.maybeMergeExecutionStatus(status);
       core_plugin_->update(status);
       const auto shutdown_safety = fabric::server::status::assessShutdownSafety(status);
       RCLCPP_INFO(this->get_logger(),
@@ -1534,34 +1406,6 @@ protected:
     publishPlanStatus(current_plan_);
   }
 
-  void eraseExecutionStatus(const std::string & plan_id)
-  {
-    if (plan_id.empty()) {
-      return;
-    }
-
-    std::lock_guard<std::mutex> lock(execution_status_mutex_);
-    execution_status_by_plan_.erase(plan_id);
-  }
-
-  void eraseCapabilityBatteryUsage(const std::string & plan_id)
-  {
-    if (plan_id.empty()) {
-      return;
-    }
-
-    std::lock_guard<std::mutex> lock(capability_battery_mutex_);
-    for (auto it = capability_battery_usage_by_key_.begin();
-      it != capability_battery_usage_by_key_.end(); )
-    {
-      if (it->first.rfind(plan_id + "/", 0) == 0) {
-        it = capability_battery_usage_by_key_.erase(it);
-      } else {
-        ++it;
-      }
-    }
-  }
-
   void publishPlanStatus(const fabric::plan::Plan & plan)
   {
     if (plan.plan_id.empty() || !fabric_status_pub_) {
@@ -1596,10 +1440,12 @@ protected:
       {"uncertainty", "fabric::UncertaintyPlugin"},
     };
 
-    this->declare_parameter<std::vector<std::string>>(experienceParameterName(
-        "RapfsScorerPlugin.estimator_names"), default_estimator_names);
+    this->declare_parameter<std::vector<std::string>>(
+      fabric::server::experience_runtime::parameterName(
+      "RapfsScorerPlugin.estimator_names"), default_estimator_names);
     std::vector<std::string> configured_estimator_names;
-    this->get_parameter(experienceParameterName("RapfsScorerPlugin.estimator_names"),
+    this->get_parameter(fabric::server::experience_runtime::parameterName(
+      "RapfsScorerPlugin.estimator_names"),
         configured_estimator_names);
 
     std::vector<std::string> configured_plugins;
@@ -1607,8 +1453,8 @@ protected:
       const auto default_type_it = default_estimator_types.find(estimator_name);
       const std::string default_type = default_type_it !=
         default_estimator_types.end() ? default_type_it->second : std::string();
-      const std::string type_key = experienceParameterName("RapfsScorerPlugin.estimators." +
-          estimator_name + ".type");
+      const std::string type_key = fabric::server::experience_runtime::parameterName(
+        "RapfsScorerPlugin.estimators." + estimator_name + ".type");
       this->declare_parameter<std::string>(type_key, default_type);
       const std::string plugin_type = this->get_parameter(type_key).as_string();
       if (!plugin_type.empty()) {
@@ -1616,9 +1462,11 @@ protected:
       }
     }
 
-    this->declare_parameter<std::vector<std::string>>(experienceParameterName("estimator_plugins"),
-        default_estimators);
-    this->get_parameter(experienceParameterName("estimator_plugins"), estimator_plugin_names_);
+    this->declare_parameter<std::vector<std::string>>(
+      fabric::server::experience_runtime::parameterName("estimator_plugins"),
+      default_estimators);
+    this->get_parameter(fabric::server::experience_runtime::parameterName("estimator_plugins"),
+      estimator_plugin_names_);
     if (!configured_plugins.empty()) {
       estimator_plugin_names_ = configured_plugins;
     }
@@ -1645,9 +1493,11 @@ protected:
    */
   void loadScorerPlugin()
   {
-    this->declare_parameter<std::string>(experienceParameterName("scorer_plugin"),
+    this->declare_parameter<std::string>(
+      fabric::server::experience_runtime::parameterName("scorer_plugin"),
         "fabric::RapfsScorerPlugin");
-    this->get_parameter(experienceParameterName("scorer_plugin"), scorer_plugin_name_);
+    this->get_parameter(fabric::server::experience_runtime::parameterName("scorer_plugin"),
+      scorer_plugin_name_);
 
     scorer_plugin_ = scorer_loader_.createSharedInstance(scorer_plugin_name_);
     scorer_plugin_->initialize(shared_from_this());
@@ -1664,12 +1514,14 @@ protected:
   void loadValidationPlugins()
   {
     this->declare_parameter<std::vector<std::string>>(
-        experienceValidationParameterName(),
+        fabric::server::experience_runtime::validationParameterName(use_experience_),
         use_experience_ ? std::vector<std::string>{"fabric::CompatibilityValidation",
         "fabric::DependencyValidation", "fabric::DataflowValidation"} :
                           std::vector<std::string>{"fabric::CompatibilityValidation",
         "fabric::ParameterValidation"});
-    this->get_parameter(experienceValidationParameterName(), validation_plugin_names_);
+    this->get_parameter(
+        fabric::server::experience_runtime::validationParameterName(use_experience_),
+        validation_plugin_names_);
 
     validation_plugins_.clear();
     for (const auto & plugin_name : validation_plugin_names_) {
@@ -1691,7 +1543,7 @@ protected:
   void loadPlanningRefinementConfig()
   {
     const std::string planner_parameter_namespace =
-      experiencePluginParameterNamespace(planner_plugin_name_);
+      fabric::server::experience_runtime::pluginParameterNamespace(planner_plugin_name_);
     const std::string max_attempts_key = planner_parameter_namespace + ".refinement.max_attempts";
     const std::string retry_on_penalty_key = planner_parameter_namespace +
       ".refinement.retry_on_penalty_findings";
@@ -1720,9 +1572,11 @@ protected:
    */
   void loadPlannerPlugin()
   {
-    this->declare_parameter<std::string>(experienceParameterName("planner_plugin"),
+    this->declare_parameter<std::string>(
+      fabric::server::experience_runtime::parameterName("planner_plugin"),
         "fabric::PlanningPlugin");
-    this->get_parameter(experienceParameterName("planner_plugin"), planner_plugin_name_);
+    this->get_parameter(fabric::server::experience_runtime::parameterName("planner_plugin"),
+      planner_plugin_name_);
 
     planner_plugin_ = planner_loader_.createSharedInstance(planner_plugin_name_);
     planner_plugin_->initialize(shared_from_this());
@@ -1737,9 +1591,11 @@ protected:
    */
   void loadBehaviourInterfacePlugin()
   {
-    this->declare_parameter<std::string>(experienceParameterName("behaviour_interface_plugin"),
-        "experience::FabricPlugin");
-    this->get_parameter(experienceParameterName("behaviour_interface_plugin"),
+    this->declare_parameter<std::string>(
+      fabric::server::experience_runtime::parameterName("behaviour_interface_plugin"),
+      "experience::FabricPlugin");
+    this->get_parameter(fabric::server::experience_runtime::parameterName(
+      "behaviour_interface_plugin"),
         behaviour_interface_plugin_name_);
 
     behaviour_plugin_ = behaviour_loader_.createSharedInstance(behaviour_interface_plugin_name_);
@@ -1777,66 +1633,6 @@ protected:
     metadata_plugin_->wait_until_ready();
     metadata_plugin_->collect(capabilities_);
     RCLCPP_INFO(this->get_logger(), "Received runnable capability metadata from metadata plugin.");
-  }
-
-  bool hasPersistedCoreDb() const
-  {
-    return std::filesystem::exists(core_db_path_);
-  }
-
-  void removePersistedCoreDbIfSupported()
-  {
-    if (!isCoreGraphRagPlugin(core_plugin_name)) {
-      RCLCPP_WARN(this->get_logger(),
-          "rebuild=true does not know how to clear persisted state for core plugin: %s",
-          core_plugin_name.c_str());
-      return;
-    }
-
-    if (!hasPersistedCoreDb()) {
-      return;
-    }
-
-    std::error_code error_code;
-    if (!std::filesystem::remove(core_db_path_, error_code) && error_code) {
-      throw std::runtime_error("Failed to delete persisted core database: " +
-          core_db_path_.string() + " " + error_code.message());
-    }
-
-    RCLCPP_INFO(this->get_logger(), "Removed persisted core database: %s", core_db_path_.c_str());
-  }
-
-  static bool isCoreGraphRagPlugin(const std::string & plugin_name)
-  {
-    return plugin_name == "experience::CoreGraphRag" ||
-           plugin_name == "experience::GraphKnowledgeCore" ||
-           plugin_name == "fabric::CoreGraphRag" || plugin_name == "fabric::GraphKnowledgeCore";
-  }
-
-  static std::string experienceParameterName(const std::string & suffix)
-  {
-    return "experience." + suffix;
-  }
-
-  static std::string unqualifiedPluginName(const std::string & plugin_name)
-  {
-    const std::size_t separator = plugin_name.rfind("::");
-    if (separator == std::string::npos) {
-      return plugin_name;
-    }
-
-    return plugin_name.substr(separator + 2);
-  }
-
-  static std::string experiencePluginParameterNamespace(const std::string & plugin_name)
-  {
-    return experienceParameterName(unqualifiedPluginName(plugin_name));
-  }
-
-  std::string experienceValidationParameterName() const
-  {
-    return use_experience_ ? experienceParameterName("validation_plugins") :
-           std::string("validation_plugins");
   }
 
   bool shouldRefinePlanningResult(const PlanningResult & planning_result) const
@@ -2093,8 +1889,8 @@ protected:
     }
 
     fabric::server::feedback::recordTerminalPlanFeedback(*core_plugin_, pending, status);
-    eraseExecutionStatus(status.plan_id);
-    eraseCapabilityBatteryUsage(status.plan_id);
+    telemetry_aggregator_.eraseExecutionStatus(status.plan_id);
+    telemetry_aggregator_.eraseCapabilityBatteryUsage(status.plan_id);
   }
 
   void batteryCallback(const BatteryState::SharedPtr msg)
@@ -2123,12 +1919,12 @@ protected:
       return;
     }
 
-    rememberTelemetryRecord(TelemetryRecord{
+    telemetry_aggregator_.rememberTelemetryRecord(TelemetryRecord{
         fabric::status::Time{msg->header.stamp.sec, msg->header.stamp.nanosec},
         "battery",
         description,
         label,
-    });
+    }, this->now().nanoseconds());
   }
 
   /**
@@ -2344,8 +2140,6 @@ protected:
   std::mutex planning_state_mutex_;
   std::vector<PendingGeneratedPlan> pending_generated_plans_;
   std::unordered_set<std::string> finalized_plan_feedback_;
-  std::mutex execution_status_mutex_;
-  std::unordered_map<std::string, SystemStatus> execution_status_by_plan_;
   std::mutex user_feedback_file_mutex_;
   std::filesystem::path core_db_path_{"core_graphrag.sqlite3"};
   int planning_refinement_max_attempts_{0};
@@ -2359,12 +2153,9 @@ protected:
   std::string battery_topic_;
   double monitor_poll_frequency_hz_{2.0};
   int telemetry_retention_seconds_{300};
-  std::mutex telemetry_records_mutex_;
-  std::deque<TelemetryRecord> telemetry_records_;
+  fabric::server::telemetry::Aggregator telemetry_aggregator_;
   std::mutex battery_mutex_;
   BatteryState::SharedPtr last_battery_msg_;
-  std::mutex capability_battery_mutex_;
-  std::unordered_map<std::string, fabric::status::BatteryUsage> capability_battery_usage_by_key_;
 
   /** Fabric-owned runtime telemetry publication and internal feedback queue. */
   rclcpp::Publisher<fabric_msgs::msg::FabricStatus>::SharedPtr fabric_status_pub_;

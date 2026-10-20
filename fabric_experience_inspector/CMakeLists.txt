@@ -50,6 +50,10 @@ if(BUILD_TESTING)
     test/test_score_client.py
   )
 
+  ament_add_pytest_test(test_automation
+    test/test_automation.py
+  )
+
   ament_add_pytest_test(test_plan_sandbox_helpers
     test/test_plan_sandbox_helpers.py
   )

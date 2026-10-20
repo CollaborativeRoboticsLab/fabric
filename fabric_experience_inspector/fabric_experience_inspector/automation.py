@@ -7,29 +7,29 @@ from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
 from fabric_experience_inspector.audits import export_planner_prompt_audit_summary, export_retrieval_prompt_audit
-from experience_server.prompt_decision_support import export_prompt_decision_support
-from experience_server.reasoning_outcomes import export_reasoning_outcomes
-from experience_server.score_explanation_verifier import verify_plan_score_explanation
-from experience_server.terminal_success_analysis import export_terminal_success_analysis
+from fabric_server.prompt_decision_support import export_prompt_decision_support
+from fabric_server.reasoning_outcomes import export_reasoning_outcomes
+from fabric_server.score_explanation_verifier import verify_plan_score_explanation
+from fabric_server.terminal_success_analysis import export_terminal_success_analysis
 
 
 DEFAULT_PACKAGES_UP_TO = [
-    'experience_validator',
-    'experience_estimator',
-    'experience_scorer_rapfs',
-    'experience_server',
+    'fabric_experience_validator',
+    'fabric_experience_estimator',
+    'fabric_experience_scorer_rapfs',
+    'fabric_server',
 ]
 
 DEFAULT_CHECK_TARGETS = [
-    ('experience_validator', 'test_validation_plugins'),
-    ('experience_estimator', 'test_estimator_plugins'),
-    ('experience_scorer_rapfs', 'test_rapfs_scorer_plugin'),
-    ('experience_server', 'test_export_retrieval_prompt_audit'),
-    ('experience_server', 'test_export_prompt_decision_support'),
-    ('experience_server', 'test_summarize_planner_prompt_audit'),
-    ('experience_server', 'test_export_reasoning_outcomes'),
-    ('experience_server', 'test_export_terminal_success_analysis'),
-    ('experience_server', 'test_verify_plan_score_explanation'),
+    ('fabric_experience_validator', 'test_validation_plugins'),
+    ('fabric_experience_estimator', 'test_estimator_plugins'),
+    ('fabric_experience_scorer_rapfs', 'test_rapfs_scorer_plugin'),
+    ('fabric_server', 'test_export_retrieval_prompt_audit'),
+    ('fabric_server', 'test_export_prompt_decision_support'),
+    ('fabric_server', 'test_summarize_planner_prompt_audit'),
+    ('fabric_server', 'test_export_reasoning_outcomes'),
+    ('fabric_server', 'test_export_terminal_success_analysis'),
+    ('fabric_server', 'test_verify_plan_score_explanation'),
 ]
 
 

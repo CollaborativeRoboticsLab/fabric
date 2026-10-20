@@ -641,7 +641,7 @@ def test_plan_sandbox_live_scoring_failure_preserves_offline_state(monkeypatch):
         return QtWidgets.QMessageBox.Ok
 
     def fail_score(*_args, **_kwargs):
-        raise RuntimeError('live scoring unavailable: missing ROS score client dependencies (rclpy and experience_msgs)')
+        raise RuntimeError('live scoring unavailable: missing ROS score client dependencies (rclpy and fabric_msgs)')
 
     monkeypatch.setattr(QtWidgets.QMessageBox, 'critical', staticmethod(fake_critical))
     widget._score_plan_live = fail_score

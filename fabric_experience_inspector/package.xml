@@ -18,8 +18,8 @@
   <exec_depend>qt_gui</exec_depend>
   <exec_depend>rqt_gui</exec_depend>
   <exec_depend>rqt_gui_py</exec_depend>
-  <exec_depend>experience_msgs</exec_depend>
-  <exec_depend>experience_server</exec_depend>
+  <exec_depend>fabric_msgs</exec_depend>
+  <exec_depend>fabric_server</exec_depend>
 
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>ament_lint_auto</test_depend>
