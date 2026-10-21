@@ -2,14 +2,13 @@
 
 #include <algorithm>
 #include <cctype>
+#include <fabric_base/validation_base.hpp>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
-#include <fabric_base/validation_base.hpp>
 
 namespace fabric
 {
@@ -19,7 +18,6 @@ using PlanningRequest = ::fabric::planning::Request;
 using BehaviourInfo = ::fabric::capability::Descriptor;
 using CandidatePlan = ::fabric::planning::CandidatePlan;
 using CandidatePlanNode = ::fabric::planning::CandidatePlanNode;
-using Parameter = ::fabric::capability::ParameterInfo;
 
 /**
  * @brief Validate required runtime inputs against upstream outputs and declared fallback paths.
@@ -115,8 +113,8 @@ private:
 
       ++required_inputs;
       const auto satisfiable_from = effectiveSatisfiableSources(input);
-      const ParameterMatch upstream_match = bestUpstreamMatch(input, capability_by_node, node_order,
-                                                             node.candidate_node_id, incoming_sources);
+      const ParameterMatch upstream_match =
+          bestUpstreamMatch(input, capability_by_node, node_order, node.candidate_node_id, incoming_sources);
 
       if (upstream_match.matched && !upstream_match.source_order_valid)
       {
@@ -147,7 +145,7 @@ private:
 
       if (allowsSource(satisfiable_from, "configuration"))
       {
-        const Parameter* config_parameter = supportingConfigurationParameter(input, capability);
+        const capability::ParameterInfo* config_parameter = supportingConfigurationParameter(input, capability);
         if (config_parameter != nullptr)
         {
           std::ostringstream message;
@@ -178,15 +176,16 @@ private:
       }
 
       std::ostringstream message;
-      message << "required runtime input '" << input.name << "' has no allowed upstream, configuration, external, or default source";
+      message << "required runtime input '" << input.name
+              << "' has no allowed upstream, configuration, external, or default source";
       addReject(candidate, message.str(), node.candidate_node_id, input.name);
       return;
     }
 
     if (required_inputs > 0 && structurally_satisfied < required_inputs)
     {
-      const double missing_ratio = static_cast<double>(required_inputs - structurally_satisfied) /
-                                   static_cast<double>(required_inputs);
+      const double missing_ratio =
+          static_cast<double>(required_inputs - structurally_satisfied) / static_cast<double>(required_inputs);
       if (missing_ratio > 0.0)
       {
         std::ostringstream message;
@@ -199,7 +198,7 @@ private:
     (void)node_by_id;
   }
 
-  ParameterMatch bestUpstreamMatch(const Parameter& input,
+  ParameterMatch bestUpstreamMatch(const capability::ParameterInfo& input,
                                    const std::unordered_map<std::string, const BehaviourInfo*>& capability_by_node,
                                    const std::unordered_map<std::string, size_t>& node_order,
                                    const std::string& target_node_id,
@@ -242,7 +241,7 @@ private:
     return best_match;
   }
 
-  static std::vector<std::string> effectiveSatisfiableSources(const Parameter& parameter)
+  static std::vector<std::string> effectiveSatisfiableSources(const capability::ParameterInfo& parameter)
   {
     if (!parameter.satisfiable_from.empty())
       return parameter.satisfiable_from;
@@ -261,8 +260,7 @@ private:
   }
 
   static const BehaviourInfo* findCapability(const std::vector<BehaviourInfo>& capabilities,
-                                             const std::string& interface_name,
-                                             const std::string& provider_name)
+                                             const std::string& interface_name, const std::string& provider_name)
   {
     for (const auto& capability : capabilities)
     {
@@ -272,7 +270,8 @@ private:
     return nullptr;
   }
 
-  static const Parameter* supportingConfigurationParameter(const Parameter& input, const BehaviourInfo& capability)
+  static const capability::ParameterInfo* supportingConfigurationParameter(const capability::ParameterInfo& input,
+                                                                          const BehaviourInfo& capability)
   {
     if (!input.fallback_parameter.empty())
     {
@@ -292,16 +291,17 @@ private:
     return nullptr;
   }
 
-  static bool hasDefaultSupport(const Parameter& input, const BehaviourInfo& capability)
+  static bool hasDefaultSupport(const capability::ParameterInfo& input, const BehaviourInfo& capability)
   {
     if (input.has_default)
       return true;
 
-    const Parameter* config_parameter = supportingConfigurationParameter(input, capability);
+    const capability::ParameterInfo* config_parameter = supportingConfigurationParameter(input, capability);
     return config_parameter != nullptr && config_parameter->has_default;
   }
 
-  static std::pair<std::string, double> parameterIdentityScore(const Parameter& left, const Parameter& right)
+  static std::pair<std::string, double> parameterIdentityScore(const capability::ParameterInfo& left,
+                                                             const capability::ParameterInfo& right)
   {
     const std::string left_semantic = lower(left.semantic_key);
     const std::string right_semantic = lower(right.semantic_key);
