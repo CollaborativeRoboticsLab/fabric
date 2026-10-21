@@ -843,8 +843,10 @@ protected:
       parse_parameter_list(definition["configuration_parameters"]);
 
     const YAML::Node runtime_parameters = definition["runtime_parameters"];
-    provider_info.runtime_input_parameters = parse_parameter_list(runtime_parameters["input"]);
-    provider_info.runtime_output_parameters = parse_parameter_list(runtime_parameters["output"]);
+    if (runtime_parameters && runtime_parameters.IsMap()) {
+      provider_info.runtime_input_parameters = parse_parameter_list(runtime_parameters["input"]);
+      provider_info.runtime_output_parameters = parse_parameter_list(runtime_parameters["output"]);
+    }
     return provider_info;
   }
 
@@ -861,16 +863,21 @@ protected:
     descriptor.provider_name = yaml_string_or_empty(provider, "name");
     descriptor.provider_description = yaml_string_or_empty(provider, "description");
 
+    descriptor.relations = parse_relation_list(root["relations"]);
     const YAML::Node definition = root["definition"];
+    if (!definition || !definition.IsMap()) {
+      return descriptor;
+    }
+
     descriptor.command = yaml_string_or_empty(definition, "command");
     descriptor.configuration_parameters =
       parse_parameter_list(definition["configuration_parameters"]);
 
     const YAML::Node runtime_parameters = definition["runtime_parameters"];
-    descriptor.runtime_input_parameters = parse_parameter_list(runtime_parameters["input"]);
-    descriptor.runtime_output_parameters = parse_parameter_list(runtime_parameters["output"]);
-
-    descriptor.relations = parse_relation_list(root["relations"]);
+    if (runtime_parameters && runtime_parameters.IsMap()) {
+      descriptor.runtime_input_parameters = parse_parameter_list(runtime_parameters["input"]);
+      descriptor.runtime_output_parameters = parse_parameter_list(runtime_parameters["output"]);
+    }
     return descriptor;
   }
 

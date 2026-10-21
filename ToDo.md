@@ -12,7 +12,8 @@ Last recorded validation: 2026-10-21, ROS Jazzy, default workspace `build/`, `in
 - Both component integration cases pass: initialization followed by explicit unload, and container shutdown with Fabric still loaded. Two live launch-proxy tests pass for main/child process measurements and concurrent launches.
 - The isolated standard-config smoke passes fresh-core creation, plugin loading, readiness, status publication, bond formation, and clean standalone SIGINT shutdown of both Fabric and capabilities2.
 - Smoke limits: isolated HOME/working directory, empty registry, harmless startup-plan override, local model-service stubs instead of prompt_bridge. Missing scan paths and invalid empty-plan runner requests mean this is not a normal capability-execution test. No paid inference or real robot capabilities were exercised.
-- A completion-only plan with the installed capability registry is blocked before readiness: runnable-metadata conversion raises `invalid node; first invalid key: "definition"`. Three interfaces/runnable capabilities load, but the plan never executes; shutdown remains clean.
+- Optional runnable metadata is now guarded in both descriptor and provider-details conversion. Regression tests pass for absent/null/empty definitions and runtime parameters; Fabric rebuilds into the default install.
+- The completion-only smoke now parses all 27 installed runnable descriptors without the missing-`definition` error. Startup subsequently stops during knowledge-core construction with `Tokenize service reported failure` from the empty local model stub; the plan still does not execute, and shutdown remains clean.
 - Workspace executable-source and manifest scans found no active legacy Supervisor/Experience consumers. Documentation still contains old names/examples; consumers outside this workspace have not been audited.
 - Full runtime decomposition, terminal-feedback parity, live battery/resource attribution, and model/hardware workflows remain open. Retirement is not complete.
 
@@ -95,7 +96,8 @@ Ownership rules: capabilities2 owns capability facts and event history. Fabric m
 - [x] Fix the three Fabric uncrustify divergences and pass the full package test suite, including opt-in component integration.
 - [ ] Clear `fabric_experience_inspector` flake8 failures before treating it as an integration gate.
 - [x] Validate initialized component unload and active-component container shutdown with standard configs and local model stubs.
-- [ ] Fix runnable-metadata handling of the missing YAML `definition` key, then rerun the completion-only plan through normal dispatch.
+- [x] Fix runnable-metadata handling of missing/null/empty YAML definitions and runtime parameters, with descriptor/provider regression coverage.
+- [ ] Supply successful local model-stub responses for knowledge-core initialization, then rerun the completion-only plan through normal dispatch.
 
 ### Runtime Gates
 
@@ -118,7 +120,7 @@ Ownership rules: capabilities2 owns capability facts and event history. Fabric m
 
 ## Next Steps
 
-1. Fix the missing-`definition` metadata failure and get the completion-only plan to execute with the standard configs.
+1. Resolve the local model-stub initialization failure and get the completion-only plan to execute with the standard configs; the missing-`definition` metadata failure is fixed.
 2. Finish Experience service/generation isolation while preserving dispatch behavior.
 3. Validate end-to-end feedback and battery telemetry; establish reliable launch-to-execution identity before claiming resource attribution.
 4. Audit deployed consumers, refresh legacy documentation examples, and complete Supervisor parity gates.

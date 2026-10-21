@@ -112,3 +112,55 @@ TEST_F(CapabilityMetadataTest, ReportsMalformedResponseOnTheCallingThread)
   EXPECT_THROW(client_.getRunnableSpecs(capabilities), fabric::fabric_exception);
   EXPECT_TRUE(capabilities.empty());
 }
+
+TEST_F(CapabilityMetadataTest, AcceptsMissingNullAndEmptyDefinitionMetadata)
+{
+  const std::vector<std::string> definitions{
+    "",
+    "definition: null\n",
+    "definition: {}\n",
+    "definition: {command: echo}\n",
+    "definition: {runtime_parameters: null}\n",
+    "definition: {runtime_parameters: {}}\n",
+  };
+  capabilities2_msgs::srv::GetRunnableSpecs::Response response;
+  for (size_t index = 0; index < definitions.size(); ++index) {
+    response.index_of_specs.push_back("demo/Provider" + std::to_string(index));
+    capabilities2_msgs::msg::RunnableSpec spec;
+    spec.spec =
+      "interface: {name: demo/Move, description: Move to a target}\n"
+      "provider: {name: demo/Provider, description: Target provider}\n"
+      "relations: [{subject: demo/Move, predicate: depends_on, object: demo/Localization}]\n" +
+      definitions[index];
+    response.runnable_specs.push_back(spec);
+  }
+  serve(response);
+
+  std::vector<fabric::capability::Descriptor> capabilities;
+  ASSERT_NO_THROW(client_.getRunnableSpecs(capabilities));
+  ASSERT_EQ(capabilities.size(), definitions.size());
+  for (size_t index = 0; index < capabilities.size(); ++index) {
+    SCOPED_TRACE(definitions[index]);
+    const auto & descriptor = capabilities[index];
+    EXPECT_EQ(descriptor.interface_name, "demo/Move");
+    EXPECT_EQ(descriptor.provider_name, "demo/Provider");
+    EXPECT_EQ(descriptor.interface_description, "Move to a target");
+    EXPECT_EQ(descriptor.provider_description, "Target provider");
+    EXPECT_EQ(descriptor.command, index == 3 ? "echo" : "");
+    EXPECT_TRUE(descriptor.configuration_parameters.empty());
+    EXPECT_TRUE(descriptor.runtime_input_parameters.empty());
+    EXPECT_TRUE(descriptor.runtime_output_parameters.empty());
+    ASSERT_EQ(descriptor.relations.size(), 1u);
+    EXPECT_EQ(descriptor.relations.front().object, "demo/Localization");
+  }
+
+  std::vector<fabric::capability::Info> provider_capabilities(1);
+  provider_capabilities.front().provider = "demo/Provider";
+  ASSERT_NO_THROW(client_.getRunnableSpecs(provider_capabilities));
+  ASSERT_EQ(provider_capabilities.front().provider_details.size(), 1u);
+  const auto & provider = provider_capabilities.front().provider_details.front();
+  EXPECT_EQ(provider.provider, "demo/Provider");
+  EXPECT_TRUE(provider.configuration_parameters.empty());
+  EXPECT_TRUE(provider.runtime_input_parameters.empty());
+  EXPECT_TRUE(provider.runtime_output_parameters.empty());
+}
