@@ -884,7 +884,8 @@ protected:
     (void)uuid;
 
     if (!startup_complete_.load()) {
-      RCLCPP_WARN(this->get_logger(), "[server] Rejecting generation request before startup completes");
+      RCLCPP_WARN(this->get_logger(),
+          "[server] Rejecting generation request before startup completes");
       return rclcpp_action::GoalResponse::REJECT;
     }
 
@@ -1867,44 +1868,13 @@ protected:
    */
   void persistTerminalPlanFeedback(const SystemStatus & status)
   {
-    if (!fabric::server::feedback::isTerminalPlanState(status.capability_plan_state) ||
-      status.plan_id.empty() ||
-      status.planning_request_id.empty() || status.candidate_plan_id.empty() ||
-      status.graph_hash.empty())
+    if (fabric::server::feedback::finalizeTerminalPlanFeedback(
+        *core_plugin_, planning_state_mutex_, pending_generated_plans_, finalized_plan_feedback_,
+        status))
     {
-      return;
+      telemetry_aggregator_.eraseExecutionStatus(status.plan_id);
+      telemetry_aggregator_.eraseCapabilityBatteryUsage(status.plan_id);
     }
-
-    PendingGeneratedPlan pending;
-    {
-      std::lock_guard<std::mutex> lock(planning_state_mutex_);
-      if (finalized_plan_feedback_.count(status.plan_id) > 0) {
-        return;
-      }
-
-      auto pending_it = pending_generated_plans_.end();
-      for (auto it = pending_generated_plans_.begin(); it != pending_generated_plans_.end(); ++it) {
-        if (it->planning_request_id == status.planning_request_id &&
-          it->candidate_plan_id == status.candidate_plan_id &&
-          it->graph_hash == status.graph_hash)
-        {
-          pending_it = it;
-          break;
-        }
-      }
-
-      if (pending_it == pending_generated_plans_.end()) {
-        return;
-      }
-
-      pending = *pending_it;
-      finalized_plan_feedback_.insert(status.plan_id);
-      pending_generated_plans_.erase(pending_it);
-    }
-
-    fabric::server::feedback::recordTerminalPlanFeedback(*core_plugin_, pending, status);
-    telemetry_aggregator_.eraseExecutionStatus(status.plan_id);
-    telemetry_aggregator_.eraseCapabilityBatteryUsage(status.plan_id);
   }
 
   void batteryCallback(const BatteryState::SharedPtr msg)
@@ -1956,27 +1926,11 @@ protected:
       return;
     }
 
-    if (const auto error =
-      fabric::server::score_services::validateRecordPlanFeedbackRequest(*request);
-      error.has_value())
-    {
-      response->stored = false;
-      response->found_existing = false;
-      response->message = error.value();
-      return;
-    }
-
-    const auto query = fabric::server::score_services::buildPlanFeedbackQuery(*request);
-    const auto existing = core_plugin_->readSelectedPlanScoreExplanationBundle(query);
-
     const auto stamp = this->now();
-    const auto feedback = fabric::server::score_services::buildPlanFeedbackRecord(existing,
-        *request, static_cast<int32_t>(stamp.seconds()),
-                                                                                  static_cast<
-          uint32_t>(stamp.nanoseconds() % 1000000000ULL));
-
-    fabric::server::score_services::populateRecordPlanFeedbackResponse(existing.has_value(),
-        core_plugin_->recordPlanFeedback(feedback), *response);
+    fabric::server::score_services::recordPlanFeedback(
+      *core_plugin_, *request, *response,
+      static_cast<int32_t>(stamp.seconds()),
+      static_cast<uint32_t>(stamp.nanoseconds() % 1000000000ULL));
   }
 
   /** Vector of plans */

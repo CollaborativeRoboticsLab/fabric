@@ -510,8 +510,9 @@ inline void recordSelectedCandidateArtifacts(
   }
 }
 
-inline void recordTerminalPlanFeedback(
-  ::fabric::CoreBase & core_plugin,
+template<typename CorePluginT>
+inline bool recordTerminalPlanFeedback(
+  CorePluginT & core_plugin,
   const PendingGeneratedPlan & pending,
   const SystemStatus & status)
 {
@@ -522,7 +523,7 @@ inline void recordTerminalPlanFeedback(
   const int warning_count = computePlanLogCount(status, 1);
   const int error_count = computePlanLogCount(status, 2);
 
-  core_plugin.recordPlanFeedback(PlanFeedbackRecord{
+  if (!core_plugin.recordPlanFeedback(PlanFeedbackRecord{
       pending.planning_request_id,
       pending.candidate_plan_id,
       pending.graph_hash,
@@ -553,10 +554,13 @@ inline void recordTerminalPlanFeedback(
       status.header.stamp.sec,
       status.header.stamp.nanosec,
       "terminal feedback inferred from Fabric SystemStatus",
-  });
+  }))
+  {
+    return false;
+  }
 
   for (const auto & node : pending.candidate.nodes) {
-    core_plugin.recordCandidatePlanSkillAttribution(CandidatePlanSkillAttribution{
+    if (!core_plugin.recordCandidatePlanSkillAttribution(CandidatePlanSkillAttribution{
         pending.planning_request_id,
         pending.candidate_plan_id,
         pending.graph_hash,
@@ -578,11 +582,14 @@ inline void recordTerminalPlanFeedback(
         status.header.stamp.sec,
         status.header.stamp.nanosec,
         "terminal node attribution update",
-    });
+    }))
+    {
+      return false;
+    }
   }
 
   for (const auto & edge : pending.candidate.edges) {
-    core_plugin.recordCandidatePlanEdgeAttribution(CandidatePlanEdgeAttribution{
+    if (!core_plugin.recordCandidatePlanEdgeAttribution(CandidatePlanEdgeAttribution{
         pending.planning_request_id,
         pending.candidate_plan_id,
         pending.graph_hash,
@@ -597,8 +604,47 @@ inline void recordTerminalPlanFeedback(
         status.header.stamp.sec,
         status.header.stamp.nanosec,
         "terminal edge attribution update",
-    });
+    }))
+    {
+      return false;
+    }
   }
+  return true;
+}
+
+template<typename CorePluginT>
+inline bool finalizeTerminalPlanFeedback(
+  CorePluginT & core_plugin,
+  std::mutex & state_mutex,
+  std::vector<PendingGeneratedPlan> & pending_plans,
+  std::unordered_set<std::string> & finalized_plans,
+  const SystemStatus & status)
+{
+  if (!isTerminalPlanState(status.capability_plan_state) || status.plan_id.empty() ||
+    status.planning_request_id.empty() || status.candidate_plan_id.empty() ||
+    status.graph_hash.empty())
+  {
+    return false;
+  }
+
+  std::lock_guard<std::mutex> lock(state_mutex);
+  if (finalized_plans.count(status.plan_id) > 0) {
+    return false;
+  }
+  const auto pending = std::find_if(pending_plans.begin(), pending_plans.end(),
+      [&status](const PendingGeneratedPlan & plan) {
+        return plan.planning_request_id == status.planning_request_id &&
+               plan.candidate_plan_id == status.candidate_plan_id &&
+               plan.graph_hash == status.graph_hash;
+      });
+  if (pending == pending_plans.end() || !recordTerminalPlanFeedback(core_plugin, *pending,
+      status))
+  {
+    return false;
+  }
+  finalized_plans.insert(status.plan_id);
+  pending_plans.erase(pending);
+  return true;
 }
 
 struct UserFeedbackHooks

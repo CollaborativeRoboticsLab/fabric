@@ -1,315 +1,125 @@
 # TO-DO
 
-## Current Integration Findings
+Goal: consolidate Experience and monitoring into Fabric, then retire Supervisor only after telemetry and feedback parity is proven.
 
-Goal: finish folding the Experience runtime into Fabric without keeping brittle Fabric/Supervisor/Experience synchronization boundaries.
+## Validation Snapshot
 
-Current code inspection already shows the main breakpoints:
+Last recorded validation: 2026-10-21, ROS Jazzy, default workspace `build/`, `install/`, and `log/`.
 
-- `fabric_server/CMakeLists.txt` has been rewritten into one coherent package definition and `fabric_server` now compiles/tests again; remaining package work is now narrower dependency auditing rather than foundation repair.
-- The copied Experience Python package and scripts have already been migrated substantially toward Fabric-owned imports and `/fabric/experience/...` endpoints; direct smoke/wrapper pytest coverage and flake8 pass. The current uncrustify gate still fails in the three files recorded below.
-- `fabric_server/include/fabric_server/server.hpp` still owns the high-level Fabric and Experience runtime, plugin loading, plan generation, scoring, and feedback persistence, but several support-heavy slices have already been extracted into helper headers under `include/fabric_server/utils/`, and the integrated generation path has been narrowed behind smaller private helpers.
-- `fabric_server/launch/fabric.launch.py` is now the single Fabric-owned launch entry point; `experience_server.launch.py` and the external readiness shim have been removed, Supervisor is no longer launched, and Experience enablement comes from merged `fabric.yaml` parameters.
-- Fabric runtime feedback now uses Fabric-owned `status_structs.hpp` `SystemStatus` snapshots; remaining work is focused on parity and ownership cleanup rather than Supervisor message replacement.
-- Fabric telemetry aggregation has been pulled out of `server.hpp` into `include/fabric_server/utils/telemetry.hpp`; execution-status merge, log/diagnostic correlation, and per-capability battery intervals now live behind a Fabric-owned helper.
-- Terminal feedback persistence now derives terminal outcome/success from Fabric capability run evidence, so failed, timed-out, and aborted runs are no longer collapsed into a generic cancelled outcome.
-- `capabilities2` already exposes the authoritative capability event stream and snapshot service (`/capabilities/get_event_snapshot`), so moving raw capability-run monitoring ownership toward `capabilities2` is viable.
-- `fabric_base/include/fabric_base/utils/status_structs.hpp` already provides a Fabric-owned status model close to the Supervisor aggregation shape, so the migration can port logic onto an existing Fabric type surface instead of inventing a new schema from scratch.
-- `fabric_experience_inspector` has unrelated in-progress changes migrating imports/dependencies from `experience_server`/`experience_msgs` to `fabric_server`/`fabric_msgs`; its live scoring endpoint has been aligned with the Fabric server's active `/fabric/experience/score` service.
+- The original 20 selected runtime packages build without legacy Experience/Supervisor roots. The additionally approved `fabric_capabilities` completion-runner package also builds into the default install.
+- The full Fabric package gate passes, including formatting and opt-in component integration: 110 aggregate records, 0 errors, 0 failures, 16 skipped. Earlier validator and monitor suites passed 19 and four behavioral cases respectively.
+- Feedback regression tests cover score-field preservation, invalid requests, retry after a failed terminal write, duplicate-terminal suppression, and completed/failed/timed-out/cancelled outcomes. Battery replay verifies per-instance intervals and cleanup; these are not end-to-end parity proofs.
+- Both component integration cases pass: initialization followed by explicit unload, and container shutdown with Fabric still loaded. Two live launch-proxy tests pass for main/child process measurements and concurrent launches.
+- The isolated standard-config smoke passes fresh-core creation, plugin loading, readiness, status publication, bond formation, and clean standalone SIGINT shutdown of both Fabric and capabilities2.
+- Smoke limits: isolated HOME/working directory, empty registry, harmless startup-plan override, local model-service stubs instead of prompt_bridge. Missing scan paths and invalid empty-plan runner requests mean this is not a normal capability-execution test. No paid inference or real robot capabilities were exercised.
+- A completion-only plan with the installed capability registry is blocked before readiness: runnable-metadata conversion raises `invalid node; first invalid key: "definition"`. Three interfaces/runnable capabilities load, but the plan never executes; shutdown remains clean.
+- Workspace executable-source and manifest scans found no active legacy Supervisor/Experience consumers. Documentation still contains old names/examples; consumers outside this workspace have not been audited.
+- Full runtime decomposition, terminal-feedback parity, live battery/resource attribution, and model/hardware workflows remain open. Retirement is not complete.
 
-Validated current state:
+Build from `src/fabric`, `src/capabilities2`, `src/prompt_tools`, `src/fabric_generator_prompttools`, and the approved `src/fabric_capabilities`. After shared plugin-interface changes, explicitly rebuild all runtime plugins; `--packages-up-to fabric_server` alone misses dynamically loaded consumers. Source the default install before tests. Enable component integration with `FABRIC_RUN_INTEGRATION_TESTS=1` and use an isolated `ROS_DOMAIN_ID`.
 
-- Parsing now uses Fabric's internal parser directly; runnable metadata comes from the header-only `CapabilityClient`, without the old behaviour/metadata interface plugins.
-- Retirement validation remains open. After the user removed workspace artifacts, all 20 selected packages built successfully into default `build/`, `install/`, and `log/` directories using only the ROS Jazzy underlay and non-legacy source roots (2026-10-21). Neither the previous workspace install nor the temporary validation overlay satisfies this gate.
-- Retirement validation source roots are `src/fabric`, `src/capabilities2`, `src/prompt_tools`, and `src/fabric_generator_prompttools`; `src/experience` and `src/supervisor` are excluded. Initial checks used `/tmp/fabric-retirement-{build,install,log}`; validation then switched to freshly cleared default directories with temporary overlay paths cleared from the environment. Package lookup resolves Fabric and capabilities2 to the default workspace install.
-- The isolated build exposed a namespace-level `Parameter` alias collision in `DataflowValidation`. The alias has been removed in favor of explicit `capability::ParameterInfo` types. All 19 validator behavioral tests, including all seven dataflow cases, also passed against the fresh default install. Tests must source the corresponding fresh install for generated message libraries.
-- Focused default-install tests for the core, estimator, planner, scorer, validator, and monitor packages passed: colcon aggregate 48 tests, 0 errors, 0 failures, 0 skipped. Subsequent Fabric server and capabilities event/runner tests passed behavioral checks but failed Fabric's uncrustify gate in `server.hpp`, `test_capability_metadata.cpp`, and `test_internal_parsing.cpp`. Combined recorded results: 155 tests, 0 errors, 4 failures (the lint wrapper plus three file results), 16 skipped. These are aggregate counts, not distinct behavioral cases.
-- The isolated fresh-core probe uses the existing standard `fabric.yaml` and `capabilities.yaml` via launch defaults, with an isolated HOME/working directory, harmless startup plan, and local stubs at standard `/prompt/...` endpoints instead of prompt_bridge. After the shutdown fixes it passes without a debugger: fresh core database creation, all configured Experience plugins and five monitors loaded, readiness, eight status messages, bond formation, and clean native exits from Fabric and capabilities2 after SIGINT without escalation. Three local prompt-stub calls were observed; a zero-request assertion was incorrect because standard rosout monitoring uses the LLM adapter. No external model calls or real robot capabilities were exercised. Missing relative `install/` and Humble scan paths and invalid empty-plan runner requests remain fixture limitations, so this does not validate normal capability execution.
-- Shutdown fixes explicitly stop Fabric's runtime and both sides' bonds before closing their ROS contexts, wake the status worker, and cancel pending LLM/snapshot waits. Both standalone executables use `MultiThreadedExecutor::spin()` with timer-driven cancellation. All dynamically loaded LLM interface consumers were rebuilt into the default install; `--packages-up-to fabric_server` alone does not rebuild every runtime plugin.
-- Focused post-fix checks pass: the monitor suite has four behavioral cases including stop with a pending, unanswered snapshot request (five aggregate colcon records); all 16 Fabric CTest targets other than the known uncrustify gate pass. The modified Fabric entry point passes its file-scoped uncrustify check. The three pre-existing formatting divergences remain unfixed.
-- Fresh-core startup and coordinated standalone shutdown are demonstrated only for this isolated probe. Terminal-feedback parity, live battery/resource attribution, component-container shutdown, and full model/hardware workflows remain open; retirement is not complete.
-- Earlier telemetry/helper extraction validation reported 82 tests, 0 failures, 13 skipped; that historical result does not supersede the fresh default-install lint and runtime failures above.
-- Score explanation, scoring epoch, plan feedback, feedback persistence, planning helpers, plan-status shaping, and the first integrated generation/selection helper slices have already been pulled out of the hottest parts of `server.hpp`.
+## Stage 5: Packaging And Migration
 
+- [x] Unify Fabric executable/component packaging, dependencies, Python installation, and test targets.
+- [x] Migrate copied Experience modules, scripts, imports, and service names to Fabric ownership.
+- [x] Use Fabric's internal parser and `CapabilityClient` runnable metadata instead of legacy interface plugins.
+- [x] Add passing Python entry-point and wrapper smoke coverage.
 
-## Stage 5: Fabric Server Foundation Repair
+## Stage 6: Runtime Decomposition
 
-Goal: make `fabric_server` build and package cleanly as the primary integrated runtime before doing larger ownership moves.
+- [x] Extract feedback, planning, score/explanation, status, telemetry, and Experience configuration helpers into `fabric_server/include/fabric_server/utils/`.
+- [x] Split initialization, generation, selection, and result completion into smaller orchestration helpers.
+- [x] Narrow queue/completion state access and remove legacy external Experience-server naming.
+- [x] Extract external feedback read/merge/write and terminal-feedback finalization into existing helpers, with focused persistence regression tests.
+- [ ] Finish narrowing `server.hpp` to ROS interfaces, worker lifecycle, plugin loading, and high-level orchestration.
+- [ ] Finish isolating the remaining Experience services and generation/scoring flows from plan dispatch; feedback persistence has been extracted.
+- [ ] Validate parsing, validation, and dispatch behavior throughout the remaining refactor; avoid unrelated policy changes.
 
-### Build And Packaging
+## Stage 7: Launch And Configuration
 
-- [x] Rewrite `CMakeLists.txt` into one coherent package definition.
-- [x] Keep exactly one `ament_package()` call.
-- [x] Define a single clear build story for the Fabric executable/component and the integrated Experience support code.
-- [x] Replace stale `experience_*` package references with the actual Fabric-side packages now present in this repo (`fabric_experience_*`, `fabric_validator`, `fabric_parser_xml`, etc.) where appropriate.
-- [x] Install the Python package and scripts only once from the unified package definition.
-- [x] Fix test target dependencies and header include paths that still reference `experience_server`.
-- [x] Update `package.xml` to match the real integrated dependency graph.
+- [x] Make `fabric_server/launch/fabric.launch.py` the unified entry point; remove separate Experience launch, readiness shim, and Supervisor inclusion.
+- [x] Consolidate Experience, monitoring, battery, plugin, and model settings in `fabric_server/config/fabric.yaml`.
+- [x] Remove obsolete Experience package-share lookups and normalize plugin names and parameter namespaces.
 
-### Python Utilities Migrated From Experience
+## Stage 8: Monitoring And LLM Ownership
 
-- [x] Update `fabric_server/__init__.py` to export Fabric-owned modules instead of importing from `experience_server`.
-- [x] Update copied Python modules to use intra-package `fabric_server` imports.
-- [x] Update ROS service names in copied scripts to Fabric-owned endpoints under `/fabric/experience/...`.
-- [x] Audit command-line help text, package names, and output text so they refer to Fabric rather than Experience where Fabric is now the runtime owner.
-- [x] Fix Python tests that still assume the old Experience package/module layout.
+Ownership rules: capabilities2 owns capability facts and event history. Fabric monitors collect and normalize telemetry; Fabric Experience owns scoring, persistence, and policy. Keep cross-source analytics and stop-safety decisions out of capabilities2.
 
-### Immediate Validation
+### Implemented
 
-- [x] Keep running `colcon build --packages-select fabric_server` after each packaging slice until the package compiles.
-- [x] Add a focused smoke check for the copied Python entry points after imports and service names are updated.
+- [x] Publish authoritative capability events and snapshots from capabilities2.
+- [x] Consume and reconstruct capability lifecycle/run evidence in Fabric's `CapabilityEventMonitor`.
+- [x] Publish execution truth on `/fabric/status` and consume it with `ExecutionStatusMonitor`.
+- [x] Add `MonitorBase` and load resource, execution, capability-event, rosout, and diagnostics monitors in Fabric.
+- [x] Route log/diagnostic output through monitor plugins instead of duplicate server subscriptions; drop the Dynamics/Odom path.
+- [x] Share `LlmAnalysisBase` prompt, embedding, and tokenization operations across monitoring, generation, and CoreGraphRAG; keep PromptTools wiring outside `fabric_base`.
+- [x] Use Fabric-owned `SystemStatus` types instead of `supervisor_msgs/SystemStatus`.
+- [x] Implement plan/instance correlation, run-evidence accumulation, log/fault enrichment, related-node tracking, battery intervals, and stop-safety helpers.
+- [x] Preserve execution identity as `plan_id + "/" + instance_id + "/" + capability_name`.
+- [x] Derive persisted terminal outcomes from run evidence rather than treating every non-completed state as cancelled.
+- [x] Consume launch-proxy resource snapshots and test subscription, plugin loading, field preservation, and native conversion.
+- [x] Stop standalone workers and bonds before ROS context shutdown; cancel pending LLM/snapshot waits and cover unanswered snapshot cancellation with a regression test.
+- [x] Use `MultiThreadedExecutor::spin()` with coordinated cancellation in both standalone executables.
+- [x] Initialize Fabric components after shared ownership exists and explicitly clean up runtime ownership on unload or context pre-shutdown.
+- [x] Retain pending terminal evidence when persistence fails; finalize only after successful writes and suppress subsequent duplicate terminal snapshots.
 
-Evidence: the fresh default-directory build passes. Behavioral tests, including copied wrapper/entry-point coverage, pass, but the current Fabric uncrustify gate fails in three files; see Current Integration Findings for fresh results and remaining runtime gates.
+### Remaining
 
-Likely local surface:
-
-- `fabric_server/CMakeLists.txt`
-- `fabric_server/package.xml`
-- `fabric_server/fabric_server/__init__.py`
-- `fabric_server/fabric_server/*.py`
-- `fabric_server/scripts/*.py`
-- `fabric_server/test/*`
-
-
-## Stage 6: Fabric Server Decomposition
-
-Goal: keep `fabric_server` responsible for ROS 2 interfaces, main processing threads, plugin loading, and high-level orchestration only.
-
-### Runtime Boundary Cleanup
-
-- [ ] Refactor `include/fabric_server/server.hpp` so the `Fabric` node owns only:
-	- ROS 2 service/action/subscription setup
-	- worker-thread lifecycle
-	- plugin loading and initialization
-	- high-level plan execution orchestration
-- [x] Move pure support code into helper headers under `include/fabric_server/utils/`.
-- [x] Prefer extracting support logic by concern: planning helpers, feedback persistence helpers, status/telemetry adapters, file/path helpers, and explanation/score adapters.
-- [x] Remove legacy Experience naming inside the Fabric runtime where the code is now Fabric-owned.
-- [x] Reduce cross-cutting direct access to shared state by giving each worker flow a narrower helper surface.
-
-Completed decomposition slices so far:
-
-- [x] Extract feedback persistence support into `include/fabric_server/utils/feedback.hpp`.
-- [x] Extract planning and score-only candidate helpers into `include/fabric_server/utils/planning.hpp`.
-- [x] Extract score explanation and scoring-epoch/plan-feedback service shaping into `include/fabric_server/utils/score_services.hpp` and `include/fabric_server/utils/score_explanation_adapter.hpp`.
-- [x] Extract Supervisor-status conversion and plan-status shaping helpers into `include/fabric_server/utils/status.hpp`.
-- [x] Split `initialize()` in `server.hpp` into smaller setup methods while keeping the top-level orchestration in `server.hpp`.
-- [x] Split plan-generation support into smaller private helper methods while keeping `executePlanGeneration()` as the orchestration entry point.
-- [x] Split integrated planning/scoring/persistence selection support into smaller private helper methods while keeping `handleIntegratedPlanGeneration()` as the orchestration entry point.
-- [x] Split integrated result-completion support into a private helper so `handleIntegratedPlanGeneration()` no longer assembles the ROS action result inline.
-- [x] Rename Fabric-owned integrated runtime setup/generation helpers away from legacy external Experience-server phrasing inside `server.hpp`.
-- [x] Narrow queue/completion shared-state access behind helper methods in `server.hpp` instead of open-coding plan-queue and completion mutations across callbacks and worker flows.
-- [x] Extract telemetry aggregation, execution-status merge, log/diagnostic correlation, and battery interval bookkeeping into `include/fabric_server/utils/telemetry.hpp`.
-- [x] Extract Fabric Experience runtime parameter-name and persisted-core helpers into `include/fabric_server/utils/experience_runtime.hpp`.
-
-### Experience Runtime Isolation Inside Fabric
-
-- [ ] Isolate Experience-oriented services and persistence flows from the main plan-dispatch loop.
-- [ ] Keep plan parsing/validation/dispatch functional while decomposition happens.
-- [ ] Make the refactor behavior-preserving first; do not combine this slice with policy changes unless required for correctness.
-
-Likely local surface:
-
-- `fabric_server/include/fabric_server/server.hpp`
-- `fabric_server/include/fabric_server/utils/*.hpp`
-- `fabric_server/src/server_component.cpp`
-- `fabric_server/src/server_node.cpp`
-
-
-## Stage 7: Launch And Config Convergence
-
-Goal: make Fabric the single launch/config entry point for the integrated stack.
-
-### Launch Consolidation
-
-- [x] Merge the intent of `experience_server.launch.py` into `fabric.launch.py`.
-- [x] Remove the need for `fabric.launch.py` to include `experience_server.launch.py`.
-- [x] Replace launch arguments that still treat Experience as a separate stack with Fabric-owned toggles for optional subsystems.
-- [x] Decide whether a compatibility launch file should remain temporarily as a thin wrapper that delegates to Fabric launch.
-- [x] Remove the remaining Supervisor launch inclusion from `fabric.launch.py`; Fabric launch now starts only Fabric-owned runtime dependencies.
-
-### Configuration Consolidation
-
-- [x] Merge `config/experience_server.yaml` into Fabric-owned configuration layout.
-- [x] Keep Fabric defaults in `config/fabric.yaml` or a small set of Fabric-owned config files, not separate Experience-owned runtime configs.
-- [x] Normalize plugin class names, parameter namespaces, and default model/scoring/refinement settings under the Fabric package.
-- [x] Remove package-share lookups that still point at `experience_server` when Fabric now ships the runtime.
-- [x] Port retained Supervisor runtime config into `fabric.yaml` for the merged stack where still needed, specifically battery monitoring.
-
-Likely local surface:
-
-- `fabric_server/launch/fabric.launch.py`
-- `fabric_server/config/fabric.yaml`
-
-
-## Stage 8: Monitoring Ownership Migration
-
-Goal: move telemetry collection closer to the real owners while replacing Supervisor coupling with Fabric-native monitoring interfaces.
-
-### 8A. Capability Monitoring Ownership
-
-- [x] Move raw capability lifecycle/run evidence ownership to `capabilities2` where appropriate.
-- [x] Treat `capabilities2` as the source of truth for capability event publication and event snapshot access.
-- [x] Extend `fabric_server/include/fabric_server/capability_client.hpp` with any missing snapshot/query helpers Fabric needs.
-- [x] Replace Fabric’s dependency on Supervisor capability summaries with Fabric-side processing of `capabilities2` event data.
-- [ ] Keep high-level cross-source analytics out of `capabilities2`; only move capability facts and event history there.
-
-Concrete ownership split for the current Supervisor capability monitor:
-
-- [x] Do **not** move `supervisor::CapabilityMonitor` wholesale into `capabilities2`; split its responsibilities first.
-- [x] Keep only authoritative capability facts in `capabilities2`: event publication, bounded event history, snapshot/query services, and any small fact-level helpers Fabric needs.
-- [x] Move capability-event consumption, plan/instance correlation, lifecycle shaping, run-evidence accumulation, and terminal-outcome reconstruction into Fabric.
-- [ ] Keep `capabilities2` unaware of Fabric policy, Experience persistence, log correlation, or stop-safety decisions.
-
-### 8B. Fabric Monitoring Ownership
-
-- [x] Move Fabric plan execution monitoring to Fabric itself instead of polling it back through Supervisor.
-- [x] Replace the old Supervisor `FabricMonitor` polling contract with a Fabric-owned execution monitor plugin subscribed to `/fabric/status`.
-- [x] Keep `fabric_msgs/msg/FabricStatus` on `/fabric/status` as the public execution-status interface for downstream consumers and Fabric monitor plugins.
-
-Immediate decision for the current Fabric monitor plugin:
-
-- [x] Remove `supervisor::FabricMonitor` as a long-term runtime dependency; Fabric execution truth now comes from `fabric_server` publishing `/fabric/status` and `fabric_monitor::ExecutionStatusMonitor` consuming that topic.
-- [x] Add a Fabric-owned execution telemetry path inside `fabric_server` for plan status, current request/candidate IDs, graph hash, and terminal completion signals.
-- [x] Use the external Fabric status topic as the compatibility/public execution interface rather than reintroducing an internal-only telemetry merge path.
-
-### 8C. Fabric Monitoring Plugin Layer
-
-- [x] Introduce a new Fabric monitoring base class for telemetry collectors/processors.
-- [x] Introduce a Fabric-owned `LlmAnalysisBase` interface with PromptTools-shaped prompt, embedding, and tokenization operations so monitoring and Experience plugins can share one model-service contract without pulling `prompt_msgs` into `fabric_base` consumers that do not need it.
-- [x] Add initial monitoring plugins for capability event monitoring, Fabric execution monitoring, and log monitoring.
-- [x] Route rosout and diagnostics monitor output into Fabric telemetry ingestion and remove the duplicate direct subscriptions from `fabric_server`.
-- [x] Move capability snapshot polling and capability-event reconstruction out of `fabric_server` into a Fabric monitor plugin that emits Fabric-owned `SystemStatus` snapshots.
-- [ ] Keep monitoring collection separate from Experience scoring/persistence so telemetry ingestion remains reusable even if scoring policy changes.
-- [x] Process capability, Fabric, and log monitoring flows under Fabric rather than routing them through Supervisor.
-- [ ] Keep log summarization off the critical execution path; log analysis should not become a reason plan execution stalls.
-- [x] Keep `MonitorBase` data-oriented; concrete monitoring plugins may optionally depend on an `LlmAnalysisBase` implementation for deferred summarization/extraction.
-- [x] Load configured Fabric monitor plugins in `fabric_server` and inject the shared analysis plugin at startup.
-
-Initial Fabric monitoring destinations:
-
-- [x] Move `supervisor_log/RosoutMonitor` semantics into the new Fabric monitoring layer rather than `capabilities2`; log ingestion is cross-cutting runtime telemetry, not capability registry state.
-- [x] Move `supervisor_diagnostic/RosDiagnosticsMonitor` semantics into the same Fabric monitoring layer if those signals are still required after parity validation.
-- [x] Drop the old Dynamics and Odom monitor path from the merged Fabric runtime instead of carrying their training-heavy Supervisor configs forward.
-- [ ] Keep the new Fabric monitoring layer focused on collection and normalization; leave scoring, persistence, and policy decisions in the existing Fabric Experience runtime.
-- [x] Back the initial monitor-analysis path with a PromptTools-provided `LlmAnalysisBase` plugin rather than embedding prompt-service clients inside the base monitor interface.
-
-### 8E. Shared LLM Analysis Abstraction
-
-- [x] Add a single Fabric `LlmAnalysisBase` with three overridable operations: prompt completion, embedding, and tokenization.
-- [x] Allow `GenerationBase` implementations to receive an optional shared `LlmAnalysisBase` instance for prompt-side work instead of hard-coding PromptTools service calls.
-- [x] Migrate the current CoreGraphRAG embedded prompt/embedding/tokenization client behind the same `LlmAnalysisBase` contract once the interface is stable.
-- [x] Keep PromptTools-specific ROS service wiring in a separate implementation package so `fabric_base` stays interface-only.
-
-### 8D. Replace Supervisor-Derived Aggregation
-
-- [x] Replace direct use of `supervisor_msgs/msg/SystemStatus` in Fabric runtime.
-- [x] Reuse and extend `fabric_base/include/fabric_base/utils/status_structs.hpp` as the canonical Fabric telemetry model.
-- [ ] Port Supervisor aggregation helpers onto Fabric-owned types, especially:
-	- capability lifecycle and run-evidence accumulation
-	- Fabric/log fault correlation while capabilities are active
-	- per-capability related-node tracking
-- [x] Port battery-usage accumulation onto Fabric-owned telemetry/status processing.
-- [x] Port Fabric/log fault correlation while capabilities are active and per-capability related-node tracking into Fabric-owned status helpers.
-- [x] Port shutdown-safety assessment helpers onto Fabric-owned types.
-- [ ] Define any missing Fabric-owned telemetry fields needed by:
-	- `core_plugin_->update(...)`
-	- terminal feedback persistence
-	- stop-safety guidance
-	- execution/log fault correlation
-- [x] Terminal feedback persistence now derives terminal outcome/success from Fabric-owned capability run evidence instead of collapsing all non-completed terminal states to cancelled.
-- [ ] Decide which of the current Supervisor helper code should move unchanged into Fabric utilities versus which should be redesigned around Fabric threads/plugins.
-
-Specific aggregation direction:
-
-- [x] Port the join logic now centered in `supervisor_server` into Fabric: capability records grouped by `plan_id`, matched with Fabric execution state, then enriched with related-node and log evidence.
-- [ ] Treat Supervisor only as a temporary compatibility publisher once Fabric owns the aggregation path; Supervisor should not remain the long-term join point.
-- [ ] Preserve the current execution identity scheme during the move: `plan_id + "/" + instance_id + "/" + capability_name`.
-- [ ] Keep stop-safety and terminal-outcome rules behavior-preserving during the first port, then redesign only after parity validation passes.
-
-Likely local surface:
-
-- `fabric_server/include/fabric_server/server.hpp`
-- `fabric_server/include/fabric_server/capability_client.hpp`
-- `fabric_server/include/fabric_server/utils/status.hpp`
-- `supervisor/supervisor_capability/include/supervisor_capability/capability_monitor.hpp`
-- `supervisor/supervisor_fabric/include/supervisor_fabric/fabric_monitor.hpp`
-- `supervisor/supervisor_log/include/supervisor_log/rosout_monitor.hpp`
-- `supervisor/supervisor_server/include/supervisor_server/server.hpp`
-- `capabilities2/capabilities2_server/include/capabilities2_server/capabilities_server.hpp`
-
+- [ ] Audit collection/normalization boundaries so monitoring remains reusable independently of scoring and persistence.
+- [ ] Validate deferred log analysis cannot stall plan execution under load or unavailable model services.
+- [ ] Resolve any telemetry-field gaps found by core-update, feedback, stop-safety, and correlation parity tests.
+- [ ] Keep terminal-outcome and stop-safety policy changes deferred until parity validation passes.
 
 ## Stage 9: Supervisor Retirement Gate
 
-Goal: remove the Supervisor stack only after Fabric reaches telemetry and feedback parity.
+- [x] Build and start the selected integrated runtime without legacy Experience/Supervisor source roots or Supervisor launch dependencies.
+- [x] Implement Fabric-owned aggregation and terminal-outcome/stop-safety helpers; runtime parity is still pending.
+- [ ] Prove every triggered run produces exactly one terminal outcome with sufficient evidence for Experience/RAPFS feedback persistence.
+- [ ] Prove terminal outcomes and stop-safety decisions match required semantics without Supervisor messages.
+- [ ] Prove capability activity, Fabric state, logs, and related nodes remain correctly correlated.
+- [x] Scan workspace executable sources and manifests for legacy Supervisor/Experience consumers; none found in the scan.
+- [ ] Audit deployed/external Supervisor consumers and migrate or adapt only where needed; update stale documentation examples.
+- [ ] Complete parity gates before declaring Supervisor fully retired.
 
-- [ ] Reimplement the current Supervisor aggregation semantics inside Fabric rather than depending on compatibility shims long term.
-- [ ] Prove Fabric can reproduce the execution evidence currently needed for Experience feedback persistence.
-- [ ] Prove Fabric can derive terminal outcomes and stop-safety decisions without `supervisor_msgs/SystemStatus`.
-- [ ] Prove capability activity, Fabric state, and log evidence can still be correlated after Supervisor is removed.
-- [ ] Identify any remaining external consumers of Supervisor topics/services and either migrate them or provide a compatibility adapter.
-- [ ] Remove Supervisor runtime dependencies from Fabric only after the replacement path is validated.
-- [ ] If needed, keep a temporary Fabric-published compatibility topic/service layer for old Supervisor consumers while the internal implementation has already moved.
+## Stage 10: Integration Validation
 
+### Build And Test Gates
 
-## Stage 10: Integration Validation And Compile Test
+- [x] Build the 20 selected runtime packages into the default workspace install.
+- [x] Build the additionally approved `fabric_capabilities` package for a harmless completion-only execution test.
+- [x] Rebuild affected Experience and dynamically loaded plugins after interface/class-name changes.
+- [x] Pass Fabric behavioral tests, Python smoke tests, flake8, and the other non-uncrustify CTest gates.
+- [x] Pass focused core, estimator, planner, scorer, validator, and monitor tests.
+- [x] Pass the isolated unified-launch smoke using existing standard config files and local model stubs.
+- [x] Verify fresh-core startup, status publication, bond formation, and clean native standalone shutdown.
+- [x] Fix the three Fabric uncrustify divergences and pass the full package test suite, including opt-in component integration.
+- [ ] Clear `fabric_experience_inspector` flake8 failures before treating it as an integration gate.
+- [x] Validate initialized component unload and active-component container shutdown with standard configs and local model stubs.
+- [ ] Fix runnable-metadata handling of the missing YAML `definition` key, then rerun the completion-only plan through normal dispatch.
 
-Goal: validate the integrated Fabric-owned stack after the structural refactor, not before it.
+### Runtime Gates
 
-### Build/Test Gates
+- [ ] Validate parameter/order checks reject malformed plans through the integrated runtime; validator unit coverage already passes.
+- [ ] Validate end-to-end plan generation, score explanation, and terminal feedback persistence.
+- [x] Align the inspector's live scoring endpoint with `/fabric/experience/score`.
+- [x] Replay capability lifecycle snapshots to verify separate battery intervals for instances, interval retention, and per-plan cleanup.
+- [ ] Validate battery-topic ingestion and per-capability intervals during actual capability execution.
+- [x] Run live proxy tests for main/child process resource production and concurrent local launches.
+- [ ] Validate Fabric resource attribution, shared processes, and terminal samples. LaunchRunner currently uses provider/interface references, not a unique execution identity; do not infer attribution from them alone.
+- [ ] Validate full model-backed and hardware workflows when authorized.
 
-- [x] `colcon build --packages-select fabric_server`
-- [x] `colcon test --packages-select fabric_server`
-- [x] Clear remaining `flake8` and `uncrustify` package-test failures in `fabric_server`.
-- [x] Build any directly affected Fabric Experience plugin packages after interface or class-name changes.
-- [ ] Clear remaining `fabric_experience_inspector` package flake8 failures before using it as an integration gate; the live scoring endpoint is fixed, but `colcon test --packages-select fabric_experience_inspector` still fails style checks.
-- [ ] Run launch smoke tests for the unified Fabric launch/config flow.
-- [ ] Run a runtime smoke test with a real or replayed `/battery_state` publisher to verify Fabric battery telemetry and per-capability battery intervals after Supervisor removal.
+## Deferred Analysis
 
-### Runtime Validation
+- [ ] Compare detailed versus community retrieval prompts.
+- [ ] Re-run RAPFS evaluation/calibration; report constraint violations and rejection reasons separately from ranking quality.
+- [ ] Calibrate prediction transforms, record checkpoint/version, and tune retrieval/explanation/prompt selection from results.
+- [ ] Give semantic validation access to core-backed node descriptions.
+- [ ] Estimate per-capability resource distributions and enable resource-cost scoring/peak feasibility only after telemetry validation.
 
-- [ ] Validate that every triggered capability run still produces exactly one terminal outcome after the monitoring migration.
-- [ ] Validate the end-to-end explanation path from plan generation to node score explanation under Fabric-owned services.
-- [ ] Validate parameter/order plan checks still reject malformed plans after the runtime refactor.
-- [ ] Validate terminal feedback persistence still records enough evidence for RAPFS analysis after Supervisor removal.
-- [x] Reconcile `fabric_experience_inspector` live scoring migration with the active Fabric score service name (`/fabric/experience/score`).
+## Next Steps
 
-### Policy/Analysis Validation After Integration Stabilizes
-
-- [ ] Re-run detailed vs community retrieval prompt comparison.
-- [ ] Re-run RAPFS policy evaluation and calibration checks on the integrated Fabric-owned stack.
-- [ ] Report constraint violations and rejected-plan reasons separately from final ranking quality.
-
-
-## Deferred Follow-Up After Integration Stabilizes
-
-### Retrieval And Prediction Engineering
-
-- [ ] Calibrate transform parameters from evaluation data and record the chosen checkpoint/version.
-- [ ] Tune retrieval, explanation output, and prompt-selection behavior from validation results.
-
-### Semantic Validation Data Access
-
-- [ ] Pass core access into validation plugins, or attach equivalent CoreGraph-backed node-description snapshots onto candidate plan nodes before validation.
-
-### Resource Telemetry
-
-- [x] Add a telemetry source for quantitative resource measurements: `fabric::ResourceMonitor` in `fabric_monitor/include/fabric_monitor/resource_monitor.hpp` consumes launch-proxy CPU/memory/process snapshots and feeds Fabric-native plan telemetry.
-- [x] Validate resource monitor subscription, plugin loading, field preservation, and native telemetry conversion with focused tests.
-- [ ] Run a live launch-proxy resource smoke test and validate launch/reference-to-capability attribution, including shared processes and terminal samples.
-- [ ] Estimate per-capability resource distributions after telemetry exists.
-- [ ] Activate resource-cost scoring and peak-resource feasibility only after resource telemetry has been validated.
-
-
-## Recommended Order
-
-1. Finish the remaining `server.hpp` decomposition so Experience flows are narrower but orchestration still stays in Fabric.
-2. Merge launch/config ownership into Fabric.
-3. Remove the `supervisor::FabricMonitor` polling path first by introducing a Fabric-native execution telemetry path inside `fabric_server`.
-4. Split `supervisor::CapabilityMonitor` ownership: keep raw capability event facts and snapshot helpers in `capabilities2`, move correlation and run-evidence shaping into Fabric.
-5. Introduce the Fabric monitoring plugin layer and migrate log/diagnostic monitoring semantics there.
-6. Replace Supervisor-derived aggregation with Fabric-native telemetry structs and processing, reusing `fabric_base` status structs and ported helper logic.
-7. Keep Supervisor only as a temporary compatibility publisher if downstream consumers still require `supervisor_msgs/SystemStatus`.
-8. Remove Supervisor from the runtime path only after parity validation.
-9. Run `colcon test --packages-select fabric_server` plus launch/runtime smoke coverage on the integrated Fabric path.
-10. Re-run Experience validation, retrieval analysis, and RAPFS policy tuning on the integrated stack.
+1. Fix the missing-`definition` metadata failure and get the completion-only plan to execute with the standard configs.
+2. Finish Experience service/generation isolation while preserving dispatch behavior.
+3. Validate end-to-end feedback and battery telemetry; establish reliable launch-to-execution identity before claiming resource attribution.
+4. Audit deployed consumers, refresh legacy documentation examples, and complete Supervisor parity gates.
+5. Run deferred model, policy, and calibration work after integration stabilizes.

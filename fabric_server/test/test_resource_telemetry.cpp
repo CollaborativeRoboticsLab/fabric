@@ -143,3 +143,45 @@ TEST(ResourceTelemetry, EmptyLaunchSnapshotClearsPreviousResources)
   EXPECT_EQ(statuses.front().resource_usage.total_memory_rss_bytes, 0u);
   EXPECT_TRUE(statuses.front().resource_usage.resources.empty());
 }
+
+TEST(ResourceTelemetry, BatteryIntervalsStaySeparateForCapabilityInstances)
+{
+  fabric::server::telemetry::Aggregator aggregator;
+  auto status = capabilityStatus();
+  auto & capability = status.capabilities.front();
+  capability.has_lifecycle = true;
+  capability.lifecycle.has_start = true;
+  capability.lifecycle.started_this_cycle = true;
+  capability.lifecycle.last_start_time.sec = 10;
+  aggregator.ingestSystemStatuses({status}, 10000000000LL, true, 0.8);
+
+  capability.instance_id = "instance-2";
+  capability.lifecycle.last_start_time.sec = 11;
+  aggregator.ingestSystemStatuses({status}, 11000000000LL, true, 0.7);
+
+  capability.instance_id = "instance-1";
+  capability.lifecycle.last_start_time.sec = 10;
+  capability.lifecycle.started_this_cycle = false;
+  capability.lifecycle.stopped_this_cycle = true;
+  capability.lifecycle.has_stop = true;
+  capability.lifecycle.last_stop_time.sec = 12;
+  auto statuses = aggregator.ingestSystemStatuses({status}, 12000000000LL, true, 0.6);
+  ASSERT_EQ(statuses.size(), 1u);
+  auto usage = statuses.front().capabilities.front().battery_usage;
+  ASSERT_EQ(usage.run_intervals.size(), 1u);
+  EXPECT_EQ(usage.runs, 1);
+  EXPECT_NEAR(usage.last_delta_percentage, 0.2, 1e-6);
+
+  capability.instance_id = "instance-2";
+  capability.lifecycle.last_start_time.sec = 11;
+  statuses = aggregator.ingestSystemStatuses({status}, 12000000000LL, true, 0.6);
+  usage = statuses.front().capabilities.front().battery_usage;
+  EXPECT_NEAR(usage.last_delta_percentage, 0.1, 1e-6);
+
+  capability.lifecycle.stopped_this_cycle = false;
+  statuses = aggregator.ingestSystemStatuses({status}, 13000000000LL, true, 0.5);
+  EXPECT_EQ(statuses.front().capabilities.front().battery_usage.run_intervals.size(), 1u);
+  aggregator.eraseCapabilityBatteryUsage(status.plan_id);
+  statuses = aggregator.ingestSystemStatuses({status}, 14000000000LL, true, 0.5);
+  EXPECT_TRUE(statuses.front().capabilities.front().battery_usage.run_intervals.empty());
+}

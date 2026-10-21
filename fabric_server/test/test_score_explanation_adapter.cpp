@@ -1,6 +1,42 @@
 #include <gtest/gtest.h>
 
 #include <fabric_server/utils/score_explanation_adapter.hpp>
+#include <fabric_server/utils/score_services.hpp>
+
+namespace
+{
+struct FeedbackCore
+{
+  std::optional<fabric::experience::SelectedPlanScoreExplanationBundle> existing;
+  fabric::experience::PlanFeedbackRecord stored;
+  int writes{0};
+  bool store_success{true};
+
+  auto readSelectedPlanScoreExplanationBundle(
+    const fabric::experience::PlanNodeScoreExplanationQuery &)
+  {
+    return existing;
+  }
+
+  bool recordPlanFeedback(const fabric::experience::PlanFeedbackRecord & record)
+  {
+    ++writes;
+    stored = record;
+    return store_success;
+  }
+
+  bool recordCandidatePlanSkillAttribution(
+    const fabric::experience::CandidatePlanSkillAttribution &)
+  {
+    return true;
+  }
+
+  bool recordCandidatePlanEdgeAttribution(const fabric::experience::CandidatePlanEdgeAttribution &)
+  {
+    return true;
+  }
+};
+}  // namespace
 
 TEST(ScoreExplanationAdapter, PreservesSemanticExplanationFields)
 {
@@ -64,4 +100,108 @@ TEST(ScoreExplanationAdapter, PreservesSemanticExplanationFields)
   EXPECT_DOUBLE_EQ(node_msg.feature_vector[0], 0.8);
   EXPECT_DOUBLE_EQ(node_msg.feature_vector[1], 4.2);
   EXPECT_DOUBLE_EQ(node_msg.feature_vector[5], 0.1);
+}
+
+TEST(FeedbackPersistence, ExternalFeedbackPreservesScoringFields)
+{
+  FeedbackCore core;
+  core.existing.emplace();
+  core.existing->feedback.final_rapfs = 0.62;
+  core.existing->feedback.expected_runtime_seconds = 4.2;
+  fabric_msgs::srv::RecordPlanFeedback::Request request;
+  request.planning_request_id = "request";
+  request.candidate_plan_id = "candidate";
+  request.graph_hash = "graph";
+  request.terminal_outcome = "completed";
+  request.terminal_success = true;
+  fabric_msgs::srv::RecordPlanFeedback::Response response;
+  fabric::server::score_services::recordPlanFeedback(core, request, response, 12, 34);
+  EXPECT_TRUE(response.stored);
+  EXPECT_TRUE(response.found_existing);
+  EXPECT_EQ(core.writes, 1);
+  EXPECT_DOUBLE_EQ(core.stored.final_rapfs, 0.62);
+  EXPECT_DOUBLE_EQ(core.stored.expected_runtime_seconds, 4.2);
+  EXPECT_EQ(core.stored.terminal_outcome, "completed");
+}
+
+TEST(FeedbackPersistence, RejectsIncompleteIdentityWithoutWriting)
+{
+  FeedbackCore core;
+  fabric_msgs::srv::RecordPlanFeedback::Request request;
+  fabric_msgs::srv::RecordPlanFeedback::Response response;
+  fabric::server::score_services::recordPlanFeedback(core, request, response, 12, 34);
+  EXPECT_FALSE(response.stored);
+  EXPECT_EQ(core.writes, 0);
+}
+
+TEST(FeedbackPersistence, FailedTerminalWriteCanRetryAndSuccessIsFinalizedOnce)
+{
+  FeedbackCore core;
+  core.store_success = false;
+  fabric::planning::PendingGeneratedPlan pending;
+  pending.planning_request_id = "request";
+  pending.candidate_plan_id = "candidate";
+  pending.graph_hash = "graph";
+  std::vector<fabric::planning::PendingGeneratedPlan> pending_plans{pending};
+  std::unordered_set<std::string> finalized;
+  std::mutex state_mutex;
+  fabric::status::SystemStatus status;
+  status.plan_id = "runtime";
+  status.planning_request_id = "request";
+  status.candidate_plan_id = "candidate";
+  status.graph_hash = "graph";
+  status.capability_plan_state = 13;
+
+  EXPECT_FALSE(fabric::server::feedback::finalizeTerminalPlanFeedback(
+      core, state_mutex, pending_plans, finalized, status));
+  EXPECT_EQ(pending_plans.size(), 1u);
+  EXPECT_TRUE(finalized.empty());
+  core.store_success = true;
+  EXPECT_TRUE(fabric::server::feedback::finalizeTerminalPlanFeedback(
+      core, state_mutex, pending_plans, finalized, status));
+  EXPECT_TRUE(pending_plans.empty());
+  EXPECT_EQ(finalized.count("runtime"), 1u);
+  EXPECT_FALSE(fabric::server::feedback::finalizeTerminalPlanFeedback(
+      core, state_mutex, pending_plans, finalized, status));
+  EXPECT_EQ(core.writes, 2);
+}
+
+TEST(FeedbackPersistence, PersistsCapabilityTerminalOutcomes)
+{
+  struct Outcome
+  {
+    std::string label;
+    int succeeded;
+    int failed;
+    int timed_out;
+    int aborted;
+  };
+  const std::vector<Outcome> outcomes{
+    {"completed", 1, 0, 0, 0},
+    {"failed", 0, 1, 0, 0},
+    {"timed_out", 0, 0, 1, 0},
+    {"cancelled", 0, 0, 0, 1},
+  };
+  for (const auto & outcome : outcomes) {
+    SCOPED_TRACE(outcome.label);
+    FeedbackCore core;
+    fabric::planning::PendingGeneratedPlan pending;
+    pending.planning_request_id = "request";
+    pending.candidate_plan_id = "candidate";
+    pending.graph_hash = "graph";
+    fabric::status::SystemStatus status;
+    status.plan_id = "runtime";
+    status.capability_plan_state = 13;
+    fabric::status::CapabilityStatus capability;
+    capability.has_run_evidence = true;
+    capability.run_evidence.runs_completed = 1;
+    capability.run_evidence.runs_succeeded = outcome.succeeded;
+    capability.run_evidence.runs_failed = outcome.failed;
+    capability.run_evidence.runs_timed_out = outcome.timed_out;
+    capability.run_evidence.runs_aborted = outcome.aborted;
+    status.capabilities.push_back(capability);
+    EXPECT_TRUE(fabric::server::feedback::recordTerminalPlanFeedback(core, pending, status));
+    EXPECT_EQ(core.stored.terminal_outcome, outcome.label);
+    EXPECT_EQ(core.stored.terminal_success, outcome.label == "completed");
+  }
 }

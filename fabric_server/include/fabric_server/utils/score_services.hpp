@@ -375,4 +375,27 @@ inline void populateRecordPlanFeedbackResponse(
   response.message = stored ? "plan feedback stored" :
     "failed to store plan feedback";
 }
+template<typename CorePluginT>
+inline void recordPlanFeedback(
+  CorePluginT & core_plugin,
+  const RecordPlanFeedback::Request & request,
+  RecordPlanFeedback::Response & response,
+  const int32_t recorded_at_sec,
+  const uint32_t recorded_at_nanosec)
+{
+  if (const auto error = validateRecordPlanFeedbackRequest(request); error.has_value()) {
+    response.stored = false;
+    response.found_existing = false;
+    response.message = error.value();
+    return;
+  }
+
+  const auto existing = core_plugin.readSelectedPlanScoreExplanationBundle(
+    buildPlanFeedbackQuery(request));
+  const auto feedback = buildPlanFeedbackRecord(
+    existing, request, recorded_at_sec, recorded_at_nanosec);
+  populateRecordPlanFeedbackResponse(
+    existing.has_value(), core_plugin.recordPlanFeedback(feedback), response);
+}
+
 }  // namespace fabric::server::score_services

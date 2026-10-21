@@ -56,7 +56,8 @@ TEST_F(CapabilityMetadataTest, CollectsRunnableSpecsAsNativeDescriptors)
   capabilities2_msgs::srv::GetRunnableSpecs::Response response;
   response.index_of_specs.push_back("demo/Provider");
   capabilities2_msgs::msg::RunnableSpec spec;
-  spec.spec = R"(
+  spec.spec =
+    R"(
 interface:
   name: demo/Move
   description: Move to a target

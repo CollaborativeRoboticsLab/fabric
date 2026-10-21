@@ -191,6 +191,11 @@ if(BUILD_TESTING)
     test/test_python_entrypoints_smoke.py
   )
 
+  ament_add_pytest_test(test_component_lifecycle
+    test/test_component_lifecycle.py
+    TIMEOUT 100
+  )
+
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   set(ament_cmake_flake8_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/setup.cfg")

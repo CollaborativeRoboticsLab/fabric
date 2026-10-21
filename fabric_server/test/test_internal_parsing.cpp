@@ -95,36 +95,37 @@ TEST_F(InternalParsingTest, PreservesTypedRunnerParameters)
 TEST_F(InternalParsingTest, SerializesPlanningAndDispatchParsing)
 {
   auto planning = std::async(std::launch::async, [this]() {
-      for (int attempt = 0; attempt < 5; ++attempt) {
-        const auto result = parser_.parsePlanDefinition(
+        for (int attempt = 0; attempt < 5; ++attempt) {
+          const auto result = parser_.parsePlanDefinition(
           "<Plan><Runner interface=\"demo/Planning\" provider=\"demo/Provider\"/></Plan>");
-        if (!result.success || result.connections.empty()) {
-          return false;
-        }
-        for (const auto & connection : result.connections) {
-          if (connection.source.interface == "demo/Dispatch") {
+          if (!result.success || result.connections.empty()) {
             return false;
           }
+          for (const auto & connection : result.connections) {
+            if (connection.source.interface == "demo/Dispatch") {
+              return false;
+            }
+          }
         }
-      }
-      return true;
+        return true;
     });
   auto dispatch = std::async(std::launch::async, [this]() {
-      for (int attempt = 0; attempt < 5; ++attempt) {
-        fabric::plan::Plan plan;
-        plan.plan_id = "dispatch-plan";
-        plan.plan = "<Plan><Runner interface=\"demo/Dispatch\" provider=\"demo/Provider\"/></Plan>";
-        parser_.parsePlan(plan);
-        if (plan.connections.empty()) {
-          return false;
-        }
-        for (const auto & entry : plan.connections) {
-          if (entry.second.source.interface == "demo/Planning") {
+        for (int attempt = 0; attempt < 5; ++attempt) {
+          fabric::plan::Plan plan;
+          plan.plan_id = "dispatch-plan";
+          plan.plan =
+          "<Plan><Runner interface=\"demo/Dispatch\" provider=\"demo/Provider\"/></Plan>";
+          parser_.parsePlan(plan);
+          if (plan.connections.empty()) {
             return false;
           }
+          for (const auto & entry : plan.connections) {
+            if (entry.second.source.interface == "demo/Planning") {
+              return false;
+            }
+          }
         }
-      }
-      return true;
+        return true;
     });
   EXPECT_TRUE(planning.get());
   EXPECT_TRUE(dispatch.get());
