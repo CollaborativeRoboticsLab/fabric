@@ -620,7 +620,7 @@ protected:
   }
 
   /**
-  * @brief Initialize the execution-plan validation plugins.
+   * @brief Initialize the execution-plan validation plugins.
    *
    * This function declares the "validation_plugins" parameter, retrieves the list of validation plugin names,
    * and loads each plugin using the plan validation loader. Each plugin is then initialized and stored.
@@ -745,6 +745,8 @@ protected:
     this->get_parameter(fabric::server::experience_runtime::validationParameterName(use_experience_), validation_plugin_names_);
 
     generation_validation_plugins_.clear();
+
+    // Load and initialize each validation plugin specified in the configuration.
     for (const auto& plugin_name : validation_plugin_names_)
     {
       try
@@ -752,6 +754,7 @@ protected:
         auto plugin = validation_loader_.createSharedInstance(plugin_name);
         plugin->initialize(shared_from_this());
         generation_validation_plugins_.push_back(plugin);
+
         RCLCPP_INFO(this->get_logger(), "Loaded validation plugin: %s", plugin_name.c_str());
       }
       catch (const pluginlib::PluginlibException& ex)
@@ -759,6 +762,119 @@ protected:
         RCLCPP_WARN(this->get_logger(), "Failed to load validation plugin '%s': %s", plugin_name.c_str(), ex.what());
       }
     }
+  }
+
+  /**
+   * @brief Load and initialize the configured estimator plugins.
+   *
+   * Estimators are loaded dynamically so deployments can add or remove feature
+   * generators without recompiling the server.
+   */
+  void initializeEstimatorPlugins()
+  {
+    const std::vector<std::string> default_estimators = { "fabric::SuccessProbabilityPlugin", "fabric::RuntimePlugin",  "fabric::EnergyPlugin",
+                                                          "fabric::FaultBurdenPlugin",        "fabric::ResourcePlugin", "fabric::UncertaintyPlugin" };
+
+    const std::vector<std::string> default_estimator_names = { "success", "time", "energy", "fault", "resource", "uncertainty" };
+
+    const std::unordered_map<std::string, std::string> default_estimator_types = {
+      { "success", "fabric::SuccessProbabilityPlugin" }, { "time", "fabric::RuntimePlugin" },      { "energy", "fabric::EnergyPlugin" },
+      { "fault", "fabric::FaultBurdenPlugin" },          { "resource", "fabric::ResourcePlugin" }, { "uncertainty", "fabric::UncertaintyPlugin" },
+    };
+
+    this->declare_parameter<std::vector<std::string>>(fabric::server::experience_runtime::parameterName("RapfsScorerPlugin.estimator_names"),
+                                                      default_estimator_names);
+    std::vector<std::string> configured_estimator_names;
+    this->get_parameter(fabric::server::experience_runtime::parameterName("RapfsScorerPlugin.estimator_names"), configured_estimator_names);
+
+    std::vector<std::string> configured_plugins;
+    for (const auto& estimator_name : configured_estimator_names)
+    {
+      const auto default_type_it = default_estimator_types.find(estimator_name);
+      const std::string default_type = default_type_it != default_estimator_types.end() ? default_type_it->second : std::string();
+      const std::string type_key = fabric::server::experience_runtime::parameterName("RapfsScorerPlugin.estimators." + estimator_name + ".type");
+      this->declare_parameter<std::string>(type_key, default_type);
+      const std::string plugin_type = this->get_parameter(type_key).as_string();
+      if (!plugin_type.empty())
+      {
+        configured_plugins.push_back(plugin_type);
+      }
+    }
+
+    this->declare_parameter<std::vector<std::string>>(fabric::server::experience_runtime::parameterName("estimator_plugins"), default_estimators);
+    this->get_parameter(fabric::server::experience_runtime::parameterName("estimator_plugins"), estimator_plugin_names_);
+    if (!configured_plugins.empty())
+    {
+      estimator_plugin_names_ = configured_plugins;
+    }
+
+    estimator_plugins_.clear();
+    for (const auto& plugin_name : estimator_plugin_names_)
+    {
+      try
+      {
+        auto plugin = estimator_loader_.createSharedInstance(plugin_name);
+        plugin->initialize(shared_from_this());
+        estimator_plugins_.push_back(plugin);
+        RCLCPP_INFO(this->get_logger(), "Loaded estimator plugin: %s", plugin_name.c_str());
+      }
+      catch (const pluginlib::PluginlibException& ex)
+      {
+        RCLCPP_WARN(this->get_logger(), "Failed to load estimator plugin '%s': %s", plugin_name.c_str(), ex.what());
+      }
+    }
+  }
+
+  /**
+   * @brief Load and initialize the configured scorer plugin.
+   *
+   * The scorer is configured after estimators so it can immediately consume the
+   * active feature pipeline during planning requests.
+   */
+  void initializeScorerPlugin()
+  {
+    this->declare_parameter<std::string>(fabric::server::experience_runtime::parameterName("scorer_plugin"), "fabric::RapfsScorerPlugin");
+    this->get_parameter(fabric::server::experience_runtime::parameterName("scorer_plugin"), scorer_plugin_name_);
+
+    scorer_plugin_ = scorer_loader_.createSharedInstance(scorer_plugin_name_);
+    scorer_plugin_->initialize(shared_from_this());
+    scorer_plugin_->configure(core_plugin_, &estimator_plugins_);
+    RCLCPP_INFO(this->get_logger(), "Loaded scorer plugin: %s", scorer_plugin_name_.c_str());
+  }
+
+  /**
+   * @brief Load refinement retry policy driven by validation outcomes.
+   */
+  void initializePlanningRefinementConfig()
+  {
+    const std::string planner_parameter_namespace = fabric::server::experience_runtime::pluginParameterNamespace(planner_plugin_name_);
+    const std::string max_attempts_key = planner_parameter_namespace + ".refinement.max_attempts";
+    const std::string retry_on_penalty_key = planner_parameter_namespace + ".refinement.retry_on_penalty_findings";
+    const std::string retry_on_warning_key = planner_parameter_namespace + ".refinement.retry_on_warning_findings";
+
+    this->declare_parameter<int>(max_attempts_key, planning_refinement_max_attempts_);
+    this->declare_parameter<bool>(retry_on_penalty_key, planning_refinement_retry_on_penalty_findings_);
+    this->declare_parameter<bool>(retry_on_warning_key, planning_refinement_retry_on_warning_findings_);
+
+    planning_refinement_max_attempts_ = std::max(0, static_cast<int>(this->get_parameter(max_attempts_key).as_int()));
+    planning_refinement_retry_on_penalty_findings_ = this->get_parameter(retry_on_penalty_key).as_bool();
+    planning_refinement_retry_on_warning_findings_ = this->get_parameter(retry_on_warning_key).as_bool();
+  }
+
+  /**
+   * @brief Load and initialize the configured planner plugin.
+   *
+   * Planning is pluginized so generation strategies can change independently of
+   * the server lifecycle and persistence code.
+   */
+  void initializePlannerPlugin()
+  {
+    this->declare_parameter<std::string>(fabric::server::experience_runtime::parameterName("planner_plugin"), "fabric::PlanningPlugin");
+    this->get_parameter(fabric::server::experience_runtime::parameterName("planner_plugin"), planner_plugin_name_);
+
+    planner_plugin_ = planner_loader_.createSharedInstance(planner_plugin_name_);
+    planner_plugin_->initialize(shared_from_this());
+    RCLCPP_INFO(this->get_logger(), "Loaded planner plugin: %s", planner_plugin_name_.c_str());
   }
 
   /**
@@ -770,11 +886,13 @@ protected:
    */
   void initializeFabricExperienceRuntime()
   {
+    // If the experience runtime is not being used, skip initialization.
     if (!use_experience_)
     {
       return;
     }
 
+    // Declare and retrieve the core plugin parameter.
     this->declare_parameter("experience.core_plugin", "fabric::CoreGraphRag");
     core_plugin_name = this->get_parameter("experience.core_plugin").as_string();
 
@@ -782,25 +900,32 @@ protected:
 
     const bool should_attempt_persisted_load = !rebuild_experience_ && fabric::server::experience_runtime::hasPersistedCoreDb(core_db_path_);
 
+    // Determine if we should attempt to load the persisted core database.
     if (rebuild_experience_)
     {
       fabric::server::experience_runtime::removePersistedCoreDbIfSupported(this->get_logger(), core_plugin_name, core_db_path_);
     }
 
+    // Create and initialize the core plugin instance.
     core_plugin_ = core_loader_.createSharedInstance(core_plugin_name);
     core_plugin_->configureAnalysis(llm_analysis_plugin_);
     core_plugin_->initialize(shared_from_this());
 
     RCLCPP_INFO(this->get_logger(), "[server] Initialized knowledge core plugin: %s", core_plugin_name.c_str());
 
+    // Attempt to load the core plugin from the persisted database if available.
     bool loaded_from_db = false;
+
     if (should_attempt_persisted_load)
     {
       RCLCPP_INFO(this->get_logger(), "Reusing persisted core database; skipping startup capability metadata collection.");
       try
       {
+        RCLCPP_INFO(this->get_logger(), "Attempting to load core plugin from persisted database.");
+
         core_plugin_->load(capabilities_);
         loaded_from_db = true;
+
         RCLCPP_INFO(this->get_logger(), "Core plugin loaded from persisted database.");
       }
       catch (const std::exception& ex)
@@ -809,21 +934,31 @@ protected:
       }
     }
 
+    // If the core plugin was not loaded from the persisted database, build it with the collected capabilities.
     if (!loaded_from_db)
     {
+      RCLCPP_INFO(this->get_logger(), "Core plugin not loaded from persisted database; collecting capabilities and building plugin.");
+
       collect_capabilities_if_needed();
       core_plugin_->build(capabilities_);
+
       RCLCPP_INFO(this->get_logger(), "Core plugin built with capability information.");
     }
 
-    loadPlannerPlugin();
+    // Load and initialize the remaining plugins and configurations.
+    initializePlannerPlugin();
     initializeGenerationValidationPlugins();
-    loadPlanningRefinementConfig();
-    loadEstimatorPlugins();
-    loadScorerPlugin();
+    initializeEstimatorPlugins();
+    initializeScorerPlugin();
+    initializePlanningRefinementConfig();
+
+    // Consume any persisted user feedback to initialize the feedback context.
     fabric::server::feedback::consumePersistedUserFeedback(buildUserFeedbackContext());
   }
 
+  /**
+   * @brief Initialize the capability client used to query and manage capabilities.
+   */
   void initializeCapabilityClient()
   {
     capability_client_ = std::make_shared<CapabilityClient>();
@@ -1573,119 +1708,6 @@ protected:
     }
 
     fabric_status_pub_->publish(fabric::server::status::toFabricStatusMsg(plan));
-  }
-
-  /**
-   * @brief Load and initialize the configured estimator plugins.
-   *
-   * Estimators are loaded dynamically so deployments can add or remove feature
-   * generators without recompiling the server.
-   */
-  void loadEstimatorPlugins()
-  {
-    const std::vector<std::string> default_estimators = { "fabric::SuccessProbabilityPlugin", "fabric::RuntimePlugin",  "fabric::EnergyPlugin",
-                                                          "fabric::FaultBurdenPlugin",        "fabric::ResourcePlugin", "fabric::UncertaintyPlugin" };
-
-    const std::vector<std::string> default_estimator_names = { "success", "time", "energy", "fault", "resource", "uncertainty" };
-
-    const std::unordered_map<std::string, std::string> default_estimator_types = {
-      { "success", "fabric::SuccessProbabilityPlugin" }, { "time", "fabric::RuntimePlugin" },      { "energy", "fabric::EnergyPlugin" },
-      { "fault", "fabric::FaultBurdenPlugin" },          { "resource", "fabric::ResourcePlugin" }, { "uncertainty", "fabric::UncertaintyPlugin" },
-    };
-
-    this->declare_parameter<std::vector<std::string>>(fabric::server::experience_runtime::parameterName("RapfsScorerPlugin.estimator_names"),
-                                                      default_estimator_names);
-    std::vector<std::string> configured_estimator_names;
-    this->get_parameter(fabric::server::experience_runtime::parameterName("RapfsScorerPlugin.estimator_names"), configured_estimator_names);
-
-    std::vector<std::string> configured_plugins;
-    for (const auto& estimator_name : configured_estimator_names)
-    {
-      const auto default_type_it = default_estimator_types.find(estimator_name);
-      const std::string default_type = default_type_it != default_estimator_types.end() ? default_type_it->second : std::string();
-      const std::string type_key = fabric::server::experience_runtime::parameterName("RapfsScorerPlugin.estimators." + estimator_name + ".type");
-      this->declare_parameter<std::string>(type_key, default_type);
-      const std::string plugin_type = this->get_parameter(type_key).as_string();
-      if (!plugin_type.empty())
-      {
-        configured_plugins.push_back(plugin_type);
-      }
-    }
-
-    this->declare_parameter<std::vector<std::string>>(fabric::server::experience_runtime::parameterName("estimator_plugins"), default_estimators);
-    this->get_parameter(fabric::server::experience_runtime::parameterName("estimator_plugins"), estimator_plugin_names_);
-    if (!configured_plugins.empty())
-    {
-      estimator_plugin_names_ = configured_plugins;
-    }
-
-    estimator_plugins_.clear();
-    for (const auto& plugin_name : estimator_plugin_names_)
-    {
-      try
-      {
-        auto plugin = estimator_loader_.createSharedInstance(plugin_name);
-        plugin->initialize(shared_from_this());
-        estimator_plugins_.push_back(plugin);
-        RCLCPP_INFO(this->get_logger(), "Loaded estimator plugin: %s", plugin_name.c_str());
-      }
-      catch (const pluginlib::PluginlibException& ex)
-      {
-        RCLCPP_WARN(this->get_logger(), "Failed to load estimator plugin '%s': %s", plugin_name.c_str(), ex.what());
-      }
-    }
-  }
-
-  /**
-   * @brief Load and initialize the configured scorer plugin.
-   *
-   * The scorer is configured after estimators so it can immediately consume the
-   * active feature pipeline during planning requests.
-   */
-  void loadScorerPlugin()
-  {
-    this->declare_parameter<std::string>(fabric::server::experience_runtime::parameterName("scorer_plugin"), "fabric::RapfsScorerPlugin");
-    this->get_parameter(fabric::server::experience_runtime::parameterName("scorer_plugin"), scorer_plugin_name_);
-
-    scorer_plugin_ = scorer_loader_.createSharedInstance(scorer_plugin_name_);
-    scorer_plugin_->initialize(shared_from_this());
-    scorer_plugin_->configure(core_plugin_, &estimator_plugins_);
-    RCLCPP_INFO(this->get_logger(), "Loaded scorer plugin: %s", scorer_plugin_name_.c_str());
-  }
-
-  /**
-   * @brief Load refinement retry policy driven by validation outcomes.
-   */
-  void loadPlanningRefinementConfig()
-  {
-    const std::string planner_parameter_namespace = fabric::server::experience_runtime::pluginParameterNamespace(planner_plugin_name_);
-    const std::string max_attempts_key = planner_parameter_namespace + ".refinement.max_attempts";
-    const std::string retry_on_penalty_key = planner_parameter_namespace + ".refinement.retry_on_penalty_findings";
-    const std::string retry_on_warning_key = planner_parameter_namespace + ".refinement.retry_on_warning_findings";
-
-    this->declare_parameter<int>(max_attempts_key, planning_refinement_max_attempts_);
-    this->declare_parameter<bool>(retry_on_penalty_key, planning_refinement_retry_on_penalty_findings_);
-    this->declare_parameter<bool>(retry_on_warning_key, planning_refinement_retry_on_warning_findings_);
-
-    planning_refinement_max_attempts_ = std::max(0, static_cast<int>(this->get_parameter(max_attempts_key).as_int()));
-    planning_refinement_retry_on_penalty_findings_ = this->get_parameter(retry_on_penalty_key).as_bool();
-    planning_refinement_retry_on_warning_findings_ = this->get_parameter(retry_on_warning_key).as_bool();
-  }
-
-  /**
-   * @brief Load and initialize the configured planner plugin.
-   *
-   * Planning is pluginized so generation strategies can change independently of
-   * the server lifecycle and persistence code.
-   */
-  void loadPlannerPlugin()
-  {
-    this->declare_parameter<std::string>(fabric::server::experience_runtime::parameterName("planner_plugin"), "fabric::PlanningPlugin");
-    this->get_parameter(fabric::server::experience_runtime::parameterName("planner_plugin"), planner_plugin_name_);
-
-    planner_plugin_ = planner_loader_.createSharedInstance(planner_plugin_name_);
-    planner_plugin_->initialize(shared_from_this());
-    RCLCPP_INFO(this->get_logger(), "Loaded planner plugin: %s", planner_plugin_name_.c_str());
   }
 
   /**
