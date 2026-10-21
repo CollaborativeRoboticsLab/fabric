@@ -19,10 +19,10 @@ using CandidatePlan = ::fabric::planning::CandidatePlan;
 /**
  * @brief Validate that parsed candidate nodes and edges reference known capabilities.
  */
-class CompatibilityValidation : public ValidationBase
+class ExtendedCompatibilityValidation : public ValidationBase
 {
 public:
-  void validate(fabric::plan::Plan& plan, std::vector<fabric::capability::Info>& capabilities) override
+  void validate(fabric::plan::Plan& plan, const std::vector<fabric::capability::Descriptor>& capabilities) override
   {
     (void)plan;
     (void)capabilities;
@@ -30,7 +30,7 @@ public:
 
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
-    initialize_base(node, "CompatibilityValidation");
+    initialize_base(node, "ExtendedCompatibilityValidation");
   }
 
   void validate(const PlanningRequest& request, const std::vector<BehaviourInfo>& capabilities,

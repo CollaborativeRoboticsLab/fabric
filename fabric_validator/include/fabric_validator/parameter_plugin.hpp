@@ -25,7 +25,7 @@ public:
   virtual ~ParameterValidation() = default;
 
   /**
-   * @brief Initialize the syntax validation plugin.
+   * @brief Initialize the parameter validation plugin.
    */
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
@@ -35,16 +35,16 @@ public:
   /**
    * @brief Validate the given XML plan for compatibility.
    *
-    * @param plan The fabric::plan::Plan to validate.
-    * @param capabilities Support data for evaluation as a vector of fabric::capability::Info.
+   * @param plan The fabric::plan::Plan to validate.
+   * @param capabilities Resolved runnable capability descriptors.
    */
-    void validate(fabric::plan::Plan& plan, std::vector<fabric::capability::Info>& capabilities) override
+  void validate(fabric::plan::Plan& plan, const std::vector<fabric::capability::Descriptor>& capabilities) override
   {
     for (const auto& [id, connection] : plan.connections)
     {
       (void)id;
 
-      const fabric::capability::ProviderInfo* provider_info = find_provider_info(connection.source, capabilities);
+      const fabric::capability::Descriptor* provider_info = find_capability(connection.source, capabilities);
       if (provider_info == nullptr)
       {
         throw fabric::fabric_exception("Unmatched interface: " + connection.source.interface + " provider: " + connection.source.provider +
@@ -76,54 +76,18 @@ public:
   }
 
 private:
-  static const fabric::capability::Info* find_capability(const fabric::plan::node& plan_node,
-                                                         const std::vector<fabric::capability::Info>& capabilities)
+  static const fabric::capability::Descriptor* find_capability(const fabric::plan::node& plan_node,
+                                                               const std::vector<fabric::capability::Descriptor>& capabilities)
   {
     for (const auto& capability : capabilities)
     {
-      if (capability.interface != plan_node.interface)
-      {
-        continue;
-      }
-
-      if (capability.provider == plan_node.provider)
-      {
-        return &capability;
-      }
-
-      if (std::find(capability.alt_providers.begin(), capability.alt_providers.end(), plan_node.provider) != capability.alt_providers.end())
+      if (capability.interface_name == plan_node.interface && capability.provider_name == plan_node.provider)
       {
         return &capability;
       }
     }
 
     return nullptr;
-  }
-
-  static const fabric::capability::ProviderInfo* find_provider_details(const fabric::capability::Info& capability,
-                                                                       const std::string& provider_name)
-  {
-    for (const auto& provider_details : capability.provider_details)
-    {
-      if (provider_details.provider == provider_name)
-      {
-        return &provider_details;
-      }
-    }
-
-    return nullptr;
-  }
-
-  static const fabric::capability::ProviderInfo* find_provider_info(
-      const fabric::plan::node& plan_node, const std::vector<fabric::capability::Info>& capabilities)
-  {
-    const fabric::capability::Info* capability = find_capability(plan_node, capabilities);
-    if (capability == nullptr)
-    {
-      return nullptr;
-    }
-
-    return find_provider_details(*capability, plan_node.provider);
   }
 
   static bool source_allowed(const fabric::capability::ParameterInfo& parameter, const std::string& source)
@@ -136,8 +100,7 @@ private:
     return std::find(parameter.satisfiable_from.begin(), parameter.satisfiable_from.end(), source) != parameter.satisfiable_from.end();
   }
 
-  static bool type_compatible(const fabric::capability::ParameterInfo& output,
-                              const fabric::capability::ParameterInfo& input)
+  static bool type_compatible(const fabric::capability::ParameterInfo& output, const fabric::capability::ParameterInfo& input)
   {
     return output.type.empty() || input.type.empty() || output.type == input.type;
   }
@@ -167,8 +130,7 @@ private:
     return keys;
   }
 
-  static bool parameters_match(const fabric::capability::ParameterInfo& output,
-                               const fabric::capability::ParameterInfo& input)
+  static bool parameters_match(const fabric::capability::ParameterInfo& output, const fabric::capability::ParameterInfo& input)
   {
     if (!type_compatible(output, input))
     {
@@ -189,8 +151,7 @@ private:
     return false;
   }
 
-  static bool has_explicit_plan_value(const fabric::plan::node& plan_node,
-                                      const fabric::capability::ParameterInfo& parameter)
+  static bool has_explicit_plan_value(const fabric::plan::node& plan_node, const fabric::capability::ParameterInfo& parameter)
   {
     if (plan_node.parameters.has_value(parameter.name))
     {
@@ -208,8 +169,8 @@ private:
     return false;
   }
 
-  static const fabric::capability::ParameterInfo* find_configuration_parameter(
-      const fabric::capability::ProviderInfo& provider_info, const fabric::capability::ParameterInfo& runtime_input)
+  static const fabric::capability::ParameterInfo* find_configuration_parameter(const fabric::capability::Descriptor& provider_info,
+                                                                               const fabric::capability::ParameterInfo& runtime_input)
   {
     const std::string fallback_name = runtime_input.fallback_parameter.empty() ? runtime_input.name : runtime_input.fallback_parameter;
     if (fallback_name.empty())
@@ -228,8 +189,7 @@ private:
     return nullptr;
   }
 
-  static bool has_configuration_fallback(const fabric::plan::node& plan_node,
-                                         const fabric::capability::ProviderInfo& provider_info,
+  static bool has_configuration_fallback(const fabric::plan::node& plan_node, const fabric::capability::Descriptor& provider_info,
                                          const fabric::capability::ParameterInfo& runtime_input)
   {
     const fabric::capability::ParameterInfo* config_parameter = find_configuration_parameter(provider_info, runtime_input);
@@ -246,8 +206,7 @@ private:
     return config_parameter->has_default;
   }
 
-  static bool has_local_default(const fabric::capability::ProviderInfo& provider_info,
-                                const fabric::capability::ParameterInfo& runtime_input)
+  static bool has_local_default(const fabric::capability::Descriptor& provider_info, const fabric::capability::ParameterInfo& runtime_input)
   {
     if (runtime_input.has_default)
     {
@@ -273,8 +232,7 @@ private:
     return true;
   }
 
-  static std::vector<fabric::plan::node> find_upstream_nodes(const fabric::plan::Plan& plan,
-                                                             const fabric::plan::node& target)
+  static std::vector<fabric::plan::node> find_upstream_nodes(const fabric::plan::Plan& plan, const fabric::plan::node& target)
   {
     std::vector<fabric::plan::node> upstream_nodes;
 
@@ -295,12 +253,12 @@ private:
 
   static bool has_upstream_match(const fabric::plan::Plan& plan, const fabric::plan::node& target,
                                  const fabric::capability::ParameterInfo& runtime_input,
-                                 const std::vector<fabric::capability::Info>& capabilities)
+                                 const std::vector<fabric::capability::Descriptor>& capabilities)
   {
     const std::vector<fabric::plan::node> upstream_nodes = find_upstream_nodes(plan, target);
     for (const auto& upstream_node : upstream_nodes)
     {
-      const fabric::capability::ProviderInfo* upstream_provider_info = find_provider_info(upstream_node, capabilities);
+      const fabric::capability::Descriptor* upstream_provider_info = find_capability(upstream_node, capabilities);
       if (upstream_provider_info == nullptr)
       {
         continue;
@@ -319,9 +277,8 @@ private:
   }
 
   static bool is_runtime_input_satisfied(const fabric::plan::Plan& plan, const fabric::plan::node& plan_node,
-                                         const fabric::capability::ProviderInfo& provider_info,
-                                         const fabric::capability::ParameterInfo& runtime_input,
-                                         const std::vector<fabric::capability::Info>& capabilities)
+                                         const fabric::capability::Descriptor& provider_info, const fabric::capability::ParameterInfo& runtime_input,
+                                         const std::vector<fabric::capability::Descriptor>& capabilities)
   {
     if (source_allowed(runtime_input, "upstream") && has_upstream_match(plan, plan_node, runtime_input, capabilities))
     {

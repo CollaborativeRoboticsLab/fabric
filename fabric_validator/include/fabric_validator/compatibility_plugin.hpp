@@ -1,16 +1,16 @@
 #pragma once
+#include <algorithm>
 #include <string>
 #include <vector>
-#include <tinyxml2.h>
 #include <rclcpp/rclcpp.hpp>
 #include <fabric_base/validation_base.hpp>
 
 namespace fabric
 {
 /**
- * @brief Syntax validation plugin for XML plans.
+ * @brief Compatibility validation plugin for parsed plans.
  *
- * This plugin checks the XML plan for basic syntax errors (well-formedness, root tag, etc).
+ * Checks plan references against resolved runnable interface/provider pairs.
  */
 class CompatibilityValidation : public ValidationBase
 {
@@ -19,7 +19,7 @@ public:
   virtual ~CompatibilityValidation() = default;
 
   /**
-   * @brief Initialize the syntax validation plugin.
+   * @brief Initialize the compatibility validation plugin.
    */
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
@@ -29,39 +29,17 @@ public:
   /**
    * @brief Validate the given XML plan for compatibility.
    *
-    * @param plan The fabric::plan::Plan to validate.
-    * @param capabilities Support data for evaluation as a vector of fabric::capability::Info.
+   * @param plan The fabric::plan::Plan to validate.
+   * @param capabilities Resolved runnable capability descriptors.
    */
-    void validate(fabric::plan::Plan& plan, std::vector<fabric::capability::Info>& capabilities) override
+  void validate(fabric::plan::Plan& plan, const std::vector<fabric::capability::Descriptor>& capabilities) override
   {
-    // Iterate through the plan and check whether each connection's interface and provider are matched in
-    // the provided capability metadata. If a provider is not matched, it could be in alternative providers.
-
     for (const auto& [id, connection] : plan.connections)
     {
-      bool source_matched = false;
-
-      // Check source node
-      for (const auto& cap : capabilities)
-      {
-        if (connection.source.interface == cap.interface)
-        {
-          if (connection.source.provider == cap.provider)
-          {
-            source_matched = true;
-            break;
-          }
-          else
-          {
-            // Check alternative providers
-            if (std::find(cap.alt_providers.begin(), cap.alt_providers.end(), connection.source.provider) != cap.alt_providers.end())
-            {
-              source_matched = true;
-              break;
-            }
-          }
-        }
-      }
+      (void)id;
+      const bool source_matched = std::any_of(capabilities.begin(), capabilities.end(), [&](const auto& capability) {
+        return connection.source.interface == capability.interface_name && connection.source.provider == capability.provider_name;
+      });
 
       if (!source_matched)
       {

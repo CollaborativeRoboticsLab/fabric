@@ -24,6 +24,12 @@ struct ComponentStatus
   std::string description;
 };
 
+struct BatteryData
+{
+  double percentage{ -1.0 };
+  std::vector<ComponentStatus> warnings;
+};
+
 struct LoggingData
 {
   status::Time timestamp;

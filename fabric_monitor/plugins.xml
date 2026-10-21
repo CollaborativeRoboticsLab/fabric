@@ -1,4 +1,9 @@
 <library path="fabric_monitor">
+    <class type="fabric::BatteryMonitor" base_class_type="fabric::MonitorBase">
+        <description>
+            Collects battery readings and reports low and critical battery telemetry.
+        </description>
+    </class>
     <class type="fabric::ExecutionStatusMonitor" base_class_type="fabric::MonitorBase">
         <description>
             A Fabric-native plugin that observes Fabric execution status updates and exposes plan execution metadata as SystemStatus snapshots.

@@ -52,6 +52,7 @@ Ownership rules: capabilities2 owns capability facts and event history. Fabric m
 - [x] Consume and reconstruct capability lifecycle/run evidence in Fabric's `CapabilityEventMonitor`.
 - [x] Publish execution truth on `/fabric/status` and consume it with `ExecutionStatusMonitor`.
 - [x] Add `MonitorBase` and load resource, execution, capability-event, rosout, and diagnostics monitors in Fabric.
+- [x] Move battery subscription, reading validation, and low/critical warnings into `BatteryMonitor`, configured through `BatteryMonitor.enable` and `BatteryMonitor.topic`; retain execution attribution and persistence in Fabric. Monitor and initial component-lifecycle regressions pass; the latest server rebuild is blocked by missing `Fabric::shutdownRuntime()`, so final lifecycle validation remains pending.
 - [x] Route log/diagnostic output through monitor plugins instead of duplicate server subscriptions; drop the Dynamics/Odom path.
 - [x] Share `LlmAnalysisBase` prompt, embedding, and tokenization operations across monitoring, generation, and CoreGraphRAG; keep PromptTools wiring outside `fabric_base`.
 - [x] Use Fabric-owned `SystemStatus` types instead of `supervisor_msgs/SystemStatus`.

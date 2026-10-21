@@ -18,7 +18,7 @@ using CandidatePlan = ::fabric::planning::CandidatePlan;
 class DependencyValidation : public ValidationBase
 {
 public:
-  void validate(fabric::plan::Plan& plan, std::vector<fabric::capability::Info>& capabilities) override
+  void validate(fabric::plan::Plan& plan, const std::vector<fabric::capability::Descriptor>& capabilities) override
   {
     (void)plan;
     (void)capabilities;

@@ -10,7 +10,6 @@
 #include <fabric_base/utils/planning_structs.hpp>
 #include <fabric_base/utils/plan_structs.hpp>
 #include <fabric_base/utils/exception.hpp>
-#include <fabric_base/utils/xml_helper.hpp>
 
 namespace fabric
 {
@@ -39,9 +38,9 @@ public:
    * @brief Validate the given XML plan.
    *
     * @param plan The fabric::plan::Plan to validate.
-    * @param capabilities Support data for evaluation as a vector of fabric::capability::Info.
+    * @param capabilities Resolved runnable capability descriptors.
    */
-    virtual void validate(fabric::plan::Plan& plan, std::vector<fabric::capability::Info>& capabilities) = 0;
+    virtual void validate(fabric::plan::Plan& plan, const std::vector<fabric::capability::Descriptor>& capabilities) = 0;
 
   /**
    * @brief Validate one parsed candidate plan in place.

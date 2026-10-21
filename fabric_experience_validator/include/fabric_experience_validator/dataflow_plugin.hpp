@@ -25,7 +25,7 @@ using CandidatePlanNode = ::fabric::planning::CandidatePlanNode;
 class DataflowValidation : public ValidationBase
 {
 public:
-  void validate(fabric::plan::Plan& plan, std::vector<fabric::capability::Info>& capabilities) override
+  void validate(fabric::plan::Plan& plan, const std::vector<fabric::capability::Descriptor>& capabilities) override
   {
     (void)plan;
     (void)capabilities;

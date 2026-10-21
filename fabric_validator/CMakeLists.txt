@@ -44,6 +44,14 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_validation_plugins test/test_validation_plugins.cpp)
+  if(TARGET test_validation_plugins)
+    ament_target_dependencies(test_validation_plugins rclcpp fabric_base)
+  endif()
+endif()
+
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_package()

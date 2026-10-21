@@ -168,10 +168,10 @@ private:
 };
 }  // namespace
 
-TEST(CompatibilityValidation, RejectsUnknownCapability)
+TEST(ExtendedCompatibilityValidation, RejectsUnknownCapability)
 {
   auto node_handle = testNode("compatibility_validation_test");
-  fabric::CompatibilityValidation validator;
+  fabric::ExtendedCompatibilityValidation validator;
   validator.initialize(node_handle);
 
   const auto known = producerCapability();
@@ -184,6 +184,7 @@ TEST(CompatibilityValidation, RejectsUnknownCapability)
   EXPECT_TRUE(candidate.validation.rejected);
   ASSERT_FALSE(candidate.validation.findings.empty());
   EXPECT_EQ(candidate.validation.findings.front().level, fabric::planning::ValidationFindingLevel::Reject);
+  EXPECT_EQ(candidate.validation.findings.front().plugin_name, "ExtendedCompatibilityValidation");
 }
 
 TEST(DependencyValidation, WarnsWhenImplicitDependencyIsExplicitlyPlanned)
@@ -221,10 +222,10 @@ TEST(DependencyValidation, DoesNotWarnWhenDependencyIsNotExplicitlyPlanned)
   EXPECT_TRUE(candidate.validation.findings.empty());
 }
 
-TEST(CompatibilityValidation, RejectsDuplicateNodeIds)
+TEST(ExtendedCompatibilityValidation, RejectsDuplicateNodeIds)
 {
   auto node_handle = testNode("compatibility_validation_duplicate_node_test");
-  fabric::CompatibilityValidation validator;
+  fabric::ExtendedCompatibilityValidation validator;
   validator.initialize(node_handle);
 
   const auto known = producerCapability();
@@ -239,10 +240,10 @@ TEST(CompatibilityValidation, RejectsDuplicateNodeIds)
   EXPECT_NE(candidate.validation.summary.find("duplicate node ids"), std::string::npos);
 }
 
-TEST(CompatibilityValidation, RejectsEdgeReferencingUnknownNode)
+TEST(ExtendedCompatibilityValidation, RejectsEdgeReferencingUnknownNode)
 {
   auto node_handle = testNode("compatibility_validation_unknown_edge_test");
-  fabric::CompatibilityValidation validator;
+  fabric::ExtendedCompatibilityValidation validator;
   validator.initialize(node_handle);
 
   const auto known = producerCapability();

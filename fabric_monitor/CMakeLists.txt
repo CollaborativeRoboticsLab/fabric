@@ -20,6 +20,7 @@ find_package(pluginlib REQUIRED)
 find_package(fabric_base REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(rcl_interfaces REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 include_directories(
   include
@@ -38,6 +39,7 @@ ament_target_dependencies(${PROJECT_NAME}
   fabric_base
   diagnostic_msgs
   rcl_interfaces
+  sensor_msgs
 )
 
 pluginlib_export_plugin_description_file(fabric_base plugins.xml)
@@ -59,7 +61,7 @@ ament_export_libraries(${PROJECT_NAME})
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_resource_monitor test/test_resource_monitor.cpp TIMEOUT 20)
-  ament_target_dependencies(test_resource_monitor rclcpp fabric_base capabilities2_msgs pluginlib)
+  ament_target_dependencies(test_resource_monitor rclcpp fabric_base capabilities2_msgs pluginlib sensor_msgs)
 endif()
 
 ament_package()

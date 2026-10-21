@@ -6,6 +6,7 @@
 
     validation_plugins:
       - "fabric::CompatibilityValidation"
+      - "fabric::ParameterValidation"
 
     parsing_plugin : fabric::XMLParser
     llm_analysis_plugin: fabric::PromptToolsLlmAnalysis
@@ -14,13 +15,16 @@
     telemetry:
       monitor_plugins:
         - "fabric::ResourceMonitor"
+        - "fabric::BatteryMonitor"
         - "fabric::ExecutionStatusMonitor"
         - "fabric::CapabilityEventMonitor"
         - "fabric::RosoutMonitor"
         - "fabric::RosDiagnosticsMonitor"
       monitor_poll_frequency_hz: 2.0
-      enable_battery_monitoring: true
-      battery_topic: "/battery_state"
+
+    BatteryMonitor:
+      enable: true
+      topic: "/battery_state"
 
     ResourceMonitor:
       topic: "/capabilities2_launch_proxy/resources"
@@ -70,6 +74,7 @@
       dispatch_terminal_success_only: false
       validation_plugins:
         - "fabric::CompatibilityValidation"
+        - "fabric::ExtendedCompatibilityValidation"
         - "fabric::ParameterValidation"
         - "fabric::DependencyValidation"
         - "fabric::DataflowValidation"

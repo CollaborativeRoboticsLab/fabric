@@ -1,11 +1,13 @@
 #include <any>
 #include <chrono>
 #include <memory>
+#include <limits>
 #include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
 #include <pluginlib/class_loader.hpp>
+#include <fabric_monitor/battery_monitor.hpp>
 #include <fabric_monitor/capability_event_monitor.hpp>
 #include <fabric_monitor/resource_monitor.hpp>
 
@@ -26,7 +28,11 @@ protected:
 
   void SetUp() override
   {
-    node_ = std::make_shared<rclcpp::Node>("resource_monitor_test");
+    rclcpp::NodeOptions options;
+    options.parameter_overrides(
+        { rclcpp::Parameter("BatteryMonitor.enable", true), rclcpp::Parameter("BatteryMonitor.topic", "/battery_"
+                                                                                                      "state") });
+    node_ = std::make_shared<rclcpp::Node>("resource_monitor_test", options);
     monitor_.initialize(node_);
     publisher_ =
         node_->create_publisher<fabric::ResourceMonitor::ResourceSnapshot>("/capabilities2_launch_proxy/resources", 10);
@@ -124,6 +130,69 @@ TEST_F(ResourceMonitorTest, PluginCanBeLoaded)
   pluginlib::ClassLoader<fabric::MonitorBase> loader("fabric_base", "fabric::MonitorBase");
   auto plugin = loader.createSharedInstance("fabric::ResourceMonitor");
   ASSERT_NE(plugin, nullptr);
+  auto battery_plugin = loader.createSharedInstance("fabric::BatteryMonitor");
+  ASSERT_NE(battery_plugin, nullptr);
+}
+
+TEST_F(ResourceMonitorTest, DisabledBatteryMonitorDoesNotSubscribe)
+{
+  node_->declare_parameter<bool>("BatteryMonitor.enable", true);
+  node_->set_parameter(rclcpp::Parameter("BatteryMonitor.enable", false));
+  fabric::BatteryMonitor battery_monitor;
+  battery_monitor.initialize(node_);
+  battery_monitor.start();
+  EXPECT_EQ(node_->count_subscribers("/battery_state"), 0u);
+  const auto data = std::any_cast<fabric::monitor::BatteryData>(battery_monitor.getData());
+  EXPECT_DOUBLE_EQ(data.percentage, -1.0);
+  EXPECT_TRUE(data.warnings.empty());
+  battery_monitor.stop();
+}
+
+TEST_F(ResourceMonitorTest, BatteryMonitorRetainsReadingsAndDrainsWarnings)
+{
+  fabric::BatteryMonitor battery_monitor;
+  battery_monitor.initialize(node_);
+  battery_monitor.start();
+  auto publisher =
+      node_->create_publisher<sensor_msgs::msg::BatteryState>("/battery_state", rclcpp::QoS(10).best_effort());
+  const auto deadline = std::chrono::steady_clock::now() + 3s;
+  while (publisher->get_subscription_count() == 0 && std::chrono::steady_clock::now() < deadline)
+  {
+    executor_.spin_once(10ms);
+  }
+  ASSERT_GT(publisher->get_subscription_count(), 0u);
+  for (const float percentage : { 0.8f, 0.4f, 0.2f, 0.1f, -1.0f, std::numeric_limits<float>::quiet_NaN(), 1.1f })
+  {
+    sensor_msgs::msg::BatteryState message;
+    message.header.stamp.sec = 123;
+    message.percentage = percentage;
+    publisher->publish(message);
+    const auto receive_deadline = std::chrono::steady_clock::now() + 200ms;
+    while (std::chrono::steady_clock::now() < receive_deadline)
+    {
+      executor_.spin_once(10ms);
+    }
+    const auto data = std::any_cast<fabric::monitor::BatteryData>(battery_monitor.getData());
+    EXPECT_DOUBLE_EQ(data.percentage, std::isfinite(percentage) && percentage >= 0.0f && percentage <= 1.0f ?
+                                          static_cast<double>(percentage) :
+                                          -1.0);
+    if (percentage >= 0.0f && percentage < 0.4f)
+    {
+      ASSERT_EQ(data.warnings.size(), 1u);
+      EXPECT_EQ(data.warnings.front().timestamp.sec, 123);
+      EXPECT_EQ(data.warnings.front().status, percentage < 0.2f ? fabric::monitor::MonitoringStatus::FAULTY :
+                                                                  fabric::monitor::MonitoringStatus::SUSPICIOUS);
+    }
+    else
+    {
+      EXPECT_TRUE(data.warnings.empty());
+    }
+    const auto retained = std::any_cast<fabric::monitor::BatteryData>(battery_monitor.getData());
+    EXPECT_DOUBLE_EQ(retained.percentage, data.percentage);
+    EXPECT_TRUE(retained.warnings.empty());
+  }
+  battery_monitor.stop();
+  EXPECT_DOUBLE_EQ(std::any_cast<fabric::monitor::BatteryData>(battery_monitor.getData()).percentage, -1.0);
 }
 
 TEST_F(ResourceMonitorTest, EventMonitorStopsWithPendingSnapshot)
@@ -131,10 +200,10 @@ TEST_F(ResourceMonitorTest, EventMonitorStopsWithPendingSnapshot)
   using Snapshot = fabric::CapabilityEventMonitor::GetEventSnapshot;
   bool request_received = false;
   auto service = node_->create_service<Snapshot>(
-    "/capabilities/get_event_snapshot",
-    [&request_received](std::shared_ptr<rmw_request_id_t>, std::shared_ptr<Snapshot::Request>) {
-      request_received = true;
-    });
+      "/capabilities/get_event_snapshot",
+      [&request_received](std::shared_ptr<rmw_request_id_t>, std::shared_ptr<Snapshot::Request>) {
+        request_received = true;
+      });
   fabric::CapabilityEventMonitor event_monitor;
   event_monitor.initialize(node_);
   event_monitor.start();

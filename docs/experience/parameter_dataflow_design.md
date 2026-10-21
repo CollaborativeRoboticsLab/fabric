@@ -78,7 +78,7 @@ Experience should use this classification in retrieval, scoring, and replanning:
 Current implementation boundary:
 
 - server-side validation runs after candidate parsing and before RAPFS scoring
-- `experience::CompatibilityValidation` rejects malformed or unknown candidate references
+- `fabric::ExtendedCompatibilityValidation` rejects malformed or unknown candidate references
 - `experience::DataflowValidation` rejects unsatisfied required runtime inputs and emits warning or penalty findings for weak but satisfiable dataflow
 - when every candidate is rejected, Experience can invoke planner refinement again with validator findings as critique
 

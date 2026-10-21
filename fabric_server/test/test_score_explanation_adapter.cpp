@@ -9,29 +9,27 @@ struct FeedbackCore
 {
   std::optional<fabric::experience::SelectedPlanScoreExplanationBundle> existing;
   fabric::experience::PlanFeedbackRecord stored;
-  int writes{0};
-  bool store_success{true};
+  int writes{ 0 };
+  bool store_success{ true };
 
-  auto readSelectedPlanScoreExplanationBundle(
-    const fabric::experience::PlanNodeScoreExplanationQuery &)
+  auto readSelectedPlanScoreExplanationBundle(const fabric::experience::PlanNodeScoreExplanationQuery&)
   {
     return existing;
   }
 
-  bool recordPlanFeedback(const fabric::experience::PlanFeedbackRecord & record)
+  bool recordPlanFeedback(const fabric::experience::PlanFeedbackRecord& record)
   {
     ++writes;
     stored = record;
     return store_success;
   }
 
-  bool recordCandidatePlanSkillAttribution(
-    const fabric::experience::CandidatePlanSkillAttribution &)
+  bool recordCandidatePlanSkillAttribution(const fabric::experience::CandidatePlanSkillAttribution&)
   {
     return true;
   }
 
-  bool recordCandidatePlanEdgeAttribution(const fabric::experience::CandidatePlanEdgeAttribution &)
+  bool recordCandidatePlanEdgeAttribution(const fabric::experience::CandidatePlanEdgeAttribution&)
   {
     return true;
   }
@@ -56,16 +54,16 @@ TEST(ScoreExplanationAdapter, PreservesSemanticExplanationFields)
   node_record.proxy_source = "requested_skill";
   node_record.reason = "matched semantic context";
   node_record.semantic_familiarity = 0.75;
-  node_record.semantic_relevant_capabilities = {"demo/DetectObject", "demo/EstimatePose"};
-  node_record.semantic_related_entities = {"apple", "table"};
-  node_record.semantic_dependencies = {"camera_ready", "workspace_clear"};
-  node_record.semantic_plan_patterns = {"detect_then_pick"};
-  node_record.semantic_fault_concepts = {"occlusion"};
-  node_record.semantic_community_summaries = {"vision pipeline summary"};
+  node_record.semantic_relevant_capabilities = { "demo/DetectObject", "demo/EstimatePose" };
+  node_record.semantic_related_entities = { "apple", "table" };
+  node_record.semantic_dependencies = { "camera_ready", "workspace_clear" };
+  node_record.semantic_plan_patterns = { "detect_then_pick" };
+  node_record.semantic_fault_concepts = { "occlusion" };
+  node_record.semantic_community_summaries = { "vision pipeline summary" };
   node_record.estimator_outputs = {
-    fabric::experience::EstimateResult{"success_probability", 0.8, true, "beta posterior"},
-    fabric::experience::EstimateResult{"runtime_seconds", 4.2, true, "mean observed runtime"},
-    fabric::experience::EstimateResult{"uncertainty", 0.1, true, "beta interval width"},
+    fabric::experience::EstimateResult{ "success_probability", 0.8, true, "beta posterior" },
+    fabric::experience::EstimateResult{ "runtime_seconds", 4.2, true, "mean observed runtime" },
+    fabric::experience::EstimateResult{ "uncertainty", 0.1, true, "beta interval width" },
   };
 
   fabric::experience::SelectedPlanScoreExplanationBundle bundle;
@@ -85,7 +83,7 @@ TEST(ScoreExplanationAdapter, PreservesSemanticExplanationFields)
   const auto msg = fabric::server::adapter::toPlanScoreExplanationMsg(bundle);
 
   ASSERT_EQ(msg.node_explanations.size(), 1u);
-  const auto & node_msg = msg.node_explanations.front();
+  const auto& node_msg = msg.node_explanations.front();
   EXPECT_EQ(node_msg.semantic_relevant_capabilities.size(), 2u);
   EXPECT_EQ(node_msg.semantic_related_entities.size(), 2u);
   EXPECT_EQ(node_msg.semantic_dependencies.size(), 2u);
@@ -142,7 +140,7 @@ TEST(FeedbackPersistence, FailedTerminalWriteCanRetryAndSuccessIsFinalizedOnce)
   pending.planning_request_id = "request";
   pending.candidate_plan_id = "candidate";
   pending.graph_hash = "graph";
-  std::vector<fabric::planning::PendingGeneratedPlan> pending_plans{pending};
+  std::vector<fabric::planning::PendingGeneratedPlan> pending_plans{ pending };
   std::unordered_set<std::string> finalized;
   std::mutex state_mutex;
   fabric::status::SystemStatus status;
@@ -152,17 +150,14 @@ TEST(FeedbackPersistence, FailedTerminalWriteCanRetryAndSuccessIsFinalizedOnce)
   status.graph_hash = "graph";
   status.capability_plan_state = 13;
 
-  EXPECT_FALSE(fabric::server::feedback::finalizeTerminalPlanFeedback(
-      core, state_mutex, pending_plans, finalized, status));
+  EXPECT_FALSE(fabric::server::feedback::finalizeTerminalPlanFeedback(core, state_mutex, pending_plans, finalized, status));
   EXPECT_EQ(pending_plans.size(), 1u);
   EXPECT_TRUE(finalized.empty());
   core.store_success = true;
-  EXPECT_TRUE(fabric::server::feedback::finalizeTerminalPlanFeedback(
-      core, state_mutex, pending_plans, finalized, status));
+  EXPECT_TRUE(fabric::server::feedback::finalizeTerminalPlanFeedback(core, state_mutex, pending_plans, finalized, status));
   EXPECT_TRUE(pending_plans.empty());
   EXPECT_EQ(finalized.count("runtime"), 1u);
-  EXPECT_FALSE(fabric::server::feedback::finalizeTerminalPlanFeedback(
-      core, state_mutex, pending_plans, finalized, status));
+  EXPECT_FALSE(fabric::server::feedback::finalizeTerminalPlanFeedback(core, state_mutex, pending_plans, finalized, status));
   EXPECT_EQ(core.writes, 2);
 }
 
@@ -177,12 +172,13 @@ TEST(FeedbackPersistence, PersistsCapabilityTerminalOutcomes)
     int aborted;
   };
   const std::vector<Outcome> outcomes{
-    {"completed", 1, 0, 0, 0},
-    {"failed", 0, 1, 0, 0},
-    {"timed_out", 0, 0, 1, 0},
-    {"cancelled", 0, 0, 0, 1},
+    { "completed", 1, 0, 0, 0 },
+    { "failed", 0, 1, 0, 0 },
+    { "timed_out", 0, 0, 1, 0 },
+    { "cancelled", 0, 0, 0, 1 },
   };
-  for (const auto & outcome : outcomes) {
+  for (const auto& outcome : outcomes)
+  {
     SCOPED_TRACE(outcome.label);
     FeedbackCore core;
     fabric::planning::PendingGeneratedPlan pending;

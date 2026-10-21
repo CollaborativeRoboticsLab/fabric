@@ -1,5 +1,5 @@
 <library path="fabric_experience_validator">
-  <class type="fabric::CompatibilityValidation" base_class_type="fabric::ValidationBase">
+  <class type="fabric::ExtendedCompatibilityValidation" base_class_type="fabric::ValidationBase">
     <description>
       Reject candidate plans that reference unknown capabilities or invalid candidate graph edges.
     </description>
