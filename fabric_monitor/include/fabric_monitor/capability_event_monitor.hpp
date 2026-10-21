@@ -3,6 +3,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <future>
 #include <limits>
 #include <map>
 #include <mutex>
@@ -158,29 +159,18 @@ private:
     request->after_sequence = last_capability_event_sequence_;
     request->max_events = max_events_;
 
-    bool completed = false;
-    std::mutex request_mutex;
-    std::condition_variable request_cv;
-    std::unique_lock<std::mutex> request_lock(request_mutex);
     CapabilityEventSnapshot snapshot;
-
-    auto future = snapshot_client_->async_send_request(
-      request,
-      [&completed, &request_cv, &snapshot](GetEventSnapshotClient::SharedFuture future_response) {
-        if (!future_response.valid()) {
-          throw fabric::fabric_exception("Failed to get event snapshot from capabilities2 server");
-        }
-
-        const auto response = future_response.get();
+    auto future = snapshot_client_->async_send_request(request);
+    while (monitoring_active_ && rclcpp::ok(node_->get_node_base_interface()->get_context())) {
+      if (future.wait_for(std::chrono::milliseconds(100)) == std::future_status::ready) {
+        const auto response = future.get();
         snapshot.latest_sequence = response->latest_sequence;
         snapshot.truncated = response->truncated;
         snapshot.events = response->events;
-        completed = true;
-        request_cv.notify_all();
-      });
-
-    (void)future;
-    request_cv.wait(request_lock, [&completed]() { return completed; });
+        return snapshot;
+      }
+    }
+    snapshot_client_->remove_pending_request(future);
     return snapshot;
   }
 

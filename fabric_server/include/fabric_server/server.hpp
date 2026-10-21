@@ -155,7 +155,21 @@ public:
 
   ~Fabric()
   {
-    shutting_down_.store(true);
+    shutdownRuntime();
+  }
+
+  void shutdownRuntime()
+  {
+    if (shutting_down_.exchange(true)) {
+      return;
+    }
+    {
+      std::lock_guard<std::mutex> lock(system_status_mutex_);
+      system_status_cv_.notify_all();
+    }
+    if (llm_analysis_plugin_) {
+      llm_analysis_plugin_->shutdown();
+    }
     stopMonitorPlugins();
 
     {
@@ -183,6 +197,19 @@ public:
     if (core_plugin_) {
       core_plugin_->shutdown();
     }
+
+    bond_client_cache_.clear();
+    capability_client_.reset();
+    scorer_plugin_.reset();
+    estimator_plugins_.clear();
+    validation_plugins_.clear();
+    planner_plugin_.reset();
+    core_plugin_.reset();
+    monitor_plugins_.clear();
+    generation_plugin_.reset();
+    parsing_plugin_.reset();
+    plan_validation_plugins_.clear();
+    llm_analysis_plugin_.reset();
   }
 
   /**

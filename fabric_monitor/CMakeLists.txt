@@ -58,7 +58,7 @@ ament_export_libraries(${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_resource_monitor test/test_resource_monitor.cpp)
+  ament_add_gtest(test_resource_monitor test/test_resource_monitor.cpp TIMEOUT 20)
   ament_target_dependencies(test_resource_monitor rclcpp fabric_base capabilities2_msgs pluginlib)
 endif()
 

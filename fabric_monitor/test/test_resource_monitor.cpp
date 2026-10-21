@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <pluginlib/class_loader.hpp>
+#include <fabric_monitor/capability_event_monitor.hpp>
 #include <fabric_monitor/resource_monitor.hpp>
 
 using namespace std::chrono_literals;
@@ -123,4 +124,30 @@ TEST_F(ResourceMonitorTest, PluginCanBeLoaded)
   pluginlib::ClassLoader<fabric::MonitorBase> loader("fabric_base", "fabric::MonitorBase");
   auto plugin = loader.createSharedInstance("fabric::ResourceMonitor");
   ASSERT_NE(plugin, nullptr);
+}
+
+TEST_F(ResourceMonitorTest, EventMonitorStopsWithPendingSnapshot)
+{
+  using Snapshot = fabric::CapabilityEventMonitor::GetEventSnapshot;
+  bool request_received = false;
+  auto service = node_->create_service<Snapshot>(
+    "/capabilities/get_event_snapshot",
+    [&request_received](std::shared_ptr<rmw_request_id_t>, std::shared_ptr<Snapshot::Request>) {
+      request_received = true;
+    });
+  fabric::CapabilityEventMonitor event_monitor;
+  event_monitor.initialize(node_);
+  event_monitor.start();
+
+  const auto deadline = std::chrono::steady_clock::now() + 3s;
+  while (!request_received && std::chrono::steady_clock::now() < deadline)
+  {
+    executor_.spin_once(10ms);
+  }
+
+  const auto stop_started = std::chrono::steady_clock::now();
+  event_monitor.stop();
+  EXPECT_TRUE(request_received);
+  EXPECT_LT(std::chrono::steady_clock::now() - stop_started, 1500ms);
+  EXPECT_TRUE(rclcpp::ok());
 }

@@ -87,6 +87,8 @@ public:
 
   virtual LlmTokenizationResult tokenize(const LlmTokenizationRequest& request) = 0;
 
+  virtual void shutdown() {}
+
 protected:
   void initialize_base(const rclcpp::Node::SharedPtr& node, const std::string& plugin_name)
   {
