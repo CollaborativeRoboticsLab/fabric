@@ -1,5 +1,6 @@
 #include <any>
 #include <chrono>
+#include <future>
 #include <memory>
 #include <limits>
 #include <thread>
@@ -10,8 +11,36 @@
 #include <fabric_monitor/battery_monitor.hpp>
 #include <fabric_monitor/capability_event_monitor.hpp>
 #include <fabric_monitor/resource_monitor.hpp>
+#include <fabric_monitor/rosout_monitor.hpp>
+#include <fabric_monitor/rosdiagnostics_monitor.hpp>
 
 using namespace std::chrono_literals;
+
+class RecordingAnalysis : public fabric::LlmAnalysisBase
+{
+public:
+  fabric::LlmPromptResult prompt(const fabric::LlmPromptRequest& request) override
+  {
+    if (!recorded_.exchange(true))
+    {
+      request_.set_value(request);
+    }
+    return { true, false, "summary", "" };
+  }
+
+  fabric::LlmEmbeddingResult embed(const fabric::LlmEmbeddingRequest&) override
+  {
+    return {};
+  }
+
+  fabric::LlmTokenizationResult tokenize(const fabric::LlmTokenizationRequest&) override
+  {
+    return {};
+  }
+
+  std::promise<fabric::LlmPromptRequest> request_;
+  std::atomic<bool> recorded_{ false };
+};
 
 class ResourceMonitorTest : public ::testing::Test
 {
@@ -68,6 +97,48 @@ protected:
     {
       executor_.spin_once(10ms);
     }
+  }
+
+  template <typename Monitor, typename Message>
+  void checkPromptParameters(const std::string& name, const Message& message, bool override_model)
+  {
+    std::vector<rclcpp::Parameter> parameters{
+      rclcpp::Parameter(name + ".topic", "/monitor_prompt_test"),
+      rclcpp::Parameter(name + ".frequency", 1000.0),
+    };
+    if (override_model)
+    {
+      parameters.emplace_back(name + ".model_family", "ollama");
+      parameters.emplace_back(name + ".model", "test-model");
+    }
+    rclcpp::NodeOptions options;
+    options.enable_rosout(false);
+    options.parameter_overrides(parameters);
+    auto node = std::make_shared<rclcpp::Node>("monitor_prompt_test", options);
+    auto analysis = std::make_shared<RecordingAnalysis>();
+    auto request = analysis->request_.get_future();
+    Monitor monitor;
+    monitor.initialize(node);
+    monitor.configureAnalysis(analysis);
+    auto publisher = node->create_publisher<Message>("/monitor_prompt_test", rclcpp::QoS(10).best_effort());
+    rclcpp::executors::SingleThreadedExecutor executor;
+    executor.add_node(node);
+    monitor.start();
+    const auto deadline = std::chrono::steady_clock::now() + 3s;
+    while (request.wait_for(0ms) != std::future_status::ready && std::chrono::steady_clock::now() < deadline)
+    {
+      if (publisher->get_subscription_count() > 0)
+      {
+        publisher->publish(message);
+      }
+      executor.spin_once(10ms);
+    }
+    monitor.stop();
+    ASSERT_EQ(request.wait_for(0ms), std::future_status::ready);
+    const auto captured = request.get();
+    EXPECT_EQ(captured.model_family, override_model ? "ollama" : "openai");
+    EXPECT_EQ(captured.model, override_model ? "test-model" : "gpt-5.1");
+    EXPECT_FALSE(captured.user_prompt.empty());
   }
 
   rclcpp::Node::SharedPtr node_;
@@ -219,4 +290,44 @@ TEST_F(ResourceMonitorTest, EventMonitorStopsWithPendingSnapshot)
   EXPECT_TRUE(request_received);
   EXPECT_LT(std::chrono::steady_clock::now() - stop_started, 1500ms);
   EXPECT_TRUE(rclcpp::ok());
+}
+
+TEST_F(ResourceMonitorTest, RosoutPromptUsesDefaultModel)
+{
+  rcl_interfaces::msg::Log message;
+  message.name = "test_node";
+  message.level = rcl_interfaces::msg::Log::WARN;
+  message.msg = "test warning";
+  checkPromptParameters<fabric::RosoutMonitor>("RosoutMonitor", message, false);
+}
+
+TEST_F(ResourceMonitorTest, RosoutPromptUsesConfiguredModel)
+{
+  rcl_interfaces::msg::Log message;
+  message.name = "test_node";
+  message.level = rcl_interfaces::msg::Log::WARN;
+  message.msg = "test warning";
+  checkPromptParameters<fabric::RosoutMonitor>("RosoutMonitor", message, true);
+}
+
+TEST_F(ResourceMonitorTest, DiagnosticsPromptUsesDefaultModel)
+{
+  diagnostic_msgs::msg::DiagnosticArray message;
+  diagnostic_msgs::msg::DiagnosticStatus status;
+  status.name = "test_component";
+  status.level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
+  status.message = "test warning";
+  message.status.push_back(status);
+  checkPromptParameters<fabric::RosDiagnosticsMonitor>("RosDiagnosticsMonitor", message, false);
+}
+
+TEST_F(ResourceMonitorTest, DiagnosticsPromptUsesConfiguredModel)
+{
+  diagnostic_msgs::msg::DiagnosticArray message;
+  diagnostic_msgs::msg::DiagnosticStatus status;
+  status.name = "test_component";
+  status.level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
+  status.message = "test warning";
+  message.status.push_back(status);
+  checkPromptParameters<fabric::RosDiagnosticsMonitor>("RosDiagnosticsMonitor", message, true);
 }

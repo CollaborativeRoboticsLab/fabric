@@ -44,10 +44,14 @@
     RosoutMonitor:
       topic: "/rosout"
       frequency: 1.0
+      model_family: openai
+      model: gpt-5.1
 
     RosDiagnosticsMonitor:
       topic: "/diagnostics"
       frequency: 1.0
+      model_family: openai
+      model: gpt-5.1
 
     PromptToolsLlmAnalysis:
       service_wait_timeout_sec: 10

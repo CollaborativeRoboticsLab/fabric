@@ -4,7 +4,7 @@ Goal: consolidate Experience and monitoring into Fabric, then retire Supervisor 
 
 ## Validation Snapshot
 
-Last recorded validation: 2026-10-21, ROS Jazzy, default workspace `build/`, `install/`, and `log/`.
+Last recorded runtime check: 2026-10-22, ROS Jazzy, default workspace install. Build and test results below remain from 2026-10-21; no rebuild or test-suite rerun was performed for this check.
 
 - The original 20 selected runtime packages build without legacy Experience/Supervisor roots. The additionally approved `fabric_capabilities` completion-runner package also builds into the default install.
 - The full Fabric package gate passes, including formatting and opt-in component integration: 110 aggregate records, 0 errors, 0 failures, 16 skipped. Earlier validator and monitor suites passed 19 and four behavioral cases respectively.
@@ -52,7 +52,7 @@ Ownership rules: capabilities2 owns capability facts and event history. Fabric m
 - [x] Consume and reconstruct capability lifecycle/run evidence in Fabric's `CapabilityEventMonitor`.
 - [x] Publish execution truth on `/fabric/status` and consume it with `ExecutionStatusMonitor`.
 - [x] Add `MonitorBase` and load resource, execution, capability-event, rosout, and diagnostics monitors in Fabric.
-- [x] Move battery subscription, reading validation, and low/critical warnings into `BatteryMonitor`, configured through `BatteryMonitor.enable` and `BatteryMonitor.topic`; retain execution attribution and persistence in Fabric. Monitor and initial component-lifecycle regressions pass; the latest server rebuild is blocked by missing `Fabric::shutdownRuntime()`, so final lifecycle validation remains pending.
+- [x] Move battery subscription, reading validation, and low/critical warnings into `BatteryMonitor`, configured through `BatteryMonitor.enable` and `BatteryMonitor.topic`; retain execution attribution and persistence in Fabric. Monitor and component-lifecycle regressions pass; the earlier missing `Fabric::shutdownRuntime()` rebuild blocker is superseded by the successful build and lifecycle gates above. Actual-execution battery validation remains open.
 - [x] Route log/diagnostic output through monitor plugins instead of duplicate server subscriptions; drop the Dynamics/Odom path.
 - [x] Share `LlmAnalysisBase` prompt, embedding, and tokenization operations across monitoring, generation, and CoreGraphRAG; keep PromptTools wiring outside `fabric_base`.
 - [x] Use Fabric-owned `SystemStatus` types instead of `supervisor_msgs/SystemStatus`.
@@ -99,6 +99,9 @@ Ownership rules: capabilities2 owns capability facts and event history. Fabric m
 - [x] Validate initialized component unload and active-component container shutdown with standard configs and local model stubs.
 - [x] Fix runnable-metadata handling of missing/null/empty YAML definitions and runtime parameters, with descriptor/provider regression coverage.
 - [ ] Supply successful local model-stub responses for knowledge-core initialization, then rerun the completion-only plan through normal dispatch.
+- [ ] Investigate PromptBridge's repeated `Prompt family not found` errors and configure a working model backend before rerunning the model-backed launch; the 2026-10-22 OpenAI request was rejected for exhausted credits.
+- [ ] Remove or correct the stale `/opt/ros/humble/share` capability scan path for ROS Jazzy.
+- [ ] Report post-readiness knowledge-core initialization failures separately from capabilities2 readiness failures.
 
 ### Runtime Gates
 
@@ -121,7 +124,7 @@ Ownership rules: capabilities2 owns capability facts and event history. Fabric m
 
 ## Next Steps
 
-1. Resolve the local model-stub initialization failure and get the completion-only plan to execute with the standard configs; the missing-`definition` metadata failure is fixed.
+1. Supply valid local model-stub responses and get the harmless completion-only plan through normal dispatch. For a model-backed rerun, first resolve PromptBridge family lookup errors and backend availability; the latest launch passed tokenization but failed core construction on exhausted OpenAI credits. Do not treat plan loading as execution proof.
 2. Finish Experience service/generation isolation while preserving dispatch behavior.
 3. Validate end-to-end feedback and battery telemetry; establish reliable launch-to-execution identity before claiming resource attribution.
 4. Audit deployed consumers, refresh legacy documentation examples, and complete Supervisor parity gates.

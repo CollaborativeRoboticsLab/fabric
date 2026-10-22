@@ -24,6 +24,10 @@ public:
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
     initialize_base(node, "RosoutMonitor");
+    node_->declare_parameter(plugin_name_ + ".model_family", "openai");
+    node_->declare_parameter(plugin_name_ + ".model", "gpt-5.1");
+    node_->get_parameter(plugin_name_ + ".model_family", model_family_);
+    node_->get_parameter(plugin_name_ + ".model", model_);
   }
 
   void start() override
@@ -125,8 +129,8 @@ private:
       "Summarize the operational condition of this ROS 2 node from the provided rosout messages in one or two sentences.",
       user_prompt,
       "",
-      "",
-      "",
+      model_family_,
+      model_,
       false,
       false,
       false,
@@ -190,6 +194,8 @@ private:
     buffer_cv_.notify_all();
   }
 
+  std::string model_family_;
+  std::string model_;
   std::map<std::string, LoggingData> pending_logs_;
   std::map<std::string, LoggingData> processing_logs_;
   std::map<std::string, ComponentStatus> results_;
