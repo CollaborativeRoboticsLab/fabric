@@ -132,6 +132,12 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   find_package(fabric_parser_xml REQUIRED)
 
+  ament_add_gtest(test_fabric_runtime test/test_fabric_runtime.cpp TIMEOUT 30)
+  if(TARGET test_fabric_runtime)
+    ament_target_dependencies(test_fabric_runtime ${FABRIC_SERVER_DEPENDENCIES})
+    target_link_libraries(test_fabric_runtime ${FABRIC_SERVER_LINK_LIBRARIES})
+  endif()
+
   ament_add_gtest(test_capability_metadata test/test_capability_metadata.cpp TIMEOUT 30)
   if(TARGET test_capability_metadata)
     ament_target_dependencies(test_capability_metadata
