@@ -27,6 +27,7 @@
       use_chat_mode: false
 
     telemetry:
+      monitor_poll_frequency_hz: 2.0
       monitor_plugins:
         - "fabric::ResourceMonitor"
         - "fabric::BatteryMonitor"
@@ -34,7 +35,6 @@
         - "fabric::CapabilityEventMonitor"
         - "fabric::RosoutMonitor"
         - "fabric::RosDiagnosticsMonitor"
-      monitor_poll_frequency_hz: 2.0
 
     ResourceMonitor:
       topic: "/capabilities2_launch_proxy/resources"
