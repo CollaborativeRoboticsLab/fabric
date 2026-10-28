@@ -952,6 +952,10 @@ private:
 
     node_.declare_parameter("plan_file_path", default_plan_file_path);
     plan_file_path_ = node_.get_parameter("plan_file_path").as_string();
+    if (plan_file_path_.empty())
+    {
+      plan_file_path_ = default_plan_file_path;
+    }
 
     node_.declare_parameter("experience.enabled", false);
     use_experience_ = node_.get_parameter("experience.enabled").as_bool();

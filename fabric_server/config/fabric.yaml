@@ -1,8 +1,24 @@
 /**:
   ros__parameters:
+    use_sim_time: false
+
+    # Empty selects the installed default; launch can override this value.
+    plan_file_path: ""
     capability_client:
       bond_topic: "/capabilities/bond"
       service_wait_timeout_sec: -1
+      services:
+        get_interfaces: "/capabilities/get_interfaces"
+        get_semantic_interfaces: "/capabilities/get_semantic_interfaces"
+        get_event_snapshot: "/capabilities/get_event_snapshot"
+        get_providers: "/capabilities/get_providers"
+        get_runnable_specs: "/capabilities/get_runnable_specs"
+        establish_bond: "/capabilities/establish_bond"
+        use_capability: "/capabilities/use_capability"
+        free_capability: "/capabilities/free_capability"
+        trigger_capability: "/capabilities/trigger_capability"
+        connect_capability: "/capabilities/connect_capability"
+        ready: "/capabilities/ready"
 
     validation_plugins:
       - "fabric::CompatibilityValidation"
@@ -21,12 +37,18 @@
         tokenize: "/prompt/tokenizer"
 
     PromptToolsGenerator:
+      service_wait_timeout_sec: 10
+      prompt_request_timeout_sec: 90
+      services:
+        get_runnable_specs: "/capabilities/get_runnable_specs"
       model_family: openai
       model: gpt-5.1
       use_cache: true
       use_chat_mode: false
 
     telemetry:
+      retention_seconds: 300
+      fabric_status_topic: "/fabric/status"
       monitor_poll_frequency_hz: 2.0
       monitor_plugins:
         - "fabric::ResourceMonitor"
@@ -43,6 +65,7 @@
     BatteryMonitor:
       enable: true
       topic: "/battery_state"
+      frequency: 1.0
 
     ExecutionStatusMonitor:
       topic: "/fabric/status"
@@ -95,6 +118,23 @@
           retry_on_warning_findings: false
 
       KnowledgeCoreGraphRag:
+        embedding_dim: 1536
+        embed:
+          model_name: "text-embedding-3-small"
+          model_family: "openai"
+        prompt:
+          model_name: "gpt-4"
+          model_family: "openai"
+        tokenize:
+          model_name: "O200K_BASE"
+          model_family: "openai"
+          tokens_per_document: 20000
+          tokens_per_document_overlap: 2000
+          tokens_per_embedding: 8191
+          tokens_per_embedding_overlap: 100
+        graph:
+          clustering_algorithm: "KMEANS"
+          num_clusters: 5
         edge:
           parameter:
             min_score: 0.35
@@ -108,6 +148,25 @@
         - "fabric::DependencyValidation"
         - "fabric::DataflowValidation"
         - "fabric::SemanticValidation"
+
+      DataflowValidation:
+        weak_match_penalty_scale: 0.20
+        external_penalty: 0.08
+        configuration_penalty: 0.05
+        default_penalty: 0.03
+        partial_coverage_penalty: 0.05
+
+      SemanticValidation:
+        prompt_service: "prompt/prompt"
+        model_family: "openai"
+        model: "gpt-5.1"
+        use_cache: true
+        flush_cache: false
+        use_chat_mode: false
+        request_timeout_sec: 5.0
+        warning_confidence_threshold: 0.60
+        low_confidence_penalty: 0.10
+        warn_when_unavailable: true
 
       estimator_plugins:
         - "fabric::SuccessProbabilityPlugin"

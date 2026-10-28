@@ -10,7 +10,7 @@ from prompt_msgs.srv import Embedding, Prompt, Tokenize
 import pytest
 import rclpy
 from rclpy.parameter import Parameter
-from rcl_interfaces.srv import GetParameters
+from rcl_interfaces.srv import GetParameters, ListParameters
 import yaml
 
 
@@ -29,8 +29,10 @@ def flatten_parameters(parameters, prefix=''):
             yield Parameter(key, value=value).to_parameter_msg()
 
 
-@pytest.mark.parametrize('unload_first', [True, False])
-def test_component_initializes_and_cleans_up(tmp_path, unload_first):
+@pytest.mark.parametrize('unload_first,use_default_plan', [
+    (True, False), (False, False), (True, True),
+])
+def test_component_initializes_and_cleans_up(tmp_path, unload_first, use_default_plan):
     rclpy.init()
     node = rclpy.create_node('fabric_component_lifecycle_test')
     services = [
@@ -51,13 +53,13 @@ def test_component_initializes_and_cleans_up(tmp_path, unload_first):
         experience['SuccessProbabilityPlugin']['alpha'] = 3.0
         plan = tmp_path / 'startup.xml'
         plan.write_text('<Plan><Control type="sequential"/></Plan>')
+        if not use_default_plan:
+            parameters['plan_file_path'] = str(plan)
         request = LoadNode.Request()
         request.package_name = 'fabric_server'
         request.plugin_name = 'fabric::Fabric'
         request.node_name = 'fabric_component_probe'
         request.parameters = list(flatten_parameters(parameters))
-        request.parameters.append(
-            Parameter('plan_file_path', value=str(plan)).to_parameter_msg())
         load = node.create_client(LoadNode, '/fabric_probe_container/_container/load_node')
         unload = node.create_client(UnloadNode, '/fabric_probe_container/_container/unload_node')
         environment = os.environ.copy()
@@ -88,6 +90,8 @@ def test_component_initializes_and_cleans_up(tmp_path, unload_first):
                     if 'Fabric processing is enabled.' in log_path.read_text():
                         break
                 assert 'Fabric processing is enabled.' in log_path.read_text()
+                if use_default_plan:
+                    assert f'Plan loaded from : {fabric_share / "plans/default.xml"}' in log_path.read_text()
                 get_parameters = node.create_client(
                     GetParameters, '/fabric_component_probe/get_parameters')
                 assert get_parameters.wait_for_service(timeout_sec=5)
@@ -106,6 +110,22 @@ def test_component_initializes_and_cleans_up(tmp_path, unload_first):
                 assert values[1].string_value == 'test_family'
                 assert values[2].double_value == 0.73
                 assert values[3].double_value == 3.0
+                list_parameters = node.create_client(
+                    ListParameters, '/fabric_component_probe/list_parameters')
+                assert list_parameters.wait_for_service(timeout_sec=5)
+                list_request = ListParameters.Request()
+                list_request.depth = ListParameters.Request.DEPTH_RECURSIVE
+                future = list_parameters.call_async(list_request)
+                rclpy.spin_until_future_complete(node, future, timeout_sec=5)
+                assert future.done(), 'Parameter listing timed out'
+                configured = {parameter.name for parameter in flatten_parameters(parameters)}
+                missing = {
+                    name for name in future.result().result.names
+                    if name not in configured
+                    and name != 'start_type_description_service'
+                    and not name.startswith('qos_overrides.')
+                }
+                assert not missing, f'Parameters absent from Fabric configuration: {sorted(missing)}'
                 if unload_first:
                     unload_request = UnloadNode.Request()
                     unload_request.unique_id = response.unique_id
