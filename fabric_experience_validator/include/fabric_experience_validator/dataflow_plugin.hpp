@@ -34,16 +34,17 @@ public:
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
     initialize_base(node, "DataflowValidation");
-    node_->declare_parameter<double>(plugin_name_ + ".weak_match_penalty_scale", 0.20);
-    node_->declare_parameter<double>(plugin_name_ + ".external_penalty", 0.08);
-    node_->declare_parameter<double>(plugin_name_ + ".configuration_penalty", 0.05);
-    node_->declare_parameter<double>(plugin_name_ + ".default_penalty", 0.03);
-    node_->declare_parameter<double>(plugin_name_ + ".partial_coverage_penalty", 0.05);
-    weak_match_penalty_scale_ = node_->get_parameter(plugin_name_ + ".weak_match_penalty_scale").as_double();
-    external_penalty_ = node_->get_parameter(plugin_name_ + ".external_penalty").as_double();
-    configuration_penalty_ = node_->get_parameter(plugin_name_ + ".configuration_penalty").as_double();
-    default_penalty_ = node_->get_parameter(plugin_name_ + ".default_penalty").as_double();
-    partial_coverage_penalty_ = node_->get_parameter(plugin_name_ + ".partial_coverage_penalty").as_double();
+    const std::string parameter_namespace = "experience." + plugin_name_;
+    node_->declare_parameter<double>(parameter_namespace + ".weak_match_penalty_scale", 0.20);
+    node_->declare_parameter<double>(parameter_namespace + ".external_penalty", 0.08);
+    node_->declare_parameter<double>(parameter_namespace + ".configuration_penalty", 0.05);
+    node_->declare_parameter<double>(parameter_namespace + ".default_penalty", 0.03);
+    node_->declare_parameter<double>(parameter_namespace + ".partial_coverage_penalty", 0.05);
+    weak_match_penalty_scale_ = node_->get_parameter(parameter_namespace + ".weak_match_penalty_scale").as_double();
+    external_penalty_ = node_->get_parameter(parameter_namespace + ".external_penalty").as_double();
+    configuration_penalty_ = node_->get_parameter(parameter_namespace + ".configuration_penalty").as_double();
+    default_penalty_ = node_->get_parameter(parameter_namespace + ".default_penalty").as_double();
+    partial_coverage_penalty_ = node_->get_parameter(parameter_namespace + ".partial_coverage_penalty").as_double();
   }
 
   void validate(const PlanningRequest& request, const std::vector<BehaviourInfo>& capabilities,

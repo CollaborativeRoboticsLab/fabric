@@ -4,7 +4,9 @@ Goal: consolidate Experience and monitoring into Fabric, then retire Supervisor 
 
 ## Validation Snapshot
 
-Last recorded runtime check: 2026-10-22, ROS Jazzy, default workspace install. Build and test results below remain from 2026-10-21; no rebuild or test-suite rerun was performed for this check.
+Previous broad runtime check: 2026-10-22, ROS Jazzy, default workspace install. Broad build and test results below remain from 2026-10-21.
+
+- 2026-10-28 focused update: consolidated the knowledge core plugin as `fabric::KnowledgeCoreGraphRag`, corrected Experience parameter namespaces, rebuilt the affected plugins and server, and passed focused plugin and opt-in component lifecycle tests. The component test uses an empty registry and does not prove execution or bond formation. Previously ignored configured planner and scoring values now take effect; model-backed and parity gates remain open.
 
 - The original 20 selected runtime packages build without legacy Experience/Supervisor roots. The additionally approved `fabric_capabilities` completion-runner package also builds into the default install.
 - The full Fabric package gate passes, including formatting and opt-in component integration: 110 aggregate records, 0 errors, 0 failures, 16 skipped. Earlier validator and monitor suites passed 19 and four behavioral cases respectively.

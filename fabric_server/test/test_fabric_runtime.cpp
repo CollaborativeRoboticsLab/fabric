@@ -72,3 +72,13 @@ TEST_F(FabricRuntimeTest, AdapterRequiresExplicitInitialization)
   EXPECT_THROW(node->runtime(), std::runtime_error);
   EXPECT_NO_THROW(node->shutdownRuntime());
 }
+
+TEST_F(FabricRuntimeTest, RecognizesKnowledgeCoreForRebuild)
+{
+  namespace experience_runtime = fabric::server::experience_runtime;
+  EXPECT_TRUE(experience_runtime::isKnowledgeCoreGraphRagPlugin("fabric::KnowledgeCoreGraphRag"));
+  EXPECT_FALSE(experience_runtime::isKnowledgeCoreGraphRagPlugin("fabric::CoreGraphRag"));
+  EXPECT_FALSE(experience_runtime::isKnowledgeCoreGraphRagPlugin("fabric::GraphKnowledgeCore"));
+  EXPECT_EQ(experience_runtime::pluginParameterNamespace("fabric::KnowledgeCoreGraphRag"),
+    "experience.KnowledgeCoreGraphRag");
+}

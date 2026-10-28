@@ -7,11 +7,9 @@
 
 namespace fabric::server::experience_runtime
 {
-inline bool isCoreGraphRagPlugin(const std::string & plugin_name)
+inline bool isKnowledgeCoreGraphRagPlugin(const std::string & plugin_name)
 {
-  return plugin_name == "experience::CoreGraphRag" ||
-         plugin_name == "experience::GraphKnowledgeCore" ||
-         plugin_name == "fabric::CoreGraphRag" || plugin_name == "fabric::GraphKnowledgeCore";
+  return plugin_name == "fabric::KnowledgeCoreGraphRag";
 }
 
 inline std::string parameterName(const std::string & suffix)
@@ -49,7 +47,7 @@ inline void removePersistedCoreDbIfSupported(
   const std::string & core_plugin_name,
   const std::filesystem::path & core_db_path)
 {
-  if (!isCoreGraphRagPlugin(core_plugin_name)) {
+  if (!isKnowledgeCoreGraphRagPlugin(core_plugin_name)) {
     RCLCPP_WARN(logger,
         "rebuild=true does not know how to clear persisted state for core plugin: %s",
         core_plugin_name.c_str());

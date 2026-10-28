@@ -43,30 +43,32 @@ public:
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
     initialize_base(node, "SemanticValidation");
+    const std::string parameter_namespace = "experience." + plugin_name_;
 
-    node_->declare_parameter<std::string>(plugin_name_ + ".prompt_service", "prompt/prompt");
-    node_->declare_parameter<std::string>(plugin_name_ + ".model_family", "openai");
-    node_->declare_parameter<std::string>(plugin_name_ + ".model", "gpt-5.1");
-    node_->declare_parameter<bool>(plugin_name_ + ".use_cache", true);
-    node_->declare_parameter<bool>(plugin_name_ + ".flush_cache", false);
-    node_->declare_parameter<bool>(plugin_name_ + ".use_chat_mode", false);
-    node_->declare_parameter<double>(plugin_name_ + ".request_timeout_sec", 5.0);
-    node_->declare_parameter<double>(plugin_name_ + ".warning_confidence_threshold", 0.60);
-    node_->declare_parameter<double>(plugin_name_ + ".low_confidence_penalty", 0.10);
-    node_->declare_parameter<bool>(plugin_name_ + ".warn_when_unavailable", true);
+    node_->declare_parameter<std::string>(parameter_namespace + ".prompt_service", "prompt/prompt");
+    node_->declare_parameter<std::string>(parameter_namespace + ".model_family", "openai");
+    node_->declare_parameter<std::string>(parameter_namespace + ".model", "gpt-5.1");
+    node_->declare_parameter<bool>(parameter_namespace + ".use_cache", true);
+    node_->declare_parameter<bool>(parameter_namespace + ".flush_cache", false);
+    node_->declare_parameter<bool>(parameter_namespace + ".use_chat_mode", false);
+    node_->declare_parameter<double>(parameter_namespace + ".request_timeout_sec", 5.0);
+    node_->declare_parameter<double>(parameter_namespace + ".warning_confidence_threshold", 0.60);
+    node_->declare_parameter<double>(parameter_namespace + ".low_confidence_penalty", 0.10);
+    node_->declare_parameter<bool>(parameter_namespace + ".warn_when_unavailable", true);
 
-    prompt_service_ = node_->get_parameter(plugin_name_ + ".prompt_service").as_string();
-    model_family_ = node_->get_parameter(plugin_name_ + ".model_family").as_string();
-    model_ = node_->get_parameter(plugin_name_ + ".model").as_string();
-    use_cache_ = node_->get_parameter(plugin_name_ + ".use_cache").as_bool();
-    flush_cache_ = node_->get_parameter(plugin_name_ + ".flush_cache").as_bool();
-    use_chat_mode_ = node_->get_parameter(plugin_name_ + ".use_chat_mode").as_bool();
-    request_timeout_sec_ = node_->get_parameter(plugin_name_ + ".request_timeout_sec").as_double();
-    warning_confidence_threshold_ = node_->get_parameter(plugin_name_ + ".warning_confidence_threshold").as_double();
-    low_confidence_penalty_ = node_->get_parameter(plugin_name_ + ".low_confidence_penalty").as_double();
-    warn_when_unavailable_ = node_->get_parameter(plugin_name_ + ".warn_when_unavailable").as_bool();
+    prompt_service_ = node_->get_parameter(parameter_namespace + ".prompt_service").as_string();
+    model_family_ = node_->get_parameter(parameter_namespace + ".model_family").as_string();
+    model_ = node_->get_parameter(parameter_namespace + ".model").as_string();
+    use_cache_ = node_->get_parameter(parameter_namespace + ".use_cache").as_bool();
+    flush_cache_ = node_->get_parameter(parameter_namespace + ".flush_cache").as_bool();
+    use_chat_mode_ = node_->get_parameter(parameter_namespace + ".use_chat_mode").as_bool();
+    request_timeout_sec_ = node_->get_parameter(parameter_namespace + ".request_timeout_sec").as_double();
+    warning_confidence_threshold_ = node_->get_parameter(parameter_namespace + ".warning_confidence_threshold").as_double();
+    low_confidence_penalty_ = node_->get_parameter(parameter_namespace + ".low_confidence_penalty").as_double();
+    warn_when_unavailable_ = node_->get_parameter(parameter_namespace + ".warn_when_unavailable").as_bool();
 
-    prompt_client_ = node_->create_client<Prompt>(prompt_service_);
+    callback_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+    prompt_client_ = node_->create_client<Prompt>(prompt_service_, rclcpp::ServicesQoS(), callback_group_);
   }
 
   void validate(const PlanningRequest& request, const std::vector<BehaviourInfo>& capabilities,
@@ -295,6 +297,7 @@ protected:
     return nullptr;
   }
 
+  rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::Client<Prompt>::SharedPtr prompt_client_;
   std::string prompt_service_ = "prompt/prompt";
   std::string model_family_ = "openai";

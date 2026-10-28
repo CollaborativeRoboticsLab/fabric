@@ -105,7 +105,7 @@ public:
    */
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
-    initialize_base(node, "RapfsScorerPlugin");
+    initialize_base(node, "experience.RapfsScorerPlugin");
     loadScoringConfig();
   }
 

@@ -67,6 +67,7 @@ if(BUILD_TESTING)
     ament_target_dependencies(test_core_graphrag_utils
       rclcpp
       fabric_base
+      pluginlib
     )
     target_link_libraries(test_core_graphrag_utils
       ${PROJECT_NAME}

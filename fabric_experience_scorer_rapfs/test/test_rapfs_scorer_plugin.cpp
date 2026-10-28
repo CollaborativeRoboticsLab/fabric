@@ -24,6 +24,26 @@ std::shared_ptr<rclcpp::Node> testNode(const std::string& name)
 }
 }  // namespace
 
+TEST(RapfsScorerPlugin, UsesExperienceScopedParametersAlreadySharedWithServer)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({
+      rclcpp::Parameter("experience.RapfsScorerPlugin.calibration_version", "test_calibration"),
+      rclcpp::Parameter("experience.RapfsScorerPlugin.estimators.success.weight", 0.73),
+      rclcpp::Parameter("experience.RapfsScorerPlugin.estimator_names", std::vector<std::string>{"success"})});
+  auto node = std::make_shared<rclcpp::Node>("rapfs_scoped_parameters_test", options);
+  node->declare_parameter<std::vector<std::string>>("experience.RapfsScorerPlugin.estimator_names", {});
+  TestRapfsScorerPlugin plugin;
+  plugin.initialize(node);
+
+  fabric::planning::CandidatePlan candidate;
+  const auto score = plugin.rejectedValidationScore(candidate);
+  EXPECT_EQ(score.calibration_version, "test_calibration");
+  ASSERT_FALSE(score.score_weights.empty());
+  EXPECT_DOUBLE_EQ(score.score_weights.front(), 0.73);
+  EXPECT_FALSE(node->has_parameter("RapfsScorerPlugin.calibration_version"));
+}
+
 TEST(RapfsScorerPlugin, CountsNonSuccessTerminalsAsFailureForSuccessEstimator)
 {
   TestRapfsScorerPlugin plugin;

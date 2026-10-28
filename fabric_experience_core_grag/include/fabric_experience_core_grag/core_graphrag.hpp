@@ -48,18 +48,16 @@ using PlanFeedbackSelectionBiasSummary = ::fabric::experience::PlanFeedbackSelec
 using EstimateResult = ::fabric::experience::EstimateResult;
 using exception = ::fabric::fabric_exception;
 
-class GraphKnowledgeCore;
-
 /**
  * @brief Vector database plugin for XML plans.
  *
  * This plugin manages the vector database for XML plans.
  */
-class CoreGraphRag : public CoreBase
+class KnowledgeCoreGraphRag : public CoreBase
 {
 public:
-  CoreGraphRag() = default;
-  virtual ~CoreGraphRag() override
+  KnowledgeCoreGraphRag() = default;
+  virtual ~KnowledgeCoreGraphRag() override
   {
     shutdown();
   }
@@ -70,7 +68,7 @@ public:
    */
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
-    initialize_base(node, "CoreGraphRag");
+    initialize_base(node, "experience.KnowledgeCoreGraphRag");
 
     node_->declare_parameter<double>(plugin_name_ + ".edge.parameter.min_score", edge_parameter_min_score_);
     node_->declare_parameter<double>(plugin_name_ + ".edge.parameter.strong_score", edge_parameter_strong_score_);
@@ -84,18 +82,18 @@ public:
 
     if (!analysis_plugin_)
     {
-      throw exception("CoreGraphRag requires a configured LLM analysis plugin.");
+      throw exception("KnowledgeCoreGraphRag requires a configured LLM analysis plugin.");
     }
 
-    llmclient_ = std::make_shared<experience::llm::PromptServiceClient>(node_, "core_graphrag", analysis_plugin_);
-    RCLCPP_INFO(node_->get_logger(), "Initialized shared analysis client for CoreGraphRag.");
+    llmclient_ = std::make_shared<experience::llm::PromptServiceClient>(node_, plugin_name_, analysis_plugin_);
+    RCLCPP_INFO(node_->get_logger(), "Initialized shared analysis client for KnowledgeCoreGraphRag.");
 
     vector_db_ =
-      std::make_shared<experience::VectorDB>(node_, "core_graphrag", experience::vectordb::MetricType::COSINE, llmclient_);
-    RCLCPP_INFO(node_->get_logger(), "Initialized VectorDB for CoreGraphRag.");
+      std::make_shared<experience::VectorDB>(node_, plugin_name_, experience::vectordb::MetricType::COSINE, llmclient_);
+    RCLCPP_INFO(node_->get_logger(), "Initialized VectorDB for KnowledgeCoreGraphRag.");
 
-    graph_rag_ = std::make_shared<experience::GraphRAG>(node_);
-    RCLCPP_INFO(node_->get_logger(), "Initialized GraphRAG for CoreGraphRag.");
+    graph_rag_ = std::make_shared<experience::GraphRAG>(node_, plugin_name_);
+    RCLCPP_INFO(node_->get_logger(), "Initialized GraphRAG for KnowledgeCoreGraphRag.");
 
     inform_db_ = std::make_shared<experience::database::SQLiteDB>(node_, "core_graphrag.sqlite3");
     inform_db_->open();
@@ -114,7 +112,7 @@ public:
     inform_db_->createPlanSkillAttributionTable();
     inform_db_->createPlanSkillEdgeAttributionTable();
     inform_db_->createPlanNodeScoreExplanationTable();
-    RCLCPP_INFO(node_->get_logger(), "Initialized SQLiteDB for CoreGraphRag.");
+    RCLCPP_INFO(node_->get_logger(), "Initialized SQLiteDB for KnowledgeCoreGraphRag.");
   }
 
   /**
@@ -124,7 +122,7 @@ public:
    */
   void build(std::vector<BehaviourInfo>& info) override
   {
-    RCLCPP_INFO(node_->get_logger(), "Building CoreGraphRag with %zu capabilities.", info.size());
+    RCLCPP_INFO(node_->get_logger(), "Building KnowledgeCoreGraphRag with %zu capabilities.", info.size());
 
     // Temporary storage for node and edge information until processing is complete
     std::vector<experience::database::NodeInformation> node_infos;
@@ -498,7 +496,7 @@ public:
       RCLCPP_INFO(node_->get_logger(), "[CoreGraphRag] Upserted community: %s", kv.second.id.c_str());
     }
 
-    RCLCPP_INFO(node_->get_logger(), "Completed building CoreGraphRag.");
+    RCLCPP_INFO(node_->get_logger(), "Completed building KnowledgeCoreGraphRag.");
 
     inform_db_->writeGraph(graph_rag_->get_graph());
     RCLCPP_INFO(node_->get_logger(), "Persisted graph structure to database.");
@@ -1294,7 +1292,4 @@ protected:
   int edge_parameter_max_weak_dependencies_ = 2;
 };
 
-class GraphKnowledgeCore : public CoreGraphRag
-{
-};
 }  // namespace fabric

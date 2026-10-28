@@ -10,6 +10,8 @@ class TestPlanningPlugin : public fabric::PlanningPlugin
 public:
   using CapabilityGenerationContext = PlanningPlugin::CapabilityGenerationContext;
   using PlanningPlugin::buildGenerationPrompt;
+  using PlanningPlugin::max_capability_context_;
+  using PlanningPlugin::model_family_;
 };
 
 fabric::planning::Request request()
@@ -30,6 +32,23 @@ fabric::experience::CandidateSkillResolution resolution()
 }
 
 }  // namespace
+
+TEST(PlanningPluginParameters, UsesExperienceScopedOverrides)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("experience.PlanningPlugin.model_family", "test_family"),
+                               rclcpp::Parameter("experience.PlanningPlugin.max_capability_context", 3)});
+  auto node = std::make_shared<rclcpp::Node>("planning_plugin_parameters_test", options);
+  auto service = node->create_service<prompt_msgs::srv::Prompt>(
+      "prompt/prompt", [](const std::shared_ptr<prompt_msgs::srv::Prompt::Request>,
+                          std::shared_ptr<prompt_msgs::srv::Prompt::Response>) {});
+  TestPlanningPlugin plugin;
+  plugin.initialize(node);
+
+  EXPECT_EQ(plugin.model_family_, "test_family");
+  EXPECT_EQ(plugin.max_capability_context_, 3);
+  EXPECT_FALSE(node->has_parameter("PlanningPlugin.model_family"));
+}
 
 TEST(PlanningPluginPrompt, FormatsDependsOnAsImplicitPrerequisites)
 {

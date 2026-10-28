@@ -388,6 +388,41 @@ TEST(DataflowValidation, WarnsWhenExternalFallbackIsUsed)
   EXPECT_EQ(candidate.validation.findings.front().level, fabric::planning::ValidationFindingLevel::Warning);
 }
 
+TEST(DataflowValidation, UsesExperienceScopedPenaltyAndPreservesFindingIdentity)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("experience.DataflowValidation.external_penalty", 0.31)});
+  auto node_handle = std::make_shared<rclcpp::Node>("dataflow_scoped_penalty_test", options);
+  fabric::DataflowValidation validator;
+  validator.initialize(node_handle);
+  const auto consumer = externalFallbackCapability();
+  fabric::planning::CandidatePlan candidate;
+  candidate.nodes.push_back(node("runner_1", consumer));
+
+  validator.validate(request(), { consumer }, candidate);
+
+  EXPECT_DOUBLE_EQ(candidate.validation.total_penalty, 0.31 + 0.05);
+  ASSERT_FALSE(candidate.validation.findings.empty());
+  EXPECT_EQ(candidate.validation.findings.front().plugin_name, "DataflowValidation");
+}
+
+TEST(SemanticValidation, UsesExperienceScopedAvailabilitySetting)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("experience.SemanticValidation.warn_when_unavailable", false)});
+  auto node_handle = std::make_shared<rclcpp::Node>("semantic_scoped_setting_test", options);
+  StubSemanticValidation validator;
+  validator.initialize(node_handle);
+  validator.setDecision(std::nullopt);
+  const auto producer = producerCapability();
+  fabric::planning::CandidatePlan candidate;
+  candidate.nodes.push_back(node("runner_1", producer));
+
+  validator.validate(request(), { producer }, candidate);
+
+  EXPECT_TRUE(candidate.validation.findings.empty());
+}
+
 TEST(SemanticValidation, AcceptsAlignedPlan)
 {
   auto node_handle = testNode("semantic_validation_accepts_plan_test");

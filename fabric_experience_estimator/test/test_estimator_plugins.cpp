@@ -103,6 +103,45 @@ TEST(SuccessProbabilityPlugin, UsesBetaPriorWithoutCompletedRuns)
   EXPECT_EQ(result.reason, "beta prior mean");
 }
 
+TEST(SuccessProbabilityPlugin, UsesExperienceScopedPrior)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("experience.SuccessProbabilityPlugin.alpha", 3.0)});
+  auto node = std::make_shared<rclcpp::Node>("success_probability_scoped_prior_test", options);
+  fabric::SuccessProbabilityPlugin plugin;
+  plugin.initialize(node);
+
+  EXPECT_EQ(plugin.plugin_name(), "SuccessProbabilityPlugin");
+  EXPECT_DOUBLE_EQ(plugin.estimate(fabric::experience::EstimatorEvidence{}).value, 0.75);
+}
+
+TEST(FaultBurdenPlugin, UsesExperienceScopedWeightAndKeepsIdentity)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("experience.FaultBurdenPlugin.warning_weight", 2.5)});
+  auto node = std::make_shared<rclcpp::Node>("fault_burden_scoped_weight_test", options);
+  fabric::FaultBurdenPlugin plugin;
+  plugin.initialize(node);
+
+  fabric::experience::EstimatorEvidence evidence;
+  evidence.warning_count = 2;
+  evidence.fault_exposure_count = 2;
+  EXPECT_EQ(plugin.plugin_name(), "FaultBurdenPlugin");
+  EXPECT_DOUBLE_EQ(plugin.estimate(evidence).value, 2.5);
+}
+
+TEST(UncertaintyPlugin, UsesExperienceScopedIntervalAndKeepsIdentity)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("experience.UncertaintyPlugin.credible_interval_z", 0.0)});
+  auto node = std::make_shared<rclcpp::Node>("uncertainty_scoped_interval_test", options);
+  fabric::UncertaintyPlugin plugin;
+  plugin.initialize(node);
+
+  EXPECT_EQ(plugin.plugin_name(), "UncertaintyPlugin");
+  EXPECT_DOUBLE_EQ(plugin.estimate(fabric::experience::EstimatorEvidence{}).value, 0.0);
+}
+
 TEST(SuccessProbabilityPlugin, ReturnsPosteriorMeanWithEvidence)
 {
   auto node = testNode("success_probability_posterior_test");

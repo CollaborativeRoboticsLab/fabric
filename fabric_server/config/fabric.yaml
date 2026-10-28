@@ -12,6 +12,20 @@
     llm_analysis_plugin: fabric::PromptToolsLlmAnalysis
     generation_plugin: fabric::PromptToolsGenerator
 
+    PromptToolsLlmAnalysis:
+      service_wait_timeout_sec: 10
+      request_timeout_sec: 90
+      services:
+        prompt: "/prompt/prompt"
+        embedding: "/prompt/embedding"
+        tokenize: "/prompt/tokenizer"
+
+    PromptToolsGenerator:
+      model_family: openai
+      model: gpt-5.1
+      use_cache: true
+      use_chat_mode: false
+
     telemetry:
       monitor_plugins:
         - "fabric::ResourceMonitor"
@@ -22,13 +36,13 @@
         - "fabric::RosDiagnosticsMonitor"
       monitor_poll_frequency_hz: 2.0
 
-    BatteryMonitor:
-      enable: true
-      topic: "/battery_state"
-
     ResourceMonitor:
       topic: "/capabilities2_launch_proxy/resources"
       frequency: 1.0
+
+    BatteryMonitor:
+      enable: true
+      topic: "/battery_state"
 
     ExecutionStatusMonitor:
       topic: "/fabric/status"
@@ -53,29 +67,40 @@
       model_family: openai
       model: gpt-5.1
 
-    PromptToolsLlmAnalysis:
-      service_wait_timeout_sec: 10
-      request_timeout_sec: 90
-      services:
-        prompt: "/prompt/prompt"
-        embedding: "/prompt/embedding"
-        tokenize: "/prompt/tokenizer"
-
-    PromptToolsGenerator:
-      model_family: openai
-      model: gpt-5.1
-      use_cache: true
-      use_chat_mode: false
-
     experience:
       enabled: true
-      core_plugin: "fabric::GraphKnowledgeCore"
-      planner_plugin: "fabric::PlanningPlugin"
-      scorer_plugin: "fabric::RapfsScorerPlugin"
       rebuild: false
       consume_feedback: true
       user_feedback_root_dir: ""
       dispatch_terminal_success_only: false
+
+      planner_plugin: "fabric::PlanningPlugin"
+      core_plugin: "fabric::KnowledgeCoreGraphRag"
+      scorer_plugin: "fabric::RapfsScorerPlugin"
+
+      PlanningPlugin:
+        model_family: "openai"
+        model: "gpt-5.1"
+        use_cache: true
+        use_chat_mode: false
+        max_capability_context: 8
+        semantic_context_mode: "detailed"
+        log_semantic_context_comparison: true
+        persist_prompt_audit: true
+        prompt_audit_dir: "planner_prompt_audit"
+        prompt_audit_include_full_text: false
+        refinement:
+          max_attempts: 2
+          retry_on_penalty_findings: true
+          retry_on_warning_findings: false
+
+      KnowledgeCoreGraphRag:
+        edge:
+          parameter:
+            min_score: 0.35
+            strong_score: 0.65
+            max_weak_dependencies: 2
+      
       validation_plugins:
         - "fabric::CompatibilityValidation"
         - "fabric::ExtendedCompatibilityValidation"
@@ -168,26 +193,3 @@
       FaultBurdenPlugin:
         warning_weight: 1.0
         error_weight: 3.0
-
-      PlanningPlugin:
-        model_family: "openai"
-        model: "gpt-5.1"
-        use_cache: true
-        use_chat_mode: false
-        max_capability_context: 8
-        semantic_context_mode: "detailed"
-        log_semantic_context_comparison: true
-        persist_prompt_audit: true
-        prompt_audit_dir: "planner_prompt_audit"
-        prompt_audit_include_full_text: false
-        refinement:
-          max_attempts: 2
-          retry_on_penalty_findings: true
-          retry_on_warning_findings: false
-
-      CoreGraphRag:
-        edge:
-          parameter:
-            min_score: 0.35
-            strong_score: 0.65
-            max_weak_dependencies: 2

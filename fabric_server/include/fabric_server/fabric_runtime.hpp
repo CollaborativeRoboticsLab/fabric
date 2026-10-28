@@ -1202,7 +1202,7 @@ private:
     }
 
     // Declare and retrieve the core plugin parameter.
-    node_.declare_parameter("experience.core_plugin", "fabric::CoreGraphRag");
+    node_.declare_parameter("experience.core_plugin", "fabric::KnowledgeCoreGraphRag");
     core_plugin_name = node_.get_parameter("experience.core_plugin").as_string();
 
     RCLCPP_INFO(node_.get_logger(), "[server] Loading knowledge core plugin: %s", core_plugin_name.c_str());

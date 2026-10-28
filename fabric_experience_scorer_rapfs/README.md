@@ -117,7 +117,7 @@ Related docs:
 
 ## Configuration
 
-The plugin reads scoring parameters from the `RapfsScorerPlugin.*` namespace on the server node.
+The plugin reads scoring parameters from the `experience.RapfsScorerPlugin.*` namespace on the server node.
 
 Important groups:
 

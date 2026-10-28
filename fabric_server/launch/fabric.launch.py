@@ -1,6 +1,8 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription
 from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
@@ -13,6 +15,7 @@ def generate_launch_description():
     fabric_config = LaunchConfiguration('fabric_config')
     capabilities_config = LaunchConfiguration('capabilities_config')
     start_prompt_tools = LaunchConfiguration('start_prompt_tools')
+    start_launch_proxy = LaunchConfiguration('start_launch_proxy')
     prompt_tools_params_file = LaunchConfiguration('prompt_tools_params_file')
 
     declare_plan_file_name = DeclareLaunchArgument(
@@ -57,6 +60,12 @@ def generate_launch_description():
         description='Whether to start prompt_bridge so prompt-based plan generation is available; set false to disable it'
     )
 
+    declare_start_launch_proxy = DeclareLaunchArgument(
+        'start_launch_proxy',
+        default_value='true',
+        description='Start the capabilities2 launch proxy; disable for an external proxy'
+    )
+
     declare_prompt_tools_params_file = DeclareLaunchArgument(
         'prompt_tools_params_file',
         default_value=PathJoinSubstitution([
@@ -65,6 +74,15 @@ def generate_launch_description():
             'prompt_bridge.yaml',
         ]),
         description='Path to the prompt_bridge parameter file'
+    )
+
+    launch_proxy = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(PathJoinSubstitution([
+            FindPackageShare('capabilities2_launch_proxy'),
+            'launch',
+            'server.launch.py',
+        ])),
+        condition=IfCondition(start_launch_proxy),
     )
 
     capabilities2 = Node(
@@ -104,7 +122,9 @@ def generate_launch_description():
         declare_fabric_config,
         declare_capabilities_config,
         declare_start_prompt_tools,
+        declare_start_launch_proxy,
         declare_prompt_tools_params_file,
+        launch_proxy,
         capabilities2,
         prompt_tools,
         fabric,

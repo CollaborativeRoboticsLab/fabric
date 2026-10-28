@@ -25,14 +25,15 @@ public:
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
     initialize_base(node, "UncertaintyPlugin");
+    const std::string parameter_namespace = "experience." + plugin_name_;
 
-    node_->declare_parameter<double>(plugin_name_ + ".alpha", 1.0);
-    node_->declare_parameter<double>(plugin_name_ + ".beta", 1.0);
-    node_->declare_parameter<double>(plugin_name_ + ".credible_interval_z", 1.96);
+    node_->declare_parameter<double>(parameter_namespace + ".alpha", 1.0);
+    node_->declare_parameter<double>(parameter_namespace + ".beta", 1.0);
+    node_->declare_parameter<double>(parameter_namespace + ".credible_interval_z", 1.96);
 
-    node_->get_parameter(plugin_name_ + ".alpha", alpha_);
-    node_->get_parameter(plugin_name_ + ".beta", beta_);
-    node_->get_parameter(plugin_name_ + ".credible_interval_z", credible_interval_z_);
+    node_->get_parameter(parameter_namespace + ".alpha", alpha_);
+    node_->get_parameter(parameter_namespace + ".beta", beta_);
+    node_->get_parameter(parameter_namespace + ".credible_interval_z", credible_interval_z_);
   }
 
   /**

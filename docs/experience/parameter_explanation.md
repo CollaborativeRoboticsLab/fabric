@@ -2,7 +2,8 @@
 
 This document explains the main ROS parameters currently used by Experience,
 with emphasis on the scorer and estimator settings in
-`experience_server/config/experience_server.yaml`.
+`fabric_server/config/fabric.yaml`. Plugin settings listed below are nested under
+`experience` in YAML and have the `experience.` prefix as ROS parameter names.
 
 The parameters fall into four layers:
 
@@ -22,7 +23,7 @@ The practical rule is simple:
 
 | Parameter | Description | Current Default / Notes |
 | --- | --- | --- |
-| `core_plugin` | Selects the knowledge core implementation. | `experience::GraphKnowledgeCore`. Change this only when swapping the core storage or retrieval backend. |
+| `core_plugin` | Selects the knowledge core implementation. | `fabric::KnowledgeCoreGraphRag`. Change this only when swapping the core storage or retrieval backend. |
 | `parsing_plugin` | Selects Fabric's parser, shared internally by planning, scoring, and dispatch. This parameter is not under `experience`. | `fabric::XMLParser`; no behavior-interface plugin is needed. |
 | `planner_plugin` | Selects the planner plugin responsible for prompt generation and plan refinement. | `experience::PlanningPlugin` |
 | `scorer_plugin` | Selects the candidate-plan scorer implementation. | `experience::RapfsScorerPlugin` |
@@ -63,15 +64,22 @@ PlanningPlugin:
 
 This policy is evaluated after candidate parsing and validation. When all candidates are rejected, or when enabled severity thresholds are present, Experience can call the planner's refinement hook again using validator findings as critique.
 
-## CoreGraphRag Parameter-Edge Settings
+## KnowledgeCoreGraphRag Parameter-Edge Settings
 
-GraphRAG parameter-flow retrieval settings now live under `CoreGraphRag.edge.parameter`.
+GraphRAG parameter-flow retrieval settings now live under `KnowledgeCoreGraphRag.edge.parameter`.
+Configurations using `fabric::CoreGraphRag` or `fabric::GraphKnowledgeCore` must use
+`fabric::KnowledgeCoreGraphRag` and rename the `CoreGraphRag` parameter section to
+`KnowledgeCoreGraphRag`. The existing `core_graphrag.sqlite3` database remains unchanged.
+Core model, embedding, and clustering settings previously under `core_graphrag.*` and
+`graph_rag.*` now use `experience.KnowledgeCoreGraphRag.*` and
+`experience.KnowledgeCoreGraphRag.graph.*`, respectively. Planner, scorer, estimator,
+and Experience validator settings are likewise prefixed with `experience.` on the ROS node.
 
 | Parameter | Description | Current Default / Notes |
 | --- | --- | --- |
-| `CoreGraphRag.edge.parameter.min_score` | Minimum structural score retained for weak parameter-flow retrieval. | `0.35` |
-| `CoreGraphRag.edge.parameter.strong_score` | Threshold for `strong` edge classification when required-input coverage is complete. | `0.65` |
-| `CoreGraphRag.edge.parameter.max_weak_dependencies` | Maximum number of weak parameter dependencies included in retrieved semantic context. | `2` |
+| `KnowledgeCoreGraphRag.edge.parameter.min_score` | Minimum structural score retained for weak parameter-flow retrieval. | `0.35` |
+| `KnowledgeCoreGraphRag.edge.parameter.strong_score` | Threshold for `strong` edge classification when required-input coverage is complete. | `0.65` |
+| `KnowledgeCoreGraphRag.edge.parameter.max_weak_dependencies` | Maximum number of weak parameter dependencies included in retrieved semantic context. | `2` |
 
 These thresholds also drive persisted `edge_strength_class` labels:
 

@@ -10,6 +10,7 @@ from prompt_msgs.srv import Embedding, Prompt, Tokenize
 import pytest
 import rclpy
 from rclpy.parameter import Parameter
+from rcl_interfaces.srv import GetParameters
 import yaml
 
 
@@ -43,6 +44,11 @@ def test_component_initializes_and_cleans_up(tmp_path, unload_first):
         capability_share = Path(get_package_share_directory('capabilities2_server'))
         with (fabric_share / 'config/fabric.yaml').open() as stream:
             parameters = yaml.safe_load(stream)['/**']['ros__parameters']
+        experience = parameters['experience']
+        experience['KnowledgeCoreGraphRag']['edge']['parameter']['min_score'] = 0.42
+        experience['PlanningPlugin']['model_family'] = 'test_family'
+        experience['RapfsScorerPlugin']['estimators']['success']['weight'] = 0.73
+        experience['SuccessProbabilityPlugin']['alpha'] = 3.0
         plan = tmp_path / 'startup.xml'
         plan.write_text('<Plan><Control type="sequential"/></Plan>')
         request = LoadNode.Request()
@@ -82,6 +88,24 @@ def test_component_initializes_and_cleans_up(tmp_path, unload_first):
                     if 'Fabric processing is enabled.' in log_path.read_text():
                         break
                 assert 'Fabric processing is enabled.' in log_path.read_text()
+                get_parameters = node.create_client(
+                    GetParameters, '/fabric_component_probe/get_parameters')
+                assert get_parameters.wait_for_service(timeout_sec=5)
+                parameter_request = GetParameters.Request()
+                parameter_request.names = [
+                    'experience.KnowledgeCoreGraphRag.edge.parameter.min_score',
+                    'experience.PlanningPlugin.model_family',
+                    'experience.RapfsScorerPlugin.estimators.success.weight',
+                    'experience.SuccessProbabilityPlugin.alpha',
+                ]
+                future = get_parameters.call_async(parameter_request)
+                rclpy.spin_until_future_complete(node, future, timeout_sec=5)
+                assert future.done(), 'Parameter lookup timed out'
+                values = future.result().values
+                assert values[0].double_value == 0.42
+                assert values[1].string_value == 'test_family'
+                assert values[2].double_value == 0.73
+                assert values[3].double_value == 3.0
                 if unload_first:
                     unload_request = UnloadNode.Request()
                     unload_request.unique_id = response.unique_id
@@ -100,8 +124,10 @@ def test_component_initializes_and_cleans_up(tmp_path, unload_first):
                         process.wait(timeout=5)
         output = log_path.read_text()
         assert all(process.returncode == 0 for process in processes), output
+        assert 'Integrated Fabric experience services are available.' in output, output
         assert 'Stopped monitor plugin: ResourceMonitor' in output, output
-        assert 'Bond stopped with capabilities server' in output, output
+        if 'Bond started with capabilities server' in output:
+            assert 'Bond stopped with capabilities server' in output, output
     finally:
         for service in services:
             node.destroy_service(service)

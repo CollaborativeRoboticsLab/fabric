@@ -24,13 +24,13 @@ SCRIPT_PATHS = [
 ]
 
 
-def install_ros_stubs() -> None:
+def install_ros_stubs(monkeypatch) -> None:
     if 'rclpy' not in sys.modules:
         rclpy_module = types.ModuleType('rclpy')
         rclpy_module.init = lambda *args, **kwargs: None
         rclpy_module.shutdown = lambda *args, **kwargs: None
         rclpy_module.spin_until_future_complete = lambda *args, **kwargs: None
-        sys.modules['rclpy'] = rclpy_module
+        monkeypatch.setitem(sys.modules, 'rclpy', rclpy_module)
 
     if 'rclpy.node' not in sys.modules:
         node_module = types.ModuleType('rclpy.node')
@@ -40,10 +40,10 @@ def install_ros_stubs() -> None:
                 pass
 
         node_module.Node = Node
-        sys.modules['rclpy.node'] = node_module
+        monkeypatch.setitem(sys.modules, 'rclpy.node', node_module)
 
     if 'fabric_msgs' not in sys.modules:
-        sys.modules['fabric_msgs'] = types.ModuleType('fabric_msgs')
+        monkeypatch.setitem(sys.modules, 'fabric_msgs', types.ModuleType('fabric_msgs'))
 
     if 'fabric_msgs.srv' not in sys.modules:
         srv_module = types.ModuleType('fabric_msgs.srv')
@@ -61,7 +61,7 @@ def install_ros_stubs() -> None:
         ]:
             setattr(srv_module, service_name, make_service_type(service_name))
 
-        sys.modules['fabric_msgs.srv'] = srv_module
+        monkeypatch.setitem(sys.modules, 'fabric_msgs.srv', srv_module)
 
 
 def load_module(script_path: Path):
@@ -73,10 +73,38 @@ def load_module(script_path: Path):
     return module
 
 
-def test_python_entrypoints_import_and_expose_main():
-    install_ros_stubs()
+def test_python_entrypoints_import_and_expose_main(monkeypatch):
+    install_ros_stubs(monkeypatch)
     for script_path in SCRIPT_PATHS:
         module = load_module(script_path)
         assert callable(getattr(module, 'main', None)), (
             f'{script_path.name} does not expose main()'
         )
+
+
+def test_standard_launch_proxy_defaults_and_opt_out():
+    from launch import LaunchContext
+    from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+    from launch.substitutions import LaunchConfiguration
+    from launch.utilities import perform_substitutions
+
+    module = load_module(PACKAGE_ROOT / 'launch' / 'fabric.launch.py')
+    description = module.generate_launch_description()
+    declaration = next(
+        action for action in description.entities
+        if isinstance(action, DeclareLaunchArgument)
+        and action.name == 'start_launch_proxy'
+    )
+    proxy = next(
+        action for action in description.entities
+        if isinstance(action, IncludeLaunchDescription)
+    )
+    context = LaunchContext()
+    assert perform_substitutions(context, declaration.default_value) == 'true'
+    declaration.execute(context)
+    assert proxy.condition.evaluate(context)
+    proxy_description = proxy.launch_description_source.get_launch_description(context)
+    assert proxy_description.entities
+    context.launch_configurations['start_launch_proxy'] = 'false'
+    assert not proxy.condition.evaluate(context)
+    assert LaunchConfiguration('start_launch_proxy').perform(context) == 'false'

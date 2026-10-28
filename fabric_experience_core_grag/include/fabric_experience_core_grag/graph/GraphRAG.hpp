@@ -26,14 +26,14 @@ public:
    *
    * @param node Shared pointer to the ROS2 node.
    */
-  GraphRAG(rclcpp::Node::SharedPtr node) : Graph(node)
+  GraphRAG(rclcpp::Node::SharedPtr node, const std::string& parameter_namespace) : Graph(node)
   {
     // Initialize GraphRAG level parameters
-    node_->declare_parameter("graph_rag.clustering_algorithm", "KMEANS");
-    node_->declare_parameter("graph_rag.num_clusters", 5);
+    node_->declare_parameter(parameter_namespace + ".graph.clustering_algorithm", "KMEANS");
+    node_->declare_parameter(parameter_namespace + ".graph.num_clusters", 5);
 
-    node_->get_parameter("graph_rag.clustering_algorithm", algorithm_);
-    node_->get_parameter("graph_rag.num_clusters", clusters_);
+    node_->get_parameter(parameter_namespace + ".graph.clustering_algorithm", algorithm_);
+    node_->get_parameter(parameter_namespace + ".graph.num_clusters", clusters_);
   }
 
   /**

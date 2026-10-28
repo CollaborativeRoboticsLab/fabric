@@ -65,8 +65,9 @@ public:
    */
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
-    initialize_base(node, "PlanningPlugin");
-    prompt_client_ = node_->create_client<Prompt>("prompt/prompt");
+    initialize_base(node, "experience.PlanningPlugin");
+    callback_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+    prompt_client_ = node_->create_client<Prompt>("prompt/prompt", rclcpp::ServicesQoS(), callback_group_);
     if (!prompt_client_->wait_for_service(std::chrono::seconds(10)))
       throw std::runtime_error("Prompt service not available for PlanningPlugin");
 
@@ -948,6 +949,7 @@ protected:
     }
   }
 
+  rclcpp::CallbackGroup::SharedPtr callback_group_;
   rclcpp::Client<Prompt>::SharedPtr prompt_client_;
   std::string model_family_;
   std::string model_;

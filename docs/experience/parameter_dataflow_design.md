@@ -124,7 +124,7 @@ Current implementation also persists a discrete `edge_strength_class` with the f
 - `medium`: `min_score <= structural_score < strong_score` and required-input coverage is complete
 - `weak`: below `min_score`, or any edge with partial required-input coverage
 
-The current defaults are loaded from `CoreGraphRag.edge.parameter.{min_score,strong_score,max_weak_dependencies}`.
+The current defaults are loaded from `KnowledgeCoreGraphRag.edge.parameter.{min_score,strong_score,max_weak_dependencies}`.
 
 Use this score in retrieval as follows:
 

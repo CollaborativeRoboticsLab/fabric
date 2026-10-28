@@ -1,10 +1,5 @@
 <library path="fabric_experience_core_grag">
-  <class type="fabric::CoreGraphRag" base_class_type="fabric::CoreBase">
-    <description>
-      Stores and retrieves experience data using a graph-rag based approach.
-    </description>
-  </class>
-  <class type="fabric::GraphKnowledgeCore" base_class_type="fabric::CoreBase">
+  <class type="fabric::KnowledgeCoreGraphRag" base_class_type="fabric::CoreBase">
     <description>
       Stores and retrieves experience data using a system-neutral graph knowledge core.
     </description>

@@ -23,12 +23,13 @@ public:
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
     initialize_base(node, "FaultBurdenPlugin");
+    const std::string parameter_namespace = "experience." + plugin_name_;
 
-    node_->declare_parameter<double>(plugin_name_ + ".warning_weight", 1.0);
-    node_->declare_parameter<double>(plugin_name_ + ".error_weight", 3.0);
+    node_->declare_parameter<double>(parameter_namespace + ".warning_weight", 1.0);
+    node_->declare_parameter<double>(parameter_namespace + ".error_weight", 3.0);
 
-    node_->get_parameter(plugin_name_ + ".warning_weight", warning_weight_);
-    node_->get_parameter(plugin_name_ + ".error_weight", error_weight_);
+    node_->get_parameter(parameter_namespace + ".warning_weight", warning_weight_);
+    node_->get_parameter(parameter_namespace + ".error_weight", error_weight_);
   }
 
   /**
