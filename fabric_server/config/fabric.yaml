@@ -42,7 +42,7 @@
       services:
         get_runnable_specs: "/capabilities/get_runnable_specs"
       model_family: openai
-      model: gpt-5.1
+      model: gpt-6.1-terra
       use_cache: true
       use_chat_mode: false
 
@@ -82,13 +82,13 @@
       topic: "/rosout"
       frequency: 1.0
       model_family: openai
-      model: gpt-5.1
+      model: gpt-6-luna
 
     RosDiagnosticsMonitor:
       topic: "/diagnostics"
       frequency: 1.0
       model_family: openai
-      model: gpt-5.1
+      model: gpt-6-luna
 
     experience:
       enabled: true
@@ -103,7 +103,7 @@
 
       PlanningPlugin:
         model_family: "openai"
-        model: "gpt-5.1"
+        model: "gpt-6.1-terra"
         use_cache: true
         use_chat_mode: false
         max_capability_context: 8
@@ -123,11 +123,11 @@
           model_name: "text-embedding-3-small"
           model_family: "openai"
         prompt:
-          model_name: "gpt-4"
+          model_name: "gpt-6-luna"
           model_family: "openai"
         tokenize:
           model_name: "O200K_BASE"
-          model_family: "openai"
+          model_family: "openai
           tokens_per_document: 20000
           tokens_per_document_overlap: 2000
           tokens_per_embedding: 8191
@@ -159,7 +159,7 @@
       SemanticValidation:
         prompt_service: "prompt/prompt"
         model_family: "openai"
-        model: "gpt-5.1"
+        model: "gpt-6-luna"
         use_cache: true
         flush_cache: false
         use_chat_mode: false
