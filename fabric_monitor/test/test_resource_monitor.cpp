@@ -310,6 +310,124 @@ TEST_F(ResourceMonitorTest, RosoutPromptUsesConfiguredModel)
   checkPromptParameters<fabric::RosoutMonitor>("RosoutMonitor", message, true);
 }
 
+TEST_F(ResourceMonitorTest, RosoutIgnoresInfoAndPromptBridgeLogs)
+{
+  rclcpp::NodeOptions options;
+  options.enable_rosout(false);
+  options.parameter_overrides({ rclcpp::Parameter("RosoutMonitor.topic", "/monitor_filter_test"),
+                                rclcpp::Parameter("RosoutMonitor.frequency", 1000.0) });
+  auto node = std::make_shared<rclcpp::Node>("monitor_filter_test", options);
+  auto analysis = std::make_shared<RecordingAnalysis>();
+  auto request = analysis->request_.get_future();
+  fabric::RosoutMonitor monitor;
+  monitor.initialize(node);
+  monitor.configureAnalysis(analysis);
+  auto publisher = node->create_publisher<rcl_interfaces::msg::Log>("/monitor_filter_test", rclcpp::QoS(10).best_effort());
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node);
+  monitor.start();
+
+  const auto deadline = std::chrono::steady_clock::now() + 3s;
+  while (publisher->get_subscription_count() == 0 && std::chrono::steady_clock::now() < deadline)
+  {
+    executor.spin_once(10ms);
+  }
+  EXPECT_GT(publisher->get_subscription_count(), 0u);
+  rcl_interfaces::msg::Log message;
+  message.name = "other_node";
+  message.level = rcl_interfaces::msg::Log::INFO;
+  message.msg = "ignored info";
+  publisher->publish(message);
+  message.name = "robot.prompt_bridge";
+  message.level = rcl_interfaces::msg::Log::ERROR;
+  message.msg = "ignored bridge error";
+  publisher->publish(message);
+  const auto filtered_deadline = std::chrono::steady_clock::now() + 300ms;
+  while (std::chrono::steady_clock::now() < filtered_deadline)
+  {
+    executor.spin_once(10ms);
+  }
+  EXPECT_EQ(request.wait_for(0ms), std::future_status::timeout);
+
+  message.name = "other_node";
+  message.level = rcl_interfaces::msg::Log::WARN;
+  message.msg = "actionable warning";
+  while (request.wait_for(0ms) != std::future_status::ready && std::chrono::steady_clock::now() < deadline)
+  {
+    publisher->publish(message);
+    executor.spin_once(10ms);
+  }
+  monitor.stop();
+  ASSERT_EQ(request.wait_for(0ms), std::future_status::ready);
+  const auto captured = request.get();
+  EXPECT_NE(captured.user_prompt.find("actionable warning"), std::string::npos);
+  EXPECT_EQ(captured.user_prompt.find("ignored"), std::string::npos);
+}
+
+TEST_F(ResourceMonitorTest, RosoutUsesConfiguredFilters)
+{
+  rclcpp::NodeOptions options;
+  options.enable_rosout(false);
+  options.parameter_overrides({ rclcpp::Parameter("RosoutMonitor.topic", "/monitor_custom_filter_test"),
+                                rclcpp::Parameter("RosoutMonitor.frequency", 1000.0),
+                                rclcpp::Parameter("RosoutMonitor.minimum_log_level", "error"),
+                                rclcpp::Parameter("RosoutMonitor.excluded_loggers",
+                                                  std::vector<std::string>{"ignored_node"}) });
+  auto node = std::make_shared<rclcpp::Node>("monitor_custom_filter_test", options);
+  auto analysis = std::make_shared<RecordingAnalysis>();
+  auto request = analysis->request_.get_future();
+  fabric::RosoutMonitor monitor;
+  monitor.initialize(node);
+  monitor.configureAnalysis(analysis);
+  auto publisher = node->create_publisher<rcl_interfaces::msg::Log>(
+    "/monitor_custom_filter_test", rclcpp::QoS(10).best_effort());
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node);
+  monitor.start();
+
+  const auto deadline = std::chrono::steady_clock::now() + 3s;
+  while (publisher->get_subscription_count() == 0 && std::chrono::steady_clock::now() < deadline)
+  {
+    executor.spin_once(10ms);
+  }
+  EXPECT_GT(publisher->get_subscription_count(), 0u);
+  rcl_interfaces::msg::Log message;
+  message.name = "other_node";
+  message.level = rcl_interfaces::msg::Log::WARN;
+  message.msg = "ignored warning";
+  publisher->publish(message);
+  message.name = "robot.ignored_node";
+  message.level = rcl_interfaces::msg::Log::ERROR;
+  message.msg = "ignored logger";
+  publisher->publish(message);
+  const auto filtered_deadline = std::chrono::steady_clock::now() + 300ms;
+  while (std::chrono::steady_clock::now() < filtered_deadline)
+  {
+    executor.spin_once(10ms);
+  }
+  EXPECT_EQ(request.wait_for(0ms), std::future_status::timeout);
+
+  message.name = "other_node";
+  message.msg = "actionable error";
+  while (request.wait_for(0ms) != std::future_status::ready && std::chrono::steady_clock::now() < deadline)
+  {
+    publisher->publish(message);
+    executor.spin_once(10ms);
+  }
+  monitor.stop();
+  ASSERT_EQ(request.wait_for(0ms), std::future_status::ready);
+  EXPECT_NE(request.get().user_prompt.find("actionable error"), std::string::npos);
+}
+
+TEST_F(ResourceMonitorTest, RosoutRejectsInvalidMinimumLevel)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("RosoutMonitor.minimum_log_level", "invalid")});
+  auto node = std::make_shared<rclcpp::Node>("monitor_invalid_level_test", options);
+  fabric::RosoutMonitor monitor;
+  EXPECT_THROW(monitor.initialize(node), std::invalid_argument);
+}
+
 TEST_F(ResourceMonitorTest, DiagnosticsPromptUsesDefaultModel)
 {
   diagnostic_msgs::msg::DiagnosticArray message;

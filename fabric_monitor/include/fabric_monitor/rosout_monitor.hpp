@@ -1,10 +1,14 @@
 #pragma once
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <condition_variable>
 #include <map>
 #include <mutex>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 #include <rcl_interfaces/msg/log.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -26,6 +30,21 @@ public:
     initialize_base(node, "RosoutMonitor");
     node_->declare_parameter(plugin_name_ + ".model_family", "openai");
     node_->declare_parameter(plugin_name_ + ".model", "gpt-5.1");
+    auto minimum_level = node_->declare_parameter(plugin_name_ + ".minimum_log_level", "WARN");
+    excluded_loggers_ = node_->declare_parameter(
+      plugin_name_ + ".excluded_loggers", std::vector<std::string>{"prompt_bridge"});
+    std::transform(minimum_level.begin(), minimum_level.end(), minimum_level.begin(),
+                   [](unsigned char character) { return static_cast<char>(std::toupper(character)); });
+    const std::map<std::string, uint8_t> levels{
+      {"DEBUG", rcl_interfaces::msg::Log::DEBUG}, {"INFO", rcl_interfaces::msg::Log::INFO},
+      {"WARN", rcl_interfaces::msg::Log::WARN}, {"ERROR", rcl_interfaces::msg::Log::ERROR},
+      {"FATAL", rcl_interfaces::msg::Log::FATAL}};
+    const auto level = levels.find(minimum_level);
+    if (level == levels.end())
+    {
+      throw std::invalid_argument("RosoutMonitor.minimum_log_level must be DEBUG, INFO, WARN, ERROR, or FATAL");
+    }
+    minimum_log_level_ = level->second;
     node_->get_parameter(plugin_name_ + ".model_family", model_family_);
     node_->get_parameter(plugin_name_ + ".model", model_);
   }
@@ -165,6 +184,20 @@ private:
 
   void rosoutCallback(const rcl_interfaces::msg::Log::ConstSharedPtr& msg)
   {
+    if (msg->level < minimum_log_level_)
+    {
+      return;
+    }
+    for (const auto& logger : excluded_loggers_)
+    {
+      if (!logger.empty() && (msg->name == logger ||
+          (msg->name.size() > logger.size() &&
+           msg->name.compare(msg->name.size() - logger.size() - 1, logger.size() + 1, "." + logger) == 0)))
+      {
+        return;
+      }
+    }
+
     std::lock_guard<std::mutex> lock(buffer_mutex_);
     auto& node_logs = pending_logs_[msg->name];
     node_logs.timestamp.sec = msg->stamp.sec;
@@ -196,6 +229,8 @@ private:
 
   std::string model_family_;
   std::string model_;
+  uint8_t minimum_log_level_{rcl_interfaces::msg::Log::WARN};
+  std::vector<std::string> excluded_loggers_;
   std::map<std::string, LoggingData> pending_logs_;
   std::map<std::string, LoggingData> processing_logs_;
   std::map<std::string, ComponentStatus> results_;
