@@ -76,24 +76,17 @@ def generate_launch_description():
         description='Path to the prompt_bridge parameter file'
     )
 
-    launch_proxy = IncludeLaunchDescription(
+    capabilities2 = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(PathJoinSubstitution([
-            FindPackageShare('capabilities2_launch_proxy'),
+            FindPackageShare('capabilities2_server'),
             'launch',
-            'server.launch.py',
+            'capabilities2_server.launch.py',
         ])),
-        condition=IfCondition(start_launch_proxy),
+        launch_arguments={
+            'capabilities_config': capabilities_config,
+            'enable_launch_proxy': start_launch_proxy,
+        }.items(),
     )
-
-    capabilities2 = Node(
-            package='capabilities2_server',
-            namespace='',
-            executable='capabilities2_server_node',
-            name='capabilities',
-            output='screen',
-            parameters=[capabilities_config],
-            arguments=['--ros-args', '--log-level', 'info']
-        )
 
     fabric = Node(
             package='fabric_server',
@@ -124,7 +117,6 @@ def generate_launch_description():
         declare_start_prompt_tools,
         declare_start_launch_proxy,
         declare_prompt_tools_params_file,
-        launch_proxy,
         capabilities2,
         prompt_tools,
         fabric,
