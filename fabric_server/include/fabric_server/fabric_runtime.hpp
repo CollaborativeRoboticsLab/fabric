@@ -296,11 +296,6 @@ public:
     {
       found = tryCancelQueuedPlan(plan_id, bond_id_to_cancel);
     }
-    const auto bond = bond_client_cache_.find(bond_id_to_cancel);
-    if (bond != bond_client_cache_.end())
-    {
-      bond->second->stop();
-    }
     return found;
   }
 
@@ -643,6 +638,10 @@ private:
     {
       return;
     }
+    if (capability_client_)
+    {
+      capability_client_->cancel_pending_requests();
+    }
     {
       // Notify all waiting threads that the system is shutting down
       std::lock_guard<std::mutex> lock(system_status_mutex_);
@@ -723,6 +722,35 @@ private:
   /** @brief Drain queued plans through parsing, validation, capability setup, and execution. */
   void execution_process()
   {
+    std::optional<fabric::plan::Plan> pending_completion;
+    auto release_plan = [this](fabric::plan::Plan& plan, bool completed) {
+      try
+      {
+        capability_client_->free_capabilities(plan);
+      }
+      catch (const std::exception& e)
+      {
+        RCLCPP_ERROR(node_.get_logger(), "[server] Capability cleanup failed: %s", e.what());
+      }
+      auto bond = bond_client_cache_.find(plan.bond_id);
+      if (bond != bond_client_cache_.end())
+      {
+        bond->second->stop();
+        bond_client_cache_.erase(bond);
+      }
+      if (completed)
+      {
+        plan.status = fabric::plan::Status::COMPLETED;
+        publishPlanStatus(plan);
+      }
+    };
+    auto finish_pending = [&]() {
+      if (pending_completion)
+      {
+        release_plan(*pending_completion, true);
+        pending_completion.reset();
+      }
+    };
     // Check if the fabric is shutting down before processing the next plan
     while (!shutting_down_.load())
     {
@@ -732,6 +760,7 @@ private:
 
       if (!tryDequeueNextPlan(current_plan_))
       {
+        finish_pending();
         break;
       }
 
@@ -740,6 +769,7 @@ private:
       if (current_plan_.status == fabric::plan::Status::CANCELLED)
       {
         RCLCPP_INFO(node_.get_logger(), "[server] Skipping cancelled plan with id: %s", current_plan_.plan_id.c_str());
+        finish_pending();
         continue;
       }
 
@@ -755,6 +785,7 @@ private:
       {
         RCLCPP_ERROR(node_.get_logger(), "[server] Fabric plan parsing failed with error: %s", e.what());
         setCurrentPlanStatus(fabric::plan::Status::PARSE_FAILED);
+        finish_pending();
         continue;
       }
       RCLCPP_INFO(node_.get_logger(), "[server] Fabric plan parsing completed successfully.");
@@ -772,6 +803,7 @@ private:
       {
         RCLCPP_ERROR(node_.get_logger(), "[server] Capability information retrieval failed with error: %s", e.what());
         setCurrentPlanStatus(fabric::plan::Status::VALIDATION_FAILED);
+        finish_pending();
         continue;
       }
 
@@ -791,6 +823,7 @@ private:
       {
         RCLCPP_ERROR(node_.get_logger(), "[server] Compatibility validation failed with error: %s", e.what());
         setCurrentPlanStatus(fabric::plan::Status::VALIDATION_FAILED);
+        finish_pending();
         continue;
       }
 
@@ -806,6 +839,7 @@ private:
       {
         RCLCPP_ERROR(node_.get_logger(), "[server] Capability bond request failed with error: %s", e.what());
         setCurrentPlanStatus(fabric::plan::Status::BOND_FAILED);
+        finish_pending();
         continue;
       }
 
@@ -813,19 +847,6 @@ private:
       RCLCPP_INFO(node_.get_logger(), "[server] Establishing bond with id : %s", current_plan_.bond_id.c_str());
       bond_client_cache_[current_plan_.bond_id] = std::make_unique<BondClient>(node_.shared_from_this(), current_plan_.bond_id);
       bond_client_cache_[current_plan_.bond_id]->start();
-
-      // Remove old bonds if any
-      if (bond_client_cache_.size() > 1)
-      {
-        for (auto& [old_bond_id, bond_client] : bond_client_cache_)
-        {
-          if (old_bond_id != current_plan_.bond_id)
-          {
-            bond_client->stop();
-            RCLCPP_INFO(node_.get_logger(), "[server] Stopping and removing old bond with id : %s", old_bond_id.c_str());
-          }
-        }
-      }
 
       RCLCPP_INFO(node_.get_logger(), "[server] Bond established with id : %s", current_plan_.bond_id.c_str());
 
@@ -842,9 +863,12 @@ private:
         RCLCPP_ERROR(node_.get_logger(), "[server] Capability usage failed with error: %s", e.what());
         setCurrentPlanStatus(fabric::plan::Status::CAPABILITY_START_FAILED);
 
-        capability_client_->free_capabilities(current_plan_);
+        release_plan(current_plan_, false);
+        finish_pending();
         continue;
       }
+
+      finish_pending();
 
       // connect the capabilities as per the plan
       try
@@ -859,7 +883,7 @@ private:
         RCLCPP_ERROR(node_.get_logger(), "[server] Capability connection failed with error: %s", e.what());
         setCurrentPlanStatus(fabric::plan::Status::CAPABILITY_CONNECT_FAILED);
 
-        capability_client_->free_capabilities(current_plan_);
+        release_plan(current_plan_, false);
         continue;
       }
 
@@ -876,6 +900,9 @@ private:
       catch (const fabric::fabric_exception& e)
       {
         RCLCPP_ERROR(node_.get_logger(), "[server] Capability trigger failed with error: %s", e.what());
+        setCurrentPlanStatus(fabric::plan::Status::CAPABILITY_START_FAILED);
+        release_plan(current_plan_, false);
+        continue;
       }
 
       RCLCPP_INFO(node_.get_logger(), "[server] First capability triggered successfully.");
@@ -898,11 +925,18 @@ private:
       if (current_plan_.status == fabric::plan::Status::CANCELLED)
       {
         RCLCPP_INFO(node_.get_logger(), "[server] Fabric plan cancelled. Releasing capabilities.");
-        capability_client_->free_capabilities(current_plan_);
+        release_plan(current_plan_, false);
         continue;
       }
 
-      setCurrentPlanStatus(fabric::plan::Status::COMPLETED);
+      if (hasQueuedPlans())
+      {
+        pending_completion = current_plan_;
+      }
+      else
+      {
+        release_plan(current_plan_, true);
+      }
       RCLCPP_INFO(node_.get_logger(), "[server] Fabric processing completed. Waiting for next plan.");
     }
   }

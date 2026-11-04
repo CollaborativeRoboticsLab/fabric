@@ -145,6 +145,12 @@ if(BUILD_TESTING)
     target_link_libraries(test_capability_metadata yaml-cpp)
   endif()
 
+  ament_add_gtest(test_capability_lifecycle test/test_capability_lifecycle.cpp TIMEOUT 30)
+  if(TARGET test_capability_lifecycle)
+    ament_target_dependencies(test_capability_lifecycle ${FABRIC_SERVER_DEPENDENCIES})
+    target_link_libraries(test_capability_lifecycle yaml-cpp)
+  endif()
+
   ament_add_gtest(test_internal_parsing test/test_internal_parsing.cpp)
   if(TARGET test_internal_parsing)
     ament_target_dependencies(test_internal_parsing fabric_base fabric_parser_xml rclcpp TinyXML2)

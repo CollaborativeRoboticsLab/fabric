@@ -2,9 +2,19 @@
 
 Goal: consolidate Experience and monitoring into Fabric, then retire Supervisor only after telemetry and feedback parity is proven.
 
+## Plan Lifecycle Design
+
+- [ ] Validate partial plan setup cleanup across failures. Explicit use, connect, and trigger results are checked, with focused client tests.
+- [ ] Track each plan's bond, acquired capabilities, connections, and completion state independently; evaluate an `active_plan` structure and map before enabling concurrent execution. The client now synchronizes concurrent claims and separate-bond cleanup; shared action and service runners still use common per-execution state and cannot safely execute overlapping plans.
+- [ ] Remove a completed plan's connections and ownership, and break only that plan's bond during completion; make cleanup idempotent and preserve bond-break recovery.
+- [x] Agree on handoff semantics: retaining shared resources requires the next plan to acquire them before the previous plan releases its bond; otherwise a gap and restart are possible. Sequential handoff implements this ordering.
+- [ ] Test shared-capability handoff, completion without a successor, partial failure, cancellation, and overlapping plans once supported.
+
 ## Validation Snapshot
 
 Previous broad runtime check: 2026-10-22, ROS Jazzy, default workspace install. Broad build and test results below remain from 2026-10-21.
+
+- 2026-11-04 live TurtleBot run: pose acquisition, model-backed plan generation, sequential handoff, and navigation to the generated waypoint succeeded. Nav2 and SLAM stayed running until the successor completed. An earlier generated plan selected the generic waypoint provider and failed due to a conflicting Nav2 dependency; deterministic provider selection remains open. Cleanup logged attempts to cancel already-completed action goals. This does not validate overlapping plans or other failure and cancellation paths.
 
 - 2026-10-28 focused update: consolidated the knowledge core plugin as `fabric::KnowledgeCoreGraphRag`, corrected Experience parameter namespaces, rebuilt the affected plugins and server, and passed focused plugin and opt-in component lifecycle tests. The component test uses an empty registry and does not prove execution or bond formation. Previously ignored configured planner and scoring values now take effect; model-backed and parity gates remain open.
 

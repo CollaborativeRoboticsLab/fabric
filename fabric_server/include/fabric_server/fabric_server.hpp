@@ -189,8 +189,11 @@ private:
   {
     const auto goal = goal_handle->get_goal();
     const auto context = this->get_node_base_interface()->get_context();
+
     GenerationCallbacks callbacks;
+
     callbacks.cancelled = [goal_handle]() { return goal_handle->is_canceling(); };
+
     callbacks.progress = [goal_handle, context](const GenerationProgress& progress) {
       if (rclcpp::ok(context) && goal_handle->is_active())
       {
@@ -200,6 +203,7 @@ private:
         goal_handle->publish_feedback(feedback);
       }
     };
+
     callbacks.complete = [goal_handle, context, header = goal->header](const GenerationResult& generated) {
       if (!rclcpp::ok(context) || !goal_handle->is_active())
       {
@@ -223,6 +227,8 @@ private:
         goal_handle->abort(result);
       }
     };
+
+    // try to start generation. or complete immediately if it fails.
     try
     {
       if (runtime_->startGeneration(GenerationRequest{ goal->task, goal->uuid, goal->flush, goal->auto_queue }, callbacks))
@@ -234,6 +240,8 @@ private:
     {
       RCLCPP_ERROR(this->get_logger(), "Unable to start generation: %s", error.what());
     }
+
+    // if we reach this point, generation could not be started, so complete immediately with an empty result.
     callbacks.complete(GenerationResult{});
   }
 
@@ -273,6 +281,7 @@ private:
       const auto plan = runtime_->parsePlan(request->plan);
       response->success = true;
       response->error.clear();
+
       for (const auto& entry : plan.connections)
       {
         const auto& connection = entry.second;
