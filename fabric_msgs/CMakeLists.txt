@@ -22,6 +22,7 @@ set(srv_files
   "srv/CancelFabricPlan.srv"
   "srv/CompleteFabric.srv"
   "srv/GetPlanStatus.srv"
+  "srv/GetFabricPlanSnapshot.srv"
   "srv/ParsePlan.srv"
   "srv/GetScoringEpoch.srv"
   "srv/GetPlanScoreExplanation.srv"

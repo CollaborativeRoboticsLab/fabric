@@ -28,11 +28,11 @@ public:
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
     initialize_base(node, "RosoutMonitor");
-    node_->declare_parameter(plugin_name_ + ".model_family", "openai");
-    node_->declare_parameter(plugin_name_ + ".model", "gpt-5.1");
-    auto minimum_level = node_->declare_parameter(plugin_name_ + ".minimum_log_level", "WARN");
+    node_->declare_parameter(parameter_namespace() + ".model_family", "openai");
+    node_->declare_parameter(parameter_namespace() + ".model", "gpt-5.1");
+    auto minimum_level = node_->declare_parameter(parameter_namespace() + ".minimum_log_level", "WARN");
     excluded_loggers_ = node_->declare_parameter(
-      plugin_name_ + ".excluded_loggers", std::vector<std::string>{"prompt_bridge"});
+      parameter_namespace() + ".excluded_loggers", std::vector<std::string>{"prompt_bridge"});
     std::transform(minimum_level.begin(), minimum_level.end(), minimum_level.begin(),
                    [](unsigned char character) { return static_cast<char>(std::toupper(character)); });
     const std::map<std::string, uint8_t> levels{
@@ -42,11 +42,11 @@ public:
     const auto level = levels.find(minimum_level);
     if (level == levels.end())
     {
-      throw std::invalid_argument("RosoutMonitor.minimum_log_level must be DEBUG, INFO, WARN, ERROR, or FATAL");
+      throw std::invalid_argument("experience.RosoutMonitor.minimum_log_level must be DEBUG, INFO, WARN, ERROR, or FATAL");
     }
     minimum_log_level_ = level->second;
-    node_->get_parameter(plugin_name_ + ".model_family", model_family_);
-    node_->get_parameter(plugin_name_ + ".model", model_);
+    node_->get_parameter(parameter_namespace() + ".model_family", model_family_);
+    node_->get_parameter(parameter_namespace() + ".model", model_);
   }
 
   void start() override

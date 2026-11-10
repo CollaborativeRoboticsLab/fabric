@@ -38,13 +38,13 @@ public:
   {
     initialize_base(node, "CapabilityEventMonitor");
 
-    node_->declare_parameter<std::string>(plugin_name_ + ".service_name", "/capabilities/get_event_snapshot");
-    node_->declare_parameter<int>(plugin_name_ + ".service_wait_timeout_sec", -1);
-    node_->declare_parameter<int>(plugin_name_ + ".max_events", 100);
+    node_->declare_parameter<std::string>(parameter_namespace() + ".service_name", "/capabilities/get_event_snapshot");
+    node_->declare_parameter<int>(parameter_namespace() + ".service_wait_timeout_sec", -1);
+    node_->declare_parameter<int>(parameter_namespace() + ".max_events", 100);
 
-    service_name_ = node_->get_parameter(plugin_name_ + ".service_name").as_string();
-    service_wait_timeout_sec_ = node_->get_parameter(plugin_name_ + ".service_wait_timeout_sec").as_int();
-    const int max_events = node_->get_parameter(plugin_name_ + ".max_events").as_int();
+    service_name_ = node_->get_parameter(parameter_namespace() + ".service_name").as_string();
+    service_wait_timeout_sec_ = node_->get_parameter(parameter_namespace() + ".service_wait_timeout_sec").as_int();
+    const int max_events = node_->get_parameter(parameter_namespace() + ".max_events").as_int();
     max_events_ = max_events > 0 ? static_cast<uint32_t>(max_events) : 100U;
 
     snapshot_client_ = node_->create_client<GetEventSnapshot>(service_name_);

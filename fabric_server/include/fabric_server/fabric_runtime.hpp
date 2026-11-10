@@ -50,6 +50,7 @@
 #include <fabric_server/bond_client.hpp>
 #include <fabric_server/utils/experience_runtime.hpp>
 #include <fabric_server/utils/feedback.hpp>
+#include <fabric_server/utils/plan_snapshot.hpp>
 #include <fabric_server/utils/planning.hpp>
 #include <fabric_server/utils/status.hpp>
 #include <fabric_server/utils/telemetry.hpp>
@@ -215,7 +216,10 @@ public:
     initializePlanValidationPlugins();
     initializeParsingPlugin();
     initializeLlmAnalysisPlugin();
-    initializeMonitorPlugins();
+    if (use_experience_)
+    {
+      initializeMonitorPlugins();
+    }
     initializeGenerationPlugin();
     initializeCapabilityClient();
     queueStarterPlan();
@@ -282,25 +286,26 @@ public:
    */
   bool cancelPlan(const std::string& plan_id)
   {
-    std::lock_guard<std::recursive_mutex> lock(current_plan_mutex_);
     std::string bond_id_to_cancel;
-    bool found = false;
-    if (current_plan_.plan_id == plan_id)
+    if (tryCancelQueuedPlan(plan_id, bond_id_to_cancel))
     {
-      setCurrentPlanStatus(fabric::plan::Status::CANCELLED);
-      bond_id_to_cancel = current_plan_.bond_id;
-      markPlanCompleted();
-      found = true;
+      return true;
     }
-    else
+
+    std::lock_guard<std::recursive_mutex> lock(current_plan_mutex_);
+    if (current_plan_.plan_id != plan_id)
     {
-      found = tryCancelQueuedPlan(plan_id, bond_id_to_cancel);
+      return false;
     }
-    return found;
+
+    setCurrentPlanStatus(fabric::plan::Status::CANCELLED);
+    bond_id_to_cancel = current_plan_.bond_id;
+    markPlanCompleted();
+    return true;
   }
 
   /**
-   * @brief Wake execution after receiving completion for the current plan.
+   * @brief Publish completion and wake execution for the current plan.
    * @param plan_id Execution plan ID reported complete.
    * @return Whether the ID matches the current plan.
    */
@@ -311,6 +316,7 @@ public:
     {
       return false;
     }
+    setCurrentPlanStatus(fabric::plan::Status::COMPLETED);
     markPlanCompleted();
     return true;
   }
@@ -323,21 +329,31 @@ public:
    */
   std::optional<fabric::plan::Plan> getPlanStatus(const std::string& plan_id, const std::string& bond_id)
   {
+    if (!plan_id.empty() || !bond_id.empty())
+    {
+      std::lock_guard<std::mutex> queue_lock(queue_mutex_);
+      for (const auto& plan : plan_queue_)
+      {
+        if ((!plan_id.empty() && plan.plan_id == plan_id) || (!bond_id.empty() && plan.bond_id == bond_id))
+        {
+          return plan;
+        }
+      }
+    }
+
     std::lock_guard<std::recursive_mutex> current_lock(current_plan_mutex_);
     if ((plan_id.empty() && bond_id.empty()) || (!plan_id.empty() && current_plan_.plan_id == plan_id) ||
         (!bond_id.empty() && current_plan_.bond_id == bond_id))
     {
       return current_plan_;
     }
-    std::lock_guard<std::mutex> queue_lock(queue_mutex_);
-    for (const auto& plan : plan_queue_)
-    {
-      if ((!plan_id.empty() && plan.plan_id == plan_id) || (!bond_id.empty() && plan.bond_id == bond_id))
-      {
-        return plan;
-      }
-    }
     return std::nullopt;
+  }
+
+  /** @brief Read the most recently published current-plan snapshot without waiting on execution. */
+  std::shared_ptr<const CurrentPlanSnapshot> getCurrentPlanSnapshot() const
+  {
+    return current_plan_snapshot_.load();
   }
 
   /**
@@ -741,6 +757,10 @@ private:
       if (completed)
       {
         plan.status = fabric::plan::Status::COMPLETED;
+        if (&plan == &current_plan_)
+        {
+          publishCurrentPlanSnapshot();
+        }
         publishPlanStatus(plan);
       }
     };
@@ -764,6 +784,8 @@ private:
         break;
       }
 
+      current_plan_connections_complete_ = false;
+
       RCLCPP_INFO(node_.get_logger(), "[server] A new Fabric plan processing starting with id: %s", current_plan_.plan_id.c_str());
 
       if (current_plan_.status == fabric::plan::Status::CANCELLED)
@@ -780,6 +802,8 @@ private:
         setCurrentPlanStatus(fabric::plan::Status::PARSING);
 
         parsing_plugin_->parsePlan(current_plan_);
+        current_plan_connections_complete_ = true;
+        publishCurrentPlanSnapshot();
       }
       catch (const fabric::fabric_exception& e)
       {
@@ -833,6 +857,7 @@ private:
         RCLCPP_INFO(node_.get_logger(), "[server] Requesting bond from capabilities2 server.");
         setCurrentPlanStatus(fabric::plan::Status::BONDING);
         current_plan_.bond_id = capability_client_->request_bond();
+        publishCurrentPlanSnapshot();
         publishPlanStatus(current_plan_);
       }
       catch (const fabric::fabric_exception& e)
@@ -1006,13 +1031,13 @@ private:
     node_.declare_parameter<bool>("experience.dispatch_terminal_success_only", false);
     dispatch_terminal_success_only_ = node_.get_parameter("experience.dispatch_terminal_success_only").as_bool();
 
-    node_.declare_parameter<int>("telemetry.retention_seconds", 300);
-    const int telemetry_retention_seconds = node_.get_parameter("telemetry.retention_seconds").as_int();
+    node_.declare_parameter<int>("experience.telemetry.retention_seconds", 300);
+    const int telemetry_retention_seconds = node_.get_parameter("experience.telemetry.retention_seconds").as_int();
     telemetry_retention_seconds_ = telemetry_retention_seconds > 0 ? telemetry_retention_seconds : 300;
     telemetry_aggregator_.configureRetentionSeconds(telemetry_retention_seconds_);
 
-    node_.declare_parameter<double>("telemetry.monitor_poll_frequency_hz", 2.0);
-    monitor_poll_frequency_hz_ = node_.get_parameter("telemetry.monitor_poll_frequency_hz").as_double();
+    node_.declare_parameter<double>("experience.telemetry.monitor_poll_frequency_hz", 2.0);
+    monitor_poll_frequency_hz_ = node_.get_parameter("experience.telemetry.monitor_poll_frequency_hz").as_double();
   }
 
   /** @brief Load the ordered validation plugins used before execution. */
@@ -1085,8 +1110,8 @@ private:
   /** @brief Load configured telemetry monitors without starting their collection loops. */
   void initializeMonitorPlugins()
   {
-    node_.declare_parameter<std::vector<std::string>>("telemetry.monitor_plugins", std::vector<std::string>{});
-    monitor_plugin_names_ = node_.get_parameter("telemetry.monitor_plugins").as_string_array();
+    node_.declare_parameter<std::vector<std::string>>("experience.telemetry.monitor_plugins", std::vector<std::string>{});
+    monitor_plugin_names_ = node_.get_parameter("experience.telemetry.monitor_plugins").as_string_array();
 
     for (const auto& monitor_plugin_name : monitor_plugin_names_)
     {
@@ -1337,7 +1362,10 @@ private:
 
     // Start the background thread for handling startup tasks.
     startup_thread_ = std::thread(&FabricRuntime::wait_for_capabilities_and_experience, this);
-    monitor_ingestion_thread_ = std::thread(&FabricRuntime::processMonitorTelemetry, this);
+    if (use_experience_)
+    {
+      monitor_ingestion_thread_ = std::thread(&FabricRuntime::processMonitorTelemetry, this);
+    }
   }
 
   /** @brief Start each configured telemetry monitor. */
@@ -1702,6 +1730,8 @@ private:
   void reset()
   {
     current_plan_ = fabric::plan::Plan();
+    current_plan_connections_complete_ = false;
+    publishCurrentPlanSnapshot();
     capability_list_.clear();
     bond_id_.clear();
     {
@@ -1714,7 +1744,14 @@ private:
   void setCurrentPlanStatus(const fabric::plan::Status status)
   {
     current_plan_.status = status;
+    publishCurrentPlanSnapshot();
     publishPlanStatus(current_plan_);
+  }
+
+  /** @brief Publish a copy while holding current_plan_mutex_; readers use atomic shared_ptr loads. */
+  void publishCurrentPlanSnapshot()
+  {
+    current_plan_snapshot_.publish(current_plan_, current_plan_connections_complete_, node_.now());
   }
 
   /** @brief Run ordered candidate validators, stopping at each candidate's first rejection. */
@@ -1812,6 +1849,8 @@ private:
 
   /** Current plan being processed */
   fabric::plan::Plan current_plan_;
+  bool current_plan_connections_complete_{ false };
+  CurrentPlanSnapshotStore current_plan_snapshot_;
 
   /** Current plan related synchronization */
   bool plan_completed_{ false };

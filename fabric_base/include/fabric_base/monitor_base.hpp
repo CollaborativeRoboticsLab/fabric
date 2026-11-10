@@ -92,15 +92,20 @@ protected:
     node_ = node;
     plugin_name_ = plugin_name;
 
-    node->declare_parameter(plugin_name_ + ".topic", "");
-    node->declare_parameter(plugin_name_ + ".frequency", 1.0);
+    node->declare_parameter(parameter_namespace() + ".topic", "");
+    node->declare_parameter(parameter_namespace() + ".frequency", 1.0);
 
-    monitor_topic_ = node->get_parameter(plugin_name_ + ".topic").as_string();
-    monitor_frequency_ = node->get_parameter(plugin_name_ + ".frequency").as_double();
+    monitor_topic_ = node->get_parameter(parameter_namespace() + ".topic").as_string();
+    monitor_frequency_ = node->get_parameter(parameter_namespace() + ".frequency").as_double();
 
     RCLCPP_INFO(node_->get_logger(), "Monitor plugin name: %s", plugin_name_.c_str());
     RCLCPP_INFO(node_->get_logger(), "Monitoring topic: %s", monitor_topic_.c_str());
     RCLCPP_INFO(node_->get_logger(), "Monitoring frequency: %.2f Hz", monitor_frequency_);
+  }
+
+  std::string parameter_namespace() const
+  {
+    return "experience." + plugin_name_;
   }
 
   /**

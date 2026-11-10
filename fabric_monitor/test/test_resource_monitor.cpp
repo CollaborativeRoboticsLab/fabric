@@ -59,7 +59,7 @@ protected:
   {
     rclcpp::NodeOptions options;
     options.parameter_overrides(
-        { rclcpp::Parameter("BatteryMonitor.enable", true), rclcpp::Parameter("BatteryMonitor.topic", "/battery_"
+        { rclcpp::Parameter("experience.BatteryMonitor.enable", true), rclcpp::Parameter("experience.BatteryMonitor.topic", "/battery_"
                                                                                                       "state") });
     node_ = std::make_shared<rclcpp::Node>("resource_monitor_test", options);
     monitor_.initialize(node_);
@@ -103,13 +103,13 @@ protected:
   void checkPromptParameters(const std::string& name, const Message& message, bool override_model)
   {
     std::vector<rclcpp::Parameter> parameters{
-      rclcpp::Parameter(name + ".topic", "/monitor_prompt_test"),
-      rclcpp::Parameter(name + ".frequency", 1000.0),
+      rclcpp::Parameter("experience." + name + ".topic", "/monitor_prompt_test"),
+      rclcpp::Parameter("experience." + name + ".frequency", 1000.0),
     };
     if (override_model)
     {
-      parameters.emplace_back(name + ".model_family", "ollama");
-      parameters.emplace_back(name + ".model", "test-model");
+      parameters.emplace_back("experience." + name + ".model_family", "ollama");
+      parameters.emplace_back("experience." + name + ".model", "test-model");
     }
     rclcpp::NodeOptions options;
     options.enable_rosout(false);
@@ -207,8 +207,8 @@ TEST_F(ResourceMonitorTest, PluginCanBeLoaded)
 
 TEST_F(ResourceMonitorTest, DisabledBatteryMonitorDoesNotSubscribe)
 {
-  node_->declare_parameter<bool>("BatteryMonitor.enable", true);
-  node_->set_parameter(rclcpp::Parameter("BatteryMonitor.enable", false));
+  node_->declare_parameter<bool>("experience.BatteryMonitor.enable", true);
+  node_->set_parameter(rclcpp::Parameter("experience.BatteryMonitor.enable", false));
   fabric::BatteryMonitor battery_monitor;
   battery_monitor.initialize(node_);
   battery_monitor.start();
@@ -314,8 +314,8 @@ TEST_F(ResourceMonitorTest, RosoutIgnoresInfoAndPromptBridgeLogs)
 {
   rclcpp::NodeOptions options;
   options.enable_rosout(false);
-  options.parameter_overrides({ rclcpp::Parameter("RosoutMonitor.topic", "/monitor_filter_test"),
-                                rclcpp::Parameter("RosoutMonitor.frequency", 1000.0) });
+  options.parameter_overrides({ rclcpp::Parameter("experience.RosoutMonitor.topic", "/monitor_filter_test"),
+                                rclcpp::Parameter("experience.RosoutMonitor.frequency", 1000.0) });
   auto node = std::make_shared<rclcpp::Node>("monitor_filter_test", options);
   auto analysis = std::make_shared<RecordingAnalysis>();
   auto request = analysis->request_.get_future();
@@ -368,10 +368,10 @@ TEST_F(ResourceMonitorTest, RosoutUsesConfiguredFilters)
 {
   rclcpp::NodeOptions options;
   options.enable_rosout(false);
-  options.parameter_overrides({ rclcpp::Parameter("RosoutMonitor.topic", "/monitor_custom_filter_test"),
-                                rclcpp::Parameter("RosoutMonitor.frequency", 1000.0),
-                                rclcpp::Parameter("RosoutMonitor.minimum_log_level", "error"),
-                                rclcpp::Parameter("RosoutMonitor.excluded_loggers",
+  options.parameter_overrides({ rclcpp::Parameter("experience.RosoutMonitor.topic", "/monitor_custom_filter_test"),
+                                rclcpp::Parameter("experience.RosoutMonitor.frequency", 1000.0),
+                                rclcpp::Parameter("experience.RosoutMonitor.minimum_log_level", "error"),
+                                rclcpp::Parameter("experience.RosoutMonitor.excluded_loggers",
                                                   std::vector<std::string>{"ignored_node"}) });
   auto node = std::make_shared<rclcpp::Node>("monitor_custom_filter_test", options);
   auto analysis = std::make_shared<RecordingAnalysis>();
@@ -422,7 +422,7 @@ TEST_F(ResourceMonitorTest, RosoutUsesConfiguredFilters)
 TEST_F(ResourceMonitorTest, RosoutRejectsInvalidMinimumLevel)
 {
   rclcpp::NodeOptions options;
-  options.parameter_overrides({rclcpp::Parameter("RosoutMonitor.minimum_log_level", "invalid")});
+  options.parameter_overrides({rclcpp::Parameter("experience.RosoutMonitor.minimum_log_level", "invalid")});
   auto node = std::make_shared<rclcpp::Node>("monitor_invalid_level_test", options);
   fabric::RosoutMonitor monitor;
   EXPECT_THROW(monitor.initialize(node), std::invalid_argument);

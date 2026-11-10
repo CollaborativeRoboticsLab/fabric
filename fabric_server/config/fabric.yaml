@@ -47,48 +47,7 @@
       use_chat_mode: false
 
     telemetry:
-      retention_seconds: 300
       fabric_status_topic: "/fabric/status"
-      monitor_poll_frequency_hz: 2.0
-      monitor_plugins:
-        - "fabric::ResourceMonitor"
-        - "fabric::BatteryMonitor"
-        - "fabric::ExecutionStatusMonitor"
-        - "fabric::CapabilityEventMonitor"
-        - "fabric::RosoutMonitor"
-        - "fabric::RosDiagnosticsMonitor"
-
-    ResourceMonitor:
-      topic: "/capabilities2_launch_proxy/resources"
-      frequency: 1.0
-
-    BatteryMonitor:
-      enable: true
-      topic: "/battery_state"
-      frequency: 1.0
-
-    ExecutionStatusMonitor:
-      topic: "/fabric/status"
-      frequency: 1.0
-
-    CapabilityEventMonitor:
-      topic: ""
-      frequency: 1.0
-      service_name: "/capabilities/get_event_snapshot"
-      service_wait_timeout_sec: -1
-      max_events: 100
-
-    RosoutMonitor:
-      topic: "/rosout"
-      frequency: 1.0
-      model_family: openai
-      model: gpt-6-luna
-
-    RosDiagnosticsMonitor:
-      topic: "/diagnostics"
-      frequency: 1.0
-      model_family: openai
-      model: gpt-6-luna
 
     experience:
       enabled: true
@@ -96,6 +55,51 @@
       consume_feedback: true
       user_feedback_root_dir: ""
       dispatch_terminal_success_only: false
+
+      telemetry:
+        retention_seconds: 300
+        monitor_poll_frequency_hz: 2.0
+        monitor_plugins:
+          - "fabric::ResourceMonitor"
+          - "fabric::BatteryMonitor"
+          - "fabric::ExecutionStatusMonitor"
+          - "fabric::CapabilityEventMonitor"
+          - "fabric::RosoutMonitor"
+          - "fabric::RosDiagnosticsMonitor"
+
+      ResourceMonitor:
+        topic: "/capabilities2_launch_proxy/resources"
+        frequency: 1.0
+
+      BatteryMonitor:
+        enable: true
+        topic: "/battery_state"
+        frequency: 1.0
+
+      ExecutionStatusMonitor:
+        topic: "/fabric/status"
+        frequency: 1.0
+
+      CapabilityEventMonitor:
+        topic: ""
+        frequency: 1.0
+        service_name: "/capabilities/get_event_snapshot"
+        service_wait_timeout_sec: -1
+        max_events: 100
+
+      RosoutMonitor:
+        topic: "/rosout"
+        frequency: 1.0
+        minimum_log_level: WARN
+        excluded_loggers: [prompt_bridge]
+        model_family: openai
+        model: gpt-6-luna
+
+      RosDiagnosticsMonitor:
+        topic: "/diagnostics"
+        frequency: 1.0
+        model_family: openai
+        model: gpt-6-luna
 
       planner_plugin: "fabric::PlanningPlugin"
       core_plugin: "fabric::KnowledgeCoreGraphRag"
@@ -127,7 +131,7 @@
           model_family: "openai"
         tokenize:
           model_name: "O200K_BASE"
-          model_family: "openai
+          model_family: "openai"
           tokens_per_document: 20000
           tokens_per_document_overlap: 2000
           tokens_per_embedding: 8191

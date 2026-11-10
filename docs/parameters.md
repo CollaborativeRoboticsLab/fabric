@@ -12,31 +12,35 @@ These parameters are read directly by `fabric_server`.
 |---|---|---|---|
 | `plan_file_path` | string | packaged default XML plan | Plan file queued at startup. |
 | `telemetry.fabric_status_topic` | string | `"/fabric/status"` | Public execution-status topic published by Fabric. |
-| `telemetry.monitor_poll_frequency_hz` | double | `2.0` | Poll frequency used by the monitor-ingestion thread. |
-| `telemetry.retention_seconds` | int | `300` | How long generic telemetry records are retained for later capability correlation. |
-| `telemetry.enable_battery_monitoring` | bool | `true` | Enable Fabric-owned battery monitoring. |
-| `telemetry.battery_topic` | string | `"/battery_state"` | Battery topic used for capability battery intervals and low-battery telemetry. |
+| `experience.telemetry.monitor_poll_frequency_hz` | double | `2.0` | Poll frequency used by the Experience monitor-ingestion thread. |
+| `experience.telemetry.retention_seconds` | int | `300` | How long telemetry records are retained for capability correlation. |
+| `experience.BatteryMonitor.enable` | bool | `true` | Enable battery monitoring. |
+| `experience.BatteryMonitor.topic` | string | `"/battery_state"` | Battery topic used for capability battery intervals and low-battery telemetry. |
 
 ## Monitor Plugin Selection
 
-The merged Fabric runtime uses pluginlib-loaded monitor plugins configured under:
+When `experience.enabled` is true, Fabric starts pluginlib-loaded monitors configured under:
 
 | Parameter | Type | Description |
 |---|---|---|
-| `telemetry.monitor_plugins` | string array | Monitor plugin class names loaded at startup. |
+| `experience.telemetry.monitor_plugins` | string array | Monitor plugin class names loaded at startup. |
 
 The current default monitor set is:
 
+- `fabric::ResourceMonitor`
+- `fabric::BatteryMonitor`
 - `fabric::ExecutionStatusMonitor`
 - `fabric::CapabilityEventMonitor`
 - `fabric::RosoutMonitor`
 - `fabric::RosDiagnosticsMonitor`
 
+The rosout and diagnostics monitors use the configured LLM analysis plugin and may make API calls. The public status topic remains available when Experience is disabled.
+
 The old Dynamics and Odom monitor paths were intentionally not carried into the merged Fabric runtime.
 
 ## Execution Status Monitor
 
-Namespace: `ExecutionStatusMonitor`
+Namespace: `experience.ExecutionStatusMonitor`
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
@@ -45,7 +49,7 @@ Namespace: `ExecutionStatusMonitor`
 
 ## Capability Event Monitor
 
-Namespace: `CapabilityEventMonitor`
+Namespace: `experience.CapabilityEventMonitor`
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
@@ -57,7 +61,7 @@ Namespace: `CapabilityEventMonitor`
 
 ## Rosout Monitor
 
-Namespace: `RosoutMonitor`
+Namespace: `experience.RosoutMonitor`
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
@@ -66,7 +70,7 @@ Namespace: `RosoutMonitor`
 
 ## Diagnostics Monitor
 
-Namespace: `RosDiagnosticsMonitor`
+Namespace: `experience.RosDiagnosticsMonitor`
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|

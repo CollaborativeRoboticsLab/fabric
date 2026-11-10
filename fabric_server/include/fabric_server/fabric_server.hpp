@@ -7,6 +7,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <fabric_server/fabric_runtime.hpp>
+#include <fabric_server/utils/plan_snapshot.hpp>
 #include <fabric_server/utils/score_services.hpp>
 #include <fabric_server/utils/status.hpp>
 #include <fabric_msgs/action/generate_plan.hpp>
@@ -14,6 +15,7 @@
 #include <fabric_msgs/srv/cancel_fabric_plan.hpp>
 #include <fabric_msgs/srv/complete_fabric.hpp>
 #include <fabric_msgs/srv/get_plan_status.hpp>
+#include <fabric_msgs/srv/get_fabric_plan_snapshot.hpp>
 #include <fabric_msgs/srv/parse_plan.hpp>
 #include <fabric_msgs/srv/submit_fabric_plan.hpp>
 
@@ -32,6 +34,7 @@ public:
   using CancelFabricPlan = fabric_msgs::srv::CancelFabricPlan;
   using CompleteFabric = fabric_msgs::srv::CompleteFabric;
   using GetPlanStatus = fabric_msgs::srv::GetPlanStatus;
+  using GetFabricPlanSnapshot = fabric_msgs::srv::GetFabricPlanSnapshot;
   using ParsePlan = fabric_msgs::srv::ParsePlan;
   using GetScoringEpoch = fabric_msgs::srv::GetScoringEpoch;
   using GetPlanScoreExplanation = fabric_msgs::srv::GetPlanScoreExplanation;
@@ -111,6 +114,8 @@ private:
         "/fabric/plan/set_completion", std::bind(&Fabric::setCompleteCallback, this, std::placeholders::_1, std::placeholders::_2));
     get_plan_status_server_ = this->create_service<GetPlanStatus>(
         "/fabric/plan/get_status", std::bind(&Fabric::getPlanStatusCallback, this, std::placeholders::_1, std::placeholders::_2));
+    get_plan_snapshot_server_ = this->create_service<GetFabricPlanSnapshot>(
+      "/fabric/plan/get_snapshot", std::bind(&Fabric::getPlanSnapshotCallback, this, std::placeholders::_1, std::placeholders::_2));
     parse_plan_server_ = this->create_service<ParsePlan>("/fabric/plan/parse",
                                                          std::bind(&Fabric::parsePlanCallback, this, std::placeholders::_1, std::placeholders::_2));
   }
@@ -284,20 +289,7 @@ private:
 
       for (const auto& entry : plan.connections)
       {
-        const auto& connection = entry.second;
-        fabric_msgs::msg::FabricConnection message;
-        const auto convert = [](const fabric::plan::node& source, auto& target) {
-          target.interface = source.interface;
-          target.provider = source.provider;
-          target.instance_id = source.instance_id;
-        };
-        convert(connection.source, message.source);
-        convert(connection.on_start, message.on_start);
-        convert(connection.on_stop, message.on_stop);
-        convert(connection.on_success, message.on_success);
-        convert(connection.on_failure, message.on_failure);
-        message.description = connection.description;
-        response->connections.push_back(std::move(message));
+        response->connections.push_back(fabric::server::plan_snapshot::toFabricConnection(entry.second));
       }
     }
     catch (const std::exception& error)
@@ -350,6 +342,14 @@ private:
     {
       response->rejected_list = plan->rejected_list;
     }
+  }
+
+  /** @brief Return a nonblocking snapshot of the current dequeued plan and its intended connections. */
+  void getPlanSnapshotCallback(const std::shared_ptr<GetFabricPlanSnapshot::Request>,
+                               std::shared_ptr<GetFabricPlanSnapshot::Response> response)
+  {
+    const auto snapshot = runtime_->getCurrentPlanSnapshot();
+    fabric::server::plan_snapshot::populateResponse(snapshot.get(), *response);
   }
 
   /**
@@ -524,6 +524,7 @@ private:
   rclcpp::Service<CancelFabricPlan>::SharedPtr cancel_server_;
   rclcpp::Service<CompleteFabric>::SharedPtr completion_server_;
   rclcpp::Service<GetPlanStatus>::SharedPtr get_plan_status_server_;
+  rclcpp::Service<GetFabricPlanSnapshot>::SharedPtr get_plan_snapshot_server_;
   rclcpp::Service<ParsePlan>::SharedPtr parse_plan_server_;
   rclcpp::Service<GetPlanScoreExplanation>::SharedPtr get_plan_score_explanation_service_;
   rclcpp::Service<ScorePlan>::SharedPtr score_plan_service_;

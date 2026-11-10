@@ -25,18 +25,18 @@ public:
   void initialize(const rclcpp::Node::SharedPtr& node) override
   {
     initialize_base(node, "BatteryMonitor");
-    if (!node_->has_parameter("BatteryMonitor.enable"))
+    if (!node_->has_parameter(parameter_namespace() + ".enable"))
     {
-      node_->declare_parameter<bool>("BatteryMonitor.enable", true);
+      node_->declare_parameter<bool>(parameter_namespace() + ".enable", true);
     }
-    enabled_ = node_->get_parameter("BatteryMonitor.enable").as_bool();
-    if (!node_->has_parameter("BatteryMonitor.topic"))
+    enabled_ = node_->get_parameter(parameter_namespace() + ".enable").as_bool();
+    if (!node_->has_parameter(parameter_namespace() + ".topic"))
     {
-      node_->declare_parameter<std::string>("BatteryMonitor.topic", "/battery_state");
+      node_->declare_parameter<std::string>(parameter_namespace() + ".topic", "/battery_state");
     }
     if (monitor_topic_.empty())
     {
-      monitor_topic_ = node_->get_parameter("BatteryMonitor.topic").as_string();
+      monitor_topic_ = node_->get_parameter(parameter_namespace() + ".topic").as_string();
     }
   }
 

@@ -7,7 +7,7 @@ launch proxy; it does not inspect processes itself or depend on Supervisor.
 ## Data Source
 
 The default topic is `/capabilities2_launch_proxy/resources`, carrying
-`capabilities2_msgs/msg/LaunchResourceList`. Set `ResourceMonitor.topic` if the
+`capabilities2_msgs/msg/LaunchResourceList`. Set `experience.ResourceMonitor.topic` if the
 proxy has a different node name or namespace. The subscription uses reliable,
 volatile QoS with a depth of 10, matching the proxy publisher.
 
@@ -25,13 +25,13 @@ drains it; an empty vector means no new measurement. A received snapshot with
 zero active launches is valid data and clears earlier process measurements.
 Stopping the plugin releases the subscription and clears unread measurements.
 
-The plugin is enabled in `fabric_server/config/fabric.yaml`. Fabric's telemetry
+The plugin is configured in `fabric_server/config/fabric.yaml` and runs when Experience is enabled. Fabric's telemetry
 aggregator converts its output to the ROS-independent `fabric::status::ResourceUsage`
 and attaches it to capability-bearing `SystemStatus` records. The
 `has_resource_usage` flag distinguishes unavailable telemetry from measured zero
 usage. The source timestamp is preserved: these are last-observed measurements,
 not a freshness guarantee. There is no historical sample store in this monitor.
-The server's `telemetry.monitor_poll_frequency_hz` controls collection from plugins;
+The server's `experience.telemetry.monitor_poll_frequency_hz` controls collection from plugins;
 the proxy controls the sampling/publication rate.
 
 ## Remaining Validation
