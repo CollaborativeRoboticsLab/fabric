@@ -28,6 +28,19 @@ public:
     if (!node_->get_parameter(bond_topic_param, topic_) || topic_.empty()) {
       topic_ = bond_topic_value;
     }
+
+    if (!node_->has_parameter("bond.topic")) {
+      node_->declare_parameter<std::string>("bond.topic", topic_);
+    }
+    if (!node_->has_parameter("bond.connect_timeout_sec")) {
+      node_->declare_parameter<double>("bond.connect_timeout_sec", 10.0);
+    }
+    if (!node_->has_parameter("bond.heartbeat_timeout_sec")) {
+      node_->declare_parameter<double>("bond.heartbeat_timeout_sec", 10.0);
+    }
+    if (!node_->has_parameter("bond.heartbeat_period_sec")) {
+      node_->declare_parameter<double>("bond.heartbeat_period_sec", 0.1);
+    }
   }
 
   /**
@@ -39,11 +52,13 @@ public:
     RCLCPP_INFO(node_->get_logger(), "Creating bond to capabilities server with id: %s",
       bond_id_.c_str());
 
+    topic_ = node_->get_parameter("bond.topic").as_string();
     bond_ = std::make_unique<bond::Bond>(topic_, bond_id_, node_,
       std::bind(&BondClient::on_broken, this), std::bind(&BondClient::on_formed, this));
 
-    bond_->setHeartbeatPeriod(0.10);
-    bond_->setHeartbeatTimeout(10.0);
+    bond_->setConnectTimeout(node_->get_parameter("bond.connect_timeout_sec").as_double());
+    bond_->setHeartbeatPeriod(node_->get_parameter("bond.heartbeat_period_sec").as_double());
+    bond_->setHeartbeatTimeout(node_->get_parameter("bond.heartbeat_timeout_sec").as_double());
     bond_->start();
 
     RCLCPP_INFO(node_->get_logger(), "Bond started with capabilities server with id: %s",

@@ -1,9 +1,11 @@
 #include <type_traits>
 #include <atomic>
+#include <chrono>
 #include <thread>
 
 #include <gtest/gtest.h>
 #include <fabric_server/fabric_server.hpp>
+#include <rcl_interfaces/msg/log.hpp>
 
 static_assert(!std::is_base_of_v<rclcpp::Node, fabric::FabricRuntime>);
 static_assert(std::is_base_of_v<rclcpp::Node, fabric::Fabric>);
@@ -38,6 +40,55 @@ TEST_F(FabricRuntimeTest, CanBeOwnedByANonFabricNodeWithoutCreatingEndpoints)
   EXPECT_FALSE(runtime.getPlanStatus("", "missing-bond"));
   EXPECT_FALSE(runtime.cancelPlan("missing-plan"));
   EXPECT_FALSE(runtime.completePlan("missing-plan"));
+}
+
+TEST_F(FabricRuntimeTest, BondClientUsesConfiguredTopicAndHeartbeat)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({
+    rclcpp::Parameter("bond.topic", "/bond_settings_fabric_test"),
+    rclcpp::Parameter("bond.connect_timeout_sec", 0.75),
+    rclcpp::Parameter("bond.heartbeat_timeout_sec", 1.6),
+    rclcpp::Parameter("bond.heartbeat_period_sec", 0.05),
+  });
+  auto node = std::make_shared<rclcpp::Node>("bond_settings_fabric_test", options);
+  bool received = false;
+  bool disconnected = false;
+  auto subscription = node->create_subscription<bond::msg::Status>(
+    "/bond_settings_fabric_test", 10, [&](bond::msg::Status::ConstSharedPtr status) {
+      if (status->active) {
+        EXPECT_NEAR(status->heartbeat_timeout, 1.6, 0.001);
+        EXPECT_NEAR(status->heartbeat_period, 0.05, 0.001);
+        received = true;
+      }
+    });
+  auto log_subscription = node->create_subscription<rcl_interfaces::msg::Log>(
+    "/rosout", rclcpp::QoS(100).reliable().transient_local(),
+    [&](rcl_interfaces::msg::Log::ConstSharedPtr message) {
+      if (message->name == node->get_name() &&
+        message->msg.find("Bond with capabilities server broken") != std::string::npos) {
+        disconnected = true;
+      }
+    });
+  BondClient client(node, "bond-settings-test");
+  client.start();
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+  while ((!received || !disconnected) && std::chrono::steady_clock::now() < deadline) {
+    rclcpp::spin_some(node);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  EXPECT_TRUE(received);
+  EXPECT_TRUE(disconnected);
+  client.stop();
+}
+
+TEST_F(FabricRuntimeTest, BondClientUsesLegacyTopicWhenNewTopicIsUnset)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter("capability_client.bond_topic", "/legacy_bond")});
+  auto node = std::make_shared<rclcpp::Node>("legacy_bond_settings_test", options);
+  BondClient client(node, "legacy-bond-settings-test");
+  EXPECT_EQ(node->get_parameter("bond.topic").as_string(), "/legacy_bond");
 }
 
 TEST(PlanSnapshotResponseTest, EmptySnapshotReportsNoPlan)

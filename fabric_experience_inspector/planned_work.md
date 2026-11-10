@@ -22,7 +22,7 @@ Database mutation is not part of this work. Existing proposal exports remain non
 
 ## Phase 1: Remaining Runtime Work
 
-- Observe an actual parse-failure snapshot before it is cleared. Test snapshot consistency across transitions, repeated instances, and every event type; manufactured snapshots alone do not establish runtime transition behavior.
+- Extend runtime snapshot coverage to `on_start`, `on_stop`, and `on_failure`, and verify partial/connecting/shutdown transitions. The active fixture now checks repeated capability instances and directed `on_success` wiring across `RUNNING`, `COMPLETED`, and `CANCELLED`; manufactured snapshots alone do not establish runtime transition behavior.
 - Test service disappearance and recovery, error paths, and bounded responsiveness while execution is held in a controlled transition. Verify snapshot reads neither dispatch nor mutate execution. Exercise the service with controlled Fabric/capabilities2, then with the inspector clients when available.
 - Preserve the single-current-plan contract: event links are intended, not confirmed; capture time is not a health check; terminal snapshots are not history. Surface dependencies only with verified direction and identity, otherwise use provider-level relationships with unknown instance ownership. Coordinate any contract change with inspector clients.
 
@@ -30,7 +30,6 @@ Database mutation is not part of this work. Existing proposal exports remain non
 
 ## Luna: Next-Part Guidelines
 
-- Observe the submitted parse-failure state before it is cleared, or explicitly test the clearing race separately.
 - During blocked parsing, connecting, and shutdown/failure scenarios, issue bounded snapshot requests and verify consistent plan ID, lifecycle, connection completeness, instances, and event direction. Test no unexpected dispatch or state changes, and confirm service reconnection after a controlled restart. Keep fixtures isolated and clean up processes and test data.
 - Run focused message/server tests and the opt-in component matrix in a sourced workspace; rebuild dynamically loaded consumers after plugin ABI changes. Run inspector regressions and standalone/rqt integration when their clients exist. Report commands, actual results, skipped or blocked checks, and package-wide failures separately; avoid reformatting unrelated changes or claiming the existing formatter failures are all unrelated to this work.
 

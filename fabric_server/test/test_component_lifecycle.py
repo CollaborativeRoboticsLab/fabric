@@ -67,6 +67,32 @@ def test_component_initializes_and_cleans_up(
         response.output.success = True
         return response
 
+    def assert_completion_graph(snapshot, plan_id):
+        runner = 'fabric_capabilities/FabricCompletionRunner'
+        assert snapshot.has_plan
+        assert snapshot.plan_id == plan_id
+        assert snapshot.connections_complete
+        assert len(snapshot.instances) == 2
+        first, second = sorted(snapshot.instances, key=lambda instance: instance.instance_id)
+        assert first.instance_id != second.instance_id
+        assert (first.interface, first.provider) == (runner, runner)
+        assert (second.interface, second.provider) == (runner, runner)
+        assert len(snapshot.connections) == 2
+        first_connection, second_connection = sorted(
+            snapshot.connections, key=lambda connection: connection.source.instance_id
+        )
+        assert first_connection.source.instance_id == first.instance_id
+        assert first_connection.on_success.instance_id == second.instance_id
+        assert (first_connection.on_success.interface, first_connection.on_success.provider) == (runner, runner)
+        assert not first_connection.on_start.interface
+        assert not first_connection.on_stop.interface
+        assert not first_connection.on_failure.interface
+        assert second_connection.source.instance_id == second.instance_id
+        assert not second_connection.on_start.interface
+        assert not second_connection.on_stop.interface
+        assert not second_connection.on_success.interface
+        assert not second_connection.on_failure.interface
+
     services = [
         node.create_service(Prompt, '/prompt/prompt', successful_prompt),
         node.create_service(Embedding, '/prompt/embedding', successful_embedding),
@@ -79,6 +105,7 @@ def test_component_initializes_and_cleans_up(
     gate_active = threading.Event()
     gate_entered = threading.Event()
     gate_release = threading.Event()
+    gate_returned = threading.Event()
     trigger_entered = threading.Event()
     free_entered = threading.Event()
     free_release = threading.Event()
@@ -118,6 +145,9 @@ def test_component_initializes_and_cleans_up(
                     if gate_active.is_set():
                         gate_entered.set()
                         gate_release.wait(timeout=30)
+                        gate_release.clear()
+                        gate_entered.clear()
+                        gate_returned.set()
                     return response
 
                 gate_node.create_service(
@@ -289,12 +319,20 @@ def test_component_initializes_and_cleans_up(
                         assert future.done(), 'Active-plan submission timed out'
                         active = future.result()
                         assert active.plan_id, active.error
-                        assert gate_entered.wait(timeout=5), 'Runtime did not reach gated capability discovery'
-
-                        future = snapshot.call_async(GetFabricPlanSnapshot.Request())
-                        rclpy.spin_until_future_complete(node, future, timeout_sec=1)
-                        assert future.done(), 'Snapshot read blocked during capability discovery'
-                        active_snapshot = future.result()
+                        gate_deadline = time.monotonic() + 15
+                        active_snapshot = None
+                        while time.monotonic() < gate_deadline:
+                            assert gate_entered.wait(timeout=5), 'Runtime did not reach gated capability discovery'
+                            future = snapshot.call_async(GetFabricPlanSnapshot.Request())
+                            rclpy.spin_until_future_complete(node, future, timeout_sec=1)
+                            assert future.done(), 'Snapshot read blocked during capability discovery'
+                            active_snapshot = future.result()
+                            if active_snapshot.has_plan and active_snapshot.plan_id == active.plan_id:
+                                break
+                            gate_returned.clear()
+                            gate_release.set()
+                            assert gate_returned.wait(timeout=5), 'Gated capability request did not resume'
+                        assert active_snapshot is not None, 'No snapshot was observed during capability discovery'
                         assert active_snapshot.has_plan
                         assert active_snapshot.plan_id == active.plan_id
                         assert active_snapshot.status.code == FabricStatus.VALIDATING
@@ -363,8 +401,7 @@ def test_component_initializes_and_cleans_up(
                         rclpy.spin_until_future_complete(node, future, timeout_sec=1)
                         assert future.done(), 'Snapshot read blocked while trigger was in flight'
                         running_snapshot = future.result()
-                        assert running_snapshot.has_plan
-                        assert running_snapshot.plan_id == active.plan_id
+                        assert_completion_graph(running_snapshot, active.plan_id)
                         assert running_snapshot.status.code == FabricStatus.RUNNING
 
                         active_status_request = GetPlanStatus.Request()
@@ -387,8 +424,7 @@ def test_component_initializes_and_cleans_up(
                         rclpy.spin_until_future_complete(node, future, timeout_sec=1)
                         assert future.done(), 'Snapshot read blocked during completion cleanup'
                         completed_snapshot = future.result()
-                        assert completed_snapshot.has_plan
-                        assert completed_snapshot.plan_id == active.plan_id
+                        assert_completion_graph(completed_snapshot, active.plan_id)
                         assert completed_snapshot.status.code == FabricStatus.COMPLETED
                         free_release.set()
 
@@ -415,8 +451,7 @@ def test_component_initializes_and_cleans_up(
                         rclpy.spin_until_future_complete(node, future, timeout_sec=1)
                         assert future.done(), 'Snapshot read blocked for the cancellation plan'
                         running_snapshot = future.result()
-                        assert running_snapshot.has_plan
-                        assert running_snapshot.plan_id == cancelled_plan.plan_id
+                        assert_completion_graph(running_snapshot, cancelled_plan.plan_id)
                         assert running_snapshot.status.code == FabricStatus.RUNNING
 
                         active_cancel_request = CancelFabricPlan.Request()
@@ -431,10 +466,62 @@ def test_component_initializes_and_cleans_up(
                         rclpy.spin_until_future_complete(node, future, timeout_sec=1)
                         assert future.done(), 'Snapshot read blocked during cancellation cleanup'
                         cancelled_snapshot = future.result()
-                        assert cancelled_snapshot.has_plan
-                        assert cancelled_snapshot.plan_id == cancelled_plan.plan_id
+                        assert_completion_graph(cancelled_snapshot, cancelled_plan.plan_id)
                         assert cancelled_snapshot.status.code == FabricStatus.CANCELLED
                         free_release.set()
+
+                        deadline = time.monotonic() + 5
+                        while time.monotonic() < deadline:
+                            future = snapshot.call_async(GetFabricPlanSnapshot.Request())
+                            rclpy.spin_until_future_complete(node, future, timeout_sec=1)
+                            assert future.done(), 'Snapshot read blocked after cancelled-plan cleanup'
+                            if not future.result().has_plan:
+                                break
+                        assert not future.result().has_plan, 'Cancelled plan remained active after cleanup'
+
+                        trigger_entered.clear()
+                        free_entered.clear()
+                        free_release.clear()
+                        future = submit.call_async(active_request)
+                        rclpy.spin_until_future_complete(node, future, timeout_sec=5)
+                        assert future.done(), 'Parse-failure predecessor submission timed out'
+                        predecessor = future.result()
+                        assert predecessor.plan_id, predecessor.error
+                        assert trigger_entered.wait(timeout=10), 'Runtime did not trigger the parse-failure predecessor'
+
+                        failure_request = SubmitFabricPlan.Request()
+                        failure_request.plan = '<NotPlan/>'
+                        future = submit.call_async(failure_request)
+                        rclpy.spin_until_future_complete(node, future, timeout_sec=5)
+                        assert future.done(), 'Parse-failure plan submission timed out'
+                        failed_plan = future.result()
+                        assert failed_plan.plan_id, failed_plan.error
+
+                        complete_request.plan_id = predecessor.plan_id
+                        future = completion.call_async(complete_request)
+                        rclpy.spin_until_future_complete(node, future, timeout_sec=5)
+                        assert future.done(), 'Parse-failure predecessor completion timed out'
+                        assert free_entered.wait(timeout=5), 'Predecessor cleanup did not reach the parse-failure gate'
+
+                        future = snapshot.call_async(GetFabricPlanSnapshot.Request())
+                        rclpy.spin_until_future_complete(node, future, timeout_sec=1)
+                        assert future.done(), 'Snapshot read blocked during parse-failure cleanup'
+                        failed_snapshot = future.result()
+                        assert failed_snapshot.has_plan
+                        assert failed_snapshot.plan_id == failed_plan.plan_id
+                        assert failed_snapshot.status.code == FabricStatus.PARSE_FAILED
+                        assert not failed_snapshot.connections_complete
+                        assert not failed_snapshot.connections
+                        free_release.set()
+
+                        deadline = time.monotonic() + 5
+                        while time.monotonic() < deadline:
+                            future = snapshot.call_async(GetFabricPlanSnapshot.Request())
+                            rclpy.spin_until_future_complete(node, future, timeout_sec=1)
+                            assert future.done(), 'Snapshot read blocked after parse-failure cleanup'
+                            if not future.result().has_plan:
+                                break
+                        assert not future.result().has_plan, 'Parse-failed plan remained active after cleanup'
                     if not gate_runnable_specs and not gate_trigger:
                         submit_request = SubmitFabricPlan.Request()
                         submit_request.plan = '<NotPlan/>'

@@ -4,8 +4,12 @@
 
     # Empty selects the installed default; launch can override this value.
     plan_file_path: ""
+    bond:
+      topic: "/capabilities/bond"
+      connect_timeout_sec: 10.0
+      heartbeat_timeout_sec: 10.0
+      heartbeat_period_sec: 0.1
     capability_client:
-      bond_topic: "/capabilities/bond"
       service_wait_timeout_sec: -1
       services:
         get_interfaces: "/capabilities/get_interfaces"
