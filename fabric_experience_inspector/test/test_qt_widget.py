@@ -1,7 +1,10 @@
 import os
 import sqlite3
+import subprocess
 import sys
 import json
+import threading
+import time
 from pathlib import Path
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -9,12 +12,321 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PACKAGE_ROOT))
 
-from python_qt_binding import QtWidgets
+from python_qt_binding import QtCore, QtWidgets
 
 from fabric_experience_inspector.app import InspectorMainWindow, InspectorWidget, ensure_application
 from fabric_experience_inspector.audits.planner_prompt_audit_summary import export_planner_prompt_audit_summary
 from fabric_experience_inspector.audits.retrieval_prompt_audit import export_retrieval_prompt_audit
+from fabric_experience_inspector.fabric_graph import Dependency, Event, FabricGraph, GraphCapture, InstanceId, ProviderId
+from fabric_experience_inspector.ui.fabric_graph_requests import FabricGraphRequests, _active_requests
+from fabric_experience_inspector.ui.fabric_graph_view import FabricGraphWidget
 from test_sqlite_reader import create_minimal_db
+
+
+def test_fabric_graph_requests_switch_failure_and_close():
+    app = ensure_application([])
+    started = threading.Event()
+    release = threading.Event()
+    closed = []
+
+    class Client:
+        def snapshot(self, include_dependencies=False):
+            started.set()
+            assert release.wait(5)
+            return 'obsolete'
+
+        def parse(self, plan_xml):
+            if plan_xml == 'bad':
+                raise TimeoutError('parse timed out')
+            return plan_xml
+
+        def close(self):
+            closed.append(True)
+
+    def wait_for(predicate):
+        deadline = time.monotonic() + 5
+        while not predicate() and time.monotonic() < deadline:
+            app.processEvents()
+            threading.Event().wait(0.005)
+        assert predicate()
+
+    requests = FabricGraphRequests(client_factory=Client)
+    captures = []
+    failures = []
+    busy = []
+    requests.capture_ready.connect(captures.append)
+    requests.failed.connect(failures.append)
+    requests.busy_changed.connect(busy.append)
+    requests.request('live')
+    assert started.wait(5)
+    requests.request('loaded', 'current')
+    release.set()
+    wait_for(lambda: captures == ['current'] and busy[-1:] == [False])
+    assert failures == []
+    assert len(closed) == 2
+
+    requests.request('loaded', 'bad')
+    wait_for(lambda: failures == ['parse timed out'] and busy[-1:] == [False])
+    assert len(closed) == 3
+
+    started.clear()
+    release.clear()
+    requests.request('live')
+    assert started.wait(5)
+    requests.close()
+    release.set()
+    wait_for(lambda: len(closed) == 4 and busy[-1:] == [False])
+    assert captures == ['current']
+    assert failures == ['parse timed out']
+
+
+def test_fabric_graph_widget_levels_selection_and_status():
+    app = ensure_application([])
+    widget = FabricGraphWidget()
+    widget.resize(1000, 700)
+    widget.show()
+    app.processEvents()
+    assert widget.view.width() > widget.details.width()
+    first = InstanceId('interface/' + 'long_name_' * 15, 'provider/first', 1)
+    second = InstanceId(first.interface, first.provider, 2)
+    other = InstanceId('interface/other', 'provider/other', 3)
+    events = (Event(first, second, 'on_success', 'first', 0),
+              Event(first, second, 'on_failure', 'second', 0),
+              Event(second, other, 'on_start', 'third', 0))
+    dependency = Dependency(first.provider_id, ProviderId('interface/dependency', 'provider/dependency'))
+    graph = FabricGraph((first, second, other), events, (dependency,), True)
+    widget._capture_ready(GraphCapture('live', graph, True, True, 'plan-id', 12, (1, 2)))
+
+    def items(kind):
+        return [item for item in widget.scene.items() if isinstance(item, kind)]
+
+    nodes = items(QtWidgets.QGraphicsRectItem)
+    paths = items(QtWidgets.QGraphicsPathItem)
+    assert len(nodes) == 2 and len(paths) == 3
+    loops = [path for path in paths if 'on_success' in path.data(0) or 'on_failure' in path.data(0)]
+    assert len(loops) == 2 and loops[0].path().boundingRect() != loops[1].path().boundingRect()
+    for loop in loops:
+        event_label = 'on_success' if 'on_success' in loop.data(0) else 'on_failure'
+        label = next(item for item in widget.scene.items()
+                     if isinstance(item, QtWidgets.QGraphicsSimpleTextItem) and item.text() == event_label)
+        assert label.sceneBoundingRect().bottom() < loop.path().pointAtPercent(0.5).y()
+    for node in nodes:
+        label = node.childItems()[0]
+        assert label.boundingRect().width() <= node.rect().width()
+    long_node = next(node for node in nodes if first.interface in node.toolTip())
+    long_node.setSelected(True)
+    app.processEvents()
+    assert first.interface in widget.details.toPlainText()
+    assert 'Instances: 2' in widget.details.toPlainText()
+
+    widget.level.setCurrentIndex(1)
+    assert len(items(QtWidgets.QGraphicsRectItem)) == 3
+    assert len(items(QtWidgets.QGraphicsPathItem)) == 3
+    widget.level.setCurrentIndex(2)
+    assert len(items(QtWidgets.QGraphicsRectItem)) == 5
+    assert len(items(QtWidgets.QGraphicsPathItem)) == 4
+    assert 'separately sampled' in widget.status.text()
+    dependency_path = next(item for item in items(QtWidgets.QGraphicsPathItem) if 'Provider dependency' in item.data(0))
+    dependency_path.setSelected(True)
+    assert 'interface/dependency' in widget.details.toPlainText()
+    widget.filter.setText('other')
+    assert len(items(QtWidgets.QGraphicsRectItem)) == 1
+    assert not items(QtWidgets.QGraphicsPathItem)
+    widget._failed('timeout')
+    widget.level.setCurrentIndex(0)
+    assert 'stale' in widget.status.text() and 'timeout' in widget.status.text()
+    widget.close_requests()
+
+
+def test_fabric_graph_opposite_event_labels_do_not_overlap():
+    app = ensure_application([])
+    widget = FabricGraphWidget()
+    first = InstanceId('demo/First', 'demo/First', 1)
+    second = InstanceId('demo/Second', 'demo/Second', 2)
+    graph = FabricGraph((first, second), (
+        Event(first, second, 'on_success', '', 0),
+        Event(second, first, 'on_failure', '', 0),
+    ), (), False)
+    widget._capture_ready(GraphCapture('live', graph, True, True))
+    labels = [item for item in widget.scene.items()
+              if isinstance(item, QtWidgets.QGraphicsSimpleTextItem)
+              and item.text() in ('on_success', 'on_failure')]
+    assert len(labels) == 2
+    assert not labels[0].sceneBoundingRect().intersects(labels[1].sceneBoundingRect())
+    widget.close_requests()
+    app.processEvents()
+
+
+def test_fabric_graph_widget_new_empty_file_invalidates_capture(tmp_path, monkeypatch):
+    app = ensure_application([])
+    widget = FabricGraphWidget()
+    widget.source.setCurrentIndex(1)
+    widget.loaded_path = 'old.xml'
+    widget.loaded_xml = '<old/>'
+    widget._capture_ready(GraphCapture('loaded', FabricGraph((), (), (), False), True, True))
+    new_file = tmp_path / 'empty.xml'
+    new_file.write_text('', encoding='utf-8')
+    monkeypatch.setattr(QtWidgets.QFileDialog, 'getOpenFileName', lambda *args: (str(new_file), ''))
+    requests = []
+    monkeypatch.setattr(widget.requests, 'request', lambda *args, **kwargs: requests.append((args, kwargs)))
+    widget._load_xml()
+    assert widget.capture is None
+    assert requests[0][0] == ('loaded', '')
+    widget._failed('invalid XML')
+    assert 'invalid XML' in widget.status.text() and 'stale' not in widget.status.text()
+    widget.close_requests()
+    app.processEvents()
+
+
+def test_fabric_graph_requests_survive_parent_destruction():
+    app = ensure_application([])
+    started = threading.Event()
+    release = threading.Event()
+    closed = threading.Event()
+
+    class Client:
+        def snapshot(self, include_dependencies=False):
+            started.set()
+            assert release.wait(5)
+            return 'late'
+
+        def close(self):
+            closed.set()
+
+    parent = QtWidgets.QWidget()
+    requests = FabricGraphRequests(parent, client_factory=Client)
+    requests.request('live')
+    assert started.wait(5)
+    requests.close()
+    parent.deleteLater()
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.DeferredDelete)
+    release.set()
+    deadline = time.monotonic() + 5
+    while (not closed.is_set() or _active_requests) and time.monotonic() < deadline:
+        app.processEvents()
+        threading.Event().wait(0.005)
+    assert closed.is_set() and not _active_requests
+
+
+def test_fabric_graph_requests_finish_on_process_exit():
+    script = '''
+import threading
+from fabric_experience_inspector.app import ensure_application
+from fabric_experience_inspector.ui.fabric_graph_requests import FabricGraphRequests
+started = threading.Event()
+class Client:
+    def snapshot(self, include_dependencies=False):
+        started.set()
+        threading.Event().wait(0.1)
+        return None
+    def close(self):
+        print('client closed', flush=True)
+app = ensure_application([])
+requests = FabricGraphRequests(client_factory=Client)
+requests.request('live')
+assert started.wait(5)
+requests.close()
+'''
+    result = subprocess.run([sys.executable, '-c', script], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    assert 'client closed' in result.stdout
+
+
+def test_fabric_graph_widget_real_services_recover_without_mutation(monkeypatch):
+    import rclpy
+    from rclpy.context import Context
+    from rclpy.executors import SingleThreadedExecutor
+    from rclpy.node import Node
+    from capabilities2_msgs.srv import ConnectCapability, TriggerCapability
+    from fabric_msgs.msg import FabricConnection, FabricNode, FabricStatus
+    from fabric_msgs.srv import CancelFabricPlan, GetFabricPlanSnapshot, ParsePlan, SubmitFabricPlan
+    from fabric_experience_inspector.services.fabric_graph_client import FabricGraphClient
+
+    monkeypatch.setenv('ROS_DOMAIN_ID', str(100 + os.getpid() % 100))
+    monkeypatch.setenv('ROS_LOCALHOST_ONLY', '1')
+    context = Context()
+    rclpy.init(context=context)
+    node = Node('inspector_read_only_test', context=context)
+    executor = SingleThreadedExecutor(context=context)
+    executor.add_node(node)
+    thread = threading.Thread(target=executor.spin, daemon=True)
+    thread.start()
+    app = ensure_application([])
+    widget = FabricGraphWidget(client_factory=lambda: FabricGraphClient(timeout_sec=1.0))
+    requests = []
+    mutations = []
+    source = FabricNode(interface='demo/Source', provider='demo/Source', instance_id=1)
+    target = FabricNode(interface='demo/Target', provider='demo/Target', instance_id=2)
+    edge = FabricConnection(source=source, on_success=target)
+
+    def snapshot_callback(request, response):
+        requests.append('snapshot')
+        response.has_plan = True
+        response.plan_id = 'controlled-plan'
+        response.status.code = FabricStatus.RUNNING
+        response.connections_complete = True
+        response.instances = [source, target]
+        response.connections = [edge]
+        return response
+
+    def parse_callback(request, response):
+        requests.append(('parse', request.plan))
+        response.success = True
+        response.connections = [edge]
+        return response
+
+    def mutation_callback(request, response):
+        mutations.append(True)
+        return response
+
+    def wait_for(predicate):
+        deadline = time.monotonic() + 8
+        while not predicate() and time.monotonic() < deadline:
+            app.processEvents()
+            threading.Event().wait(0.01)
+        assert predicate(), widget.status.text()
+
+    try:
+        snapshot_service = node.create_service(GetFabricPlanSnapshot, '/fabric/plan/get_snapshot', snapshot_callback)
+        node.create_service(ParsePlan, '/fabric/plan/parse', parse_callback)
+        node.create_service(SubmitFabricPlan, '/fabric/plan/submit', mutation_callback)
+        node.create_service(CancelFabricPlan, '/fabric/plan/cancel', mutation_callback)
+        node.create_service(ConnectCapability, '/capabilities/connect_capability', mutation_callback)
+        node.create_service(TriggerCapability, '/capabilities/trigger_capability', mutation_callback)
+
+        widget.refresh()
+        wait_for(lambda: widget.capture is not None and not widget.refreshing)
+        assert widget.capture.plan_id == 'controlled-plan'
+        assert widget.capture.graph.events[0].label == 'on_success'
+        widget.level.setCurrentIndex(1)
+        widget.filter.setText('demo')
+        widget.fit()
+        assert requests == ['snapshot']
+
+        node.destroy_service(snapshot_service)
+        widget.refresh()
+        wait_for(lambda: bool(widget.error) and not widget.refreshing)
+        assert 'stale' in widget.status.text()
+        snapshot_service = node.create_service(GetFabricPlanSnapshot, '/fabric/plan/get_snapshot', snapshot_callback)
+        widget.refresh()
+        wait_for(lambda: not widget.error and not widget.refreshing)
+        assert widget.capture.plan_id == 'controlled-plan'
+
+        widget.source.setCurrentIndex(1)
+        widget.loaded_path = 'controlled.xml'
+        widget.loaded_xml = '<Plan />'
+        widget.refresh()
+        wait_for(lambda: widget.capture is not None and not widget.refreshing)
+        assert widget.capture.source == 'loaded'
+        assert requests == ['snapshot', 'snapshot', ('parse', '<Plan />')]
+        assert not mutations
+    finally:
+        widget.close_requests()
+        wait_for(lambda: not _active_requests)
+        executor.shutdown()
+        thread.join(timeout=5)
+        node.destroy_node()
+        rclpy.shutdown(context=context)
 
 
 def test_qt_widget_smoke(tmp_path):

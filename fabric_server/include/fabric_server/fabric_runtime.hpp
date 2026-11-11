@@ -814,6 +814,11 @@ private:
       }
       RCLCPP_INFO(node_.get_logger(), "[server] Fabric plan parsing completed successfully.");
 
+      if (shutting_down_.load())
+      {
+        return;
+      }
+
       // get the capabilities available in the system
       try
       {

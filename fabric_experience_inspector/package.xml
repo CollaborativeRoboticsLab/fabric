@@ -19,6 +19,7 @@
   <exec_depend>rqt_gui</exec_depend>
   <exec_depend>rqt_gui_py</exec_depend>
   <exec_depend>fabric_msgs</exec_depend>
+  <exec_depend>capabilities2_msgs</exec_depend>
   <exec_depend>fabric_server</exec_depend>
 
   <test_depend>ament_cmake_pytest</test_depend>

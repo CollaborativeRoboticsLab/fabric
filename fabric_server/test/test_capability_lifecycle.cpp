@@ -155,3 +155,39 @@ TEST_F(CapabilityLifecycleTest, ReportsConnectionAndTriggerFailures)
   EXPECT_THROW(client_.connect_capabilities(plan), fabric::fabric_exception);
   EXPECT_THROW(client_.trigger_first_node(plan), fabric::fabric_exception);
 }
+
+TEST_F(CapabilityLifecycleTest, ConnectsStopAndSuccessEventsInTheirOriginalDirection)
+{
+  std::vector<fabric::CapabilityClient::ConnectCapability::Request> requests;
+  auto service = node_->create_service<fabric::CapabilityClient::ConnectCapability>(
+    "/capabilities/connect_capability",
+    [&requests](const fabric::CapabilityClient::ConnectCapability::Request::SharedPtr request,
+    fabric::CapabilityClient::ConnectCapability::Response::SharedPtr response) {
+      requests.push_back(*request);
+      response->successful = true;
+    });
+  executor_thread_ = std::thread([this]() {executor_.spin();});
+
+  fabric::plan::Plan plan;
+  plan.plan_id = "plan-id";
+  plan.bond_id = "bond-id";
+  auto & connection = plan.connections[0];
+  connection.source = {"demo/Source", "demo/SourceProvider", {}, 4};
+  connection.on_stop = {"demo/Target", "demo/TargetProvider", {}, 7};
+  connection.on_success = connection.on_stop;
+
+  ASSERT_NO_THROW(client_.connect_capabilities(plan));
+  ASSERT_EQ(requests.size(), 2u);
+  EXPECT_EQ(requests[0].connection.type.code, fabric::CapabilityClient::CapabilityEventCode::STOPPED);
+  EXPECT_EQ(requests[1].connection.type.code, fabric::CapabilityClient::CapabilityEventCode::SUCCEEDED);
+  for (const auto & request : requests) {
+    EXPECT_EQ(request.bond_id, "bond-id");
+    EXPECT_EQ(request.connection.ownership_id, "plan-id");
+    EXPECT_EQ(request.connection.source.capability, "demo/Source");
+    EXPECT_EQ(request.connection.source.provider, "demo/SourceProvider");
+    EXPECT_EQ(request.connection.source.instance_id, "4");
+    EXPECT_EQ(request.connection.target.capability, "demo/Target");
+    EXPECT_EQ(request.connection.target.provider, "demo/TargetProvider");
+    EXPECT_EQ(request.connection.target.instance_id, "7");
+  }
+}

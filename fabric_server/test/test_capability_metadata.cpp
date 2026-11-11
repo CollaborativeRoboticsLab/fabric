@@ -1,3 +1,4 @@
+#include <chrono>
 #include <thread>
 
 #include <gtest/gtest.h>
@@ -111,6 +112,48 @@ TEST_F(CapabilityMetadataTest, ReportsMalformedResponseOnTheCallingThread)
   std::vector<fabric::capability::Descriptor> capabilities;
   EXPECT_THROW(client_.getRunnableSpecs(capabilities), fabric::fabric_exception);
   EXPECT_TRUE(capabilities.empty());
+}
+
+TEST_F(CapabilityMetadataTest, TimesOutWhenRunnableSpecsServiceDoesNotRespond)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({
+    rclcpp::Parameter("capability_client.service_wait_timeout_sec", 1),
+    rclcpp::Parameter("capability_client.services.get_runnable_specs", "/fabric_test/unavailable_runnable_specs"),
+  });
+  auto timeout_node = std::make_shared<rclcpp::Node>("capability_metadata_timeout_test", options);
+  fabric::CapabilityClient timeout_client;
+  timeout_client.initialize(timeout_node);
+
+  std::vector<fabric::capability::Descriptor> capabilities;
+  const auto start = std::chrono::steady_clock::now();
+  EXPECT_THROW(timeout_client.getRunnableSpecs(capabilities), fabric::fabric_exception);
+  const auto elapsed = std::chrono::steady_clock::now() - start;
+  EXPECT_GE(elapsed, std::chrono::seconds(1));
+  EXPECT_LT(elapsed, std::chrono::seconds(4));
+  EXPECT_TRUE(capabilities.empty());
+
+  auto service = node_->create_service<capabilities2_msgs::srv::GetRunnableSpecs>(
+    "/fabric_test/unavailable_runnable_specs",
+    [](const capabilities2_msgs::srv::GetRunnableSpecs::Request::SharedPtr,
+    capabilities2_msgs::srv::GetRunnableSpecs::Response::SharedPtr response) {
+      response->index_of_specs.push_back("demo/Provider");
+      capabilities2_msgs::msg::RunnableSpec spec;
+      spec.spec = "interface: {name: demo/Move}\nprovider: {name: demo/Provider}\n";
+      response->runnable_specs.push_back(spec);
+    });
+  auto probe = timeout_node->create_client<capabilities2_msgs::srv::GetRunnableSpecs>(
+    "/fabric_test/unavailable_runnable_specs");
+  ASSERT_TRUE(probe->wait_for_service(std::chrono::seconds(5)));
+  executor_.add_node(timeout_node);
+  executor_thread_ = std::thread([this]() {executor_.spin();});
+  EXPECT_NO_THROW(timeout_client.getRunnableSpecs(capabilities));
+  executor_.cancel();
+  executor_thread_.join();
+  executor_.remove_node(timeout_node);
+  ASSERT_EQ(capabilities.size(), 1u);
+  EXPECT_EQ(capabilities.front().interface_name, "demo/Move");
+  EXPECT_EQ(capabilities.front().provider_name, "demo/Provider");
 }
 
 TEST_F(CapabilityMetadataTest, AcceptsMissingNullAndEmptyDefinitionMetadata)

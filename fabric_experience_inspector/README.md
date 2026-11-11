@@ -9,6 +9,7 @@ The package now uses Qt through `python_qt_binding`, which matches the ROS GUI e
 - A Qt GUI for browsing GraphRAG tables directly from `core_graphrag.sqlite3`
 - Proxy-backed sortable tables with primary and secondary column filters
 - A rendered Qt graph canvas with bidirectional node selection between the scene and inspector panels
+- A separate read-only `Fabric Graph` tab for parsed plans and live intended connections
 - A `Plan Sandbox` tab for loading Fabric XML directly into the GUI as a structural graph
 - A `Request Review` tab that joins prompt-audit iterations, persisted node explanations, and selected generated-plan snapshots per planning request
 - A `Decision Support` tab that summarizes request-level detailed-vs-community recommendations from saved prompt audits and feedback artifacts
@@ -33,6 +34,14 @@ source install/setup.bash
 ```
 
 ## GUI Usage
+
+From the colcon workspace root, start the standalone inspector:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 run fabric_experience_inspector inspector_gui.py
+```
 
 Launch the GUI with optional database, prompt-audit, and feedback artifact paths:
 
@@ -110,8 +119,9 @@ Inside the GUI you can:
 - Run terminal-success threshold analysis directly from the docked `Analysis Jobs` panel
 - Inspect the selected row in the detail pane without querying the database manually
 
-The GUI reads the SQLite database directly. It uses the Fabric-owned Python helpers
-from `fabric_server` and does not require the Fabric server to be running.
+The GUI reads the SQLite database directly. Offline inspection uses the Fabric-owned
+Python helpers from `fabric_server` and does not require the Fabric server to be running.
+The Fabric Graph tab requires the relevant ROS services for parsing or live snapshots.
 
 Optional plugin arguments can also be passed through `rqt`:
 
@@ -146,6 +156,25 @@ This writes a versioned JSON artifact containing:
 - and an explicit `mutates_database: false` policy marker.
 
 That keeps review and calibration work non-destructive by default while still producing a durable artifact that can be reviewed and converted into explicit config or export updates later.
+
+## Fabric Graph
+
+Select `Live snapshot` and refresh to request `/fabric/plan/get_snapshot`, or load an
+XML file to parse it using `/fabric/plan/parse`. Refresh is manual; changing sources
+or graph levels does not request new data. Requests run outside the Qt event loop and
+report unavailable services, stale captures, partial captures, and empty graphs.
+
+The main-capabilities level aggregates by interface and provider; the other levels
+show instances and directed event connections. The dependencies level optionally
+requests `/capabilities/get_running_capabilities` on refresh. Dependencies are
+provider-level, with instance ownership unknown; an unavailable response is not an
+empty dependency list. It is sampled separately from the snapshot, not atomically.
+
+The live graph is the cached intended graph for the current dequeued plan, not proof
+that connections are active. Its timestamp is the last state capture, not a health
+check; terminal states can disappear before refresh. Instances are derived from valid
+connection endpoints, not an independent inventory. Viewing or refreshing does not
+submit a plan.
 
 ## Plan Sandbox
 

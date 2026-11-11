@@ -106,6 +106,7 @@ private:
   /** @brief Register plan submission, cancellation, completion, status, and parsing services. */
   void createFabricServices()
   {
+    snapshot_callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     submit_plan_server_ = this->create_service<SubmitFabricPlan>(
         "/fabric/plan/submit", std::bind(&Fabric::submitPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
     cancel_server_ = this->create_service<CancelFabricPlan>(
@@ -115,7 +116,8 @@ private:
     get_plan_status_server_ = this->create_service<GetPlanStatus>(
         "/fabric/plan/get_status", std::bind(&Fabric::getPlanStatusCallback, this, std::placeholders::_1, std::placeholders::_2));
     get_plan_snapshot_server_ = this->create_service<GetFabricPlanSnapshot>(
-      "/fabric/plan/get_snapshot", std::bind(&Fabric::getPlanSnapshotCallback, this, std::placeholders::_1, std::placeholders::_2));
+      "/fabric/plan/get_snapshot", std::bind(&Fabric::getPlanSnapshotCallback, this, std::placeholders::_1, std::placeholders::_2),
+      rmw_qos_profile_services_default, snapshot_callback_group_);
     parse_plan_server_ = this->create_service<ParsePlan>("/fabric/plan/parse",
                                                          std::bind(&Fabric::parsePlanCallback, this, std::placeholders::_1, std::placeholders::_2));
   }
@@ -520,6 +522,7 @@ private:
   }
 
   rclcpp::Publisher<fabric_msgs::msg::FabricStatus>::SharedPtr fabric_status_pub_;
+  rclcpp::CallbackGroup::SharedPtr snapshot_callback_group_;
   rclcpp::Service<SubmitFabricPlan>::SharedPtr submit_plan_server_;
   rclcpp::Service<CancelFabricPlan>::SharedPtr cancel_server_;
   rclcpp::Service<CompleteFabric>::SharedPtr completion_server_;

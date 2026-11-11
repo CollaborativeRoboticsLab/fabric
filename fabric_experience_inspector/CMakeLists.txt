@@ -58,6 +58,10 @@ if(BUILD_TESTING)
     test/test_plan_sandbox_helpers.py
   )
 
+  ament_add_pytest_test(test_fabric_graph
+    test/test_fabric_graph.py
+  )
+
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()

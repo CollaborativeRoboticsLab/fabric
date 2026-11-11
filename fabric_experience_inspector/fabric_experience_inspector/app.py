@@ -18,6 +18,7 @@ from fabric_experience_inspector.storage import InspectorDatabase, TableSnapshot
 from fabric_experience_inspector.graph_plot_3d import save_graph_plot
 from fabric_experience_inspector.plan_sandbox import build_plan_sandbox_graph, build_tuning_proposal, parse_optional_json
 from fabric_experience_inspector.services import score_plan_live
+from fabric_experience_inspector.ui.fabric_graph_view import FabricGraphWidget
 from fabric_experience_inspector.ui import (
     AnalysisJobsPanel as DockAnalysisJobsPanel,
     CalibrationReviewWidget,
@@ -237,6 +238,8 @@ class InspectorWidget(QtWidgets.QWidget):
         notebook = QtWidgets.QTabWidget()
         self.notebook = notebook
         notebook.addTab(self._build_plan_sandbox(), PLAN_SANDBOX_NAME)
+        self.fabric_graph_widget = FabricGraphWidget()
+        notebook.addTab(self.fabric_graph_widget, 'Fabric Graph')
         notebook.addTab(self._build_graph_overview(), GRAPH_OVERVIEW_NAME)
         notebook.addTab(self._build_request_review(), REQUEST_REVIEW_NAME)
         notebook.addTab(self._build_decision_support(), DECISION_SUPPORT_NAME)
@@ -245,6 +248,10 @@ class InspectorWidget(QtWidgets.QWidget):
             notebook.addTab(self._build_section(section), section)
         outer_layout.addWidget(notebook, stretch=1)
         outer_layout.addWidget(self.status_label)
+
+    def closeEvent(self, event):
+        self.fabric_graph_widget.close_requests()
+        super().closeEvent(event)
 
     def _build_toolbar(self) -> QtWidgets.QHBoxLayout:
         toolbar = QtWidgets.QHBoxLayout()
@@ -1166,6 +1173,10 @@ class InspectorWidget(QtWidgets.QWidget):
 
 
 class InspectorMainWindow(QtWidgets.QMainWindow):
+    def closeEvent(self, event):
+        self.widget.fabric_graph_widget.close_requests()
+        super().closeEvent(event)
+
     def __init__(self, initial_db_path: str = '', initial_audit_root: str = '', initial_feedback_root: str = ''):
         super().__init__()
         self.setWindowTitle('Experience Inspector')

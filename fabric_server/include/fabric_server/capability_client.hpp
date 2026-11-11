@@ -146,17 +146,18 @@ public:
     node_->get_parameter("capability_client.services.connect_capability", connect_capability_);
     node_->get_parameter("capability_client.services.ready", ready_);
 
-    get_interfaces_client_ = node_->create_client<GetInterfaces>(get_interfaces_);
-    get_sem_interf_client_ = node_->create_client<GetSemanticInterfaces>(get_semantic_interfaces_);
-    get_event_snapshot_client_ = node_->create_client<GetEventSnapshot>(get_event_snapshot_);
-    get_providers_client_ = node_->create_client<GetProviders>(get_providers_);
-    get_runnable_specs_client_ = node_->create_client<GetRunnableSpecs>(get_runnable_specs_);
-    establish_bond_client_ = node_->create_client<EstablishBond>(establish_bond_);
-    use_capability_client_ = node_->create_client<UseCapability>(use_capability_);
-    free_capability_client_ = node_->create_client<FreeCapability>(free_capability_);
-    trig_capability_client_ = node_->create_client<TriggerCapability>(trigger_capability_);
-    connect_capability_client_ = node_->create_client<ConnectCapability>(connect_capability_);
-    ready_client_ = node_->create_client<Ready>(ready_);
+    callback_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+    get_interfaces_client_ = node_->create_client<GetInterfaces>(get_interfaces_, rmw_qos_profile_services_default, callback_group_);
+    get_sem_interf_client_ = node_->create_client<GetSemanticInterfaces>(get_semantic_interfaces_, rmw_qos_profile_services_default, callback_group_);
+    get_event_snapshot_client_ = node_->create_client<GetEventSnapshot>(get_event_snapshot_, rmw_qos_profile_services_default, callback_group_);
+    get_providers_client_ = node_->create_client<GetProviders>(get_providers_, rmw_qos_profile_services_default, callback_group_);
+    get_runnable_specs_client_ = node_->create_client<GetRunnableSpecs>(get_runnable_specs_, rmw_qos_profile_services_default, callback_group_);
+    establish_bond_client_ = node_->create_client<EstablishBond>(establish_bond_, rmw_qos_profile_services_default, callback_group_);
+    use_capability_client_ = node_->create_client<UseCapability>(use_capability_, rmw_qos_profile_services_default, callback_group_);
+    free_capability_client_ = node_->create_client<FreeCapability>(free_capability_, rmw_qos_profile_services_default, callback_group_);
+    trig_capability_client_ = node_->create_client<TriggerCapability>(trigger_capability_, rmw_qos_profile_services_default, callback_group_);
+    connect_capability_client_ = node_->create_client<ConnectCapability>(connect_capability_, rmw_qos_profile_services_default, callback_group_);
+    ready_client_ = node_->create_client<Ready>(ready_, rmw_qos_profile_services_default, callback_group_);
 
     RCLCPP_INFO(node_->get_logger(), "[Capability client] initialized.");
   }
@@ -811,7 +812,7 @@ protected:
     auto request_specs = std::make_shared<GetRunnableSpecs::Request>();
     std::vector<std::string> runnable_specs;
     auto future = get_runnable_specs_client_->async_send_request(request_specs);
-    const auto response = future.get();
+    const auto response = await_response(get_runnable_specs_client_, future, "get runnable capability descriptors");
     if (response->index_of_specs.size() != response->runnable_specs.size())
     {
       throw fabric::fabric_exception("Runnable specification response has mismatched index and payload sizes");
@@ -874,6 +875,7 @@ protected:
    * @brief pointer to the ROS2 node
    */
   rclcpp::Node::SharedPtr node_;
+  rclcpp::CallbackGroup::SharedPtr callback_group_;
 
   int service_wait_timeout_sec_{ -1 };
   std::atomic<bool> stopping_{ false };

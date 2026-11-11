@@ -132,6 +132,11 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   find_package(fabric_parser_xml REQUIRED)
 
+  add_library(fabric_server_test_parser SHARED test/gated_parser.cpp)
+  ament_target_dependencies(fabric_server_test_parser fabric_base fabric_parser_xml pluginlib rclcpp TinyXML2)
+  pluginlib_export_plugin_description_file(fabric_base test/test_parser_plugins.xml)
+  install(TARGETS fabric_server_test_parser LIBRARY DESTINATION lib)
+
   ament_add_gtest(test_fabric_runtime test/test_fabric_runtime.cpp TIMEOUT 30)
   if(TARGET test_fabric_runtime)
     ament_target_dependencies(test_fabric_runtime ${FABRIC_SERVER_DEPENDENCIES})

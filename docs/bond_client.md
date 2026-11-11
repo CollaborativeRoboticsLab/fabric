@@ -33,10 +33,12 @@ The `BondClient` class manages the lifecycle of a bond between the Fabric node a
 - If the bond is broken unexpectedly, the system can take recovery actions or log the failure.
 
 ## Parameters
-- `capability_client.bond_topic`: The ROS parameter specifying the bond topic (default: `/capabilities/bond`).
+- `capability_client.bond_topic`: The legacy bond topic parameter (default: `/capabilities/bond`).
+- `bond.topic`: Optional bond topic override. When explicitly configured, it takes precedence over `capability_client.bond_topic`. The shipped configuration leaves it unset so legacy topic overrides continue to work.
+- `bond.connect_timeout_sec`, `bond.heartbeat_timeout_sec`, and `bond.heartbeat_period_sec`: Bond timeouts and heartbeat period in seconds, defaulting to `10.0`, `10.0`, and `0.1`.
 
 ## Runtime Behavior
-- `start()` creates a `bond::Bond`, sets a 0.10 s heartbeat period, sets a 10.0 s timeout, and starts the heartbeat.
+- `start()` creates a `bond::Bond`, applies the configured timeouts and heartbeat period, and starts the heartbeat.
 - `stop()` destroys the bond client instance if one exists.
 
 ## Example Flow
