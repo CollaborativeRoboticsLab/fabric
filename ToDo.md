@@ -107,7 +107,7 @@ Ownership rules: capabilities2 owns capability facts and event history. Fabric m
 - [x] Pass the isolated unified-launch smoke using existing standard config files and local model stubs.
 - [x] Verify fresh-core startup, status publication, bond formation, and clean native standalone shutdown.
 - [x] Fix the three Fabric uncrustify divergences and pass the full package test suite, including opt-in component integration.
-- [ ] Clear `fabric_experience_inspector` flake8 failures before treating it as an integration gate.
+- [ ] Clear `fabric_experience_gui` flake8 failures before treating it as an integration gate.
 - [x] Validate initialized component unload and active-component container shutdown with standard configs and local model stubs.
 - [x] Fix runnable-metadata handling of missing/null/empty YAML definitions and runtime parameters, with descriptor/provider regression coverage.
 - [ ] Supply successful local model-stub responses for knowledge-core initialization, then rerun the completion-only plan through normal dispatch.
