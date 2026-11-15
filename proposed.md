@@ -14,18 +14,24 @@ callbacks and workers individually; do not replace threads merely to eliminate
 - Most adapter services share the default mutually exclusive callback group.
 	The snapshot service has its own group, and capability clients use a separate
 	reentrant group.
-- `ParserBase::parsePlan()` serializes calls on the same parser instance. The
-	XML parser has mutable instance state; `check_compatibility()` is outside that
-	mutex. Separate instances can allow parallel parsing, subject to plugin safety.
+- `ParserBase::parsePlan()` and `checkCompatibility()` serialize calls on the
+	same parser instance. The active runtime uses both wrappers; plugin overrides
+	remain unsafe if called directly or concurrently through separate instances.
+	The XML parser has mutable instance state.
 - The active adapter is `fabric_server/include/fabric_server/fabric_server.hpp`.
 	The older `server.hpp` is not used by the standalone server or component.
 - `FabricRuntime::validatePlan()` is currently an uncommitted, incomplete
 	implementation: the active adapter does not expose `/fabric/plan/validate`,
 	and concurrency and shutdown safety have not been established. Preserve and
 	evaluate this work rather than assuming it is a finished service.
+- Startup capability discovery now observes client shutdown cancellation.
+- The GUI's runnable-spec parser and fixtures match the current
+	`interface_name|provider_name` index contract.
 - Execution holds `current_plan_mutex_` across potentially blocking work;
-	generation and scoring share `generation_operation_mutex_`. More executor
-	threads alone will not remove these bottlenecks.
+	generation and scoring share `generation_operation_mutex_`. Generation goals
+	are accepted into worker threads without an admission limit, but their plugin
+	pipeline is serialized. More executor threads alone will not remove these
+	bottlenecks.
 
 ## Work
 
@@ -38,12 +44,11 @@ callbacks and workers individually; do not replace threads merely to eliminate
 	 ROS entities, shared resources or global state.
 
 2. **Isolate parsing and validation.** Use the same configured plugin classes
-	 and settings as execution, but separate initialized instances where required
-	 for parallelism. Prefer a bounded pool or per-role instances over unbounded
-	 per-request construction. Audit validator instances too: isolate or serialize
-	 them unless their contract permits concurrent use. Keep plugin loaders and
-	 instances alive for the full duration of in-flight operations, and cover
-	 `check_compatibility()` as well as `parsePlan()` in the safety audit.
+	and settings as execution, but separate initialized instances where required
+	for parallelism. Prefer a bounded pool or per-role instances over unbounded
+	per-request construction. Audit validator instances too: isolate or serialize
+	them unless their contract permits concurrent use. Keep plugin loaders and
+	instances alive for the full duration of in-flight operations.
 
 3. **Implement the active validation service.** Wire `/fabric/plan/validate` in
 	 the active adapter and adapt the partial runtime method to the chosen ownership
@@ -82,18 +87,17 @@ callbacks and workers individually; do not replace threads merely to eliminate
 	 timer is an executor callback, not a dedicated worker.
 
 7. **Finish integration and documentation.** Verify the GUI's validation flow
-	 against the active service and the current capabilities2 runnable-spec index
-	 contract (`interface_name|provider_name`); update its parsing and fixtures if
-	 needed. Document executor and plugin requirements, configuration, limits,
-	 validation semantics and any remaining worker threads.
+	against the active service. Document executor and plugin requirements,
+	configuration, limits, validation semantics and any remaining worker threads.
 
 ## Verification
 
 - Build the affected packages and run focused server and GUI tests. Rebuild before
 	running changed C++ tests; report any unavailable integration environment.
-- Exercise concurrent parse and validation requests while a plan executes and
-	generation runs. Verify independent results, plugin isolation, bounded resource
-	use and responsiveness of snapshot, status and cancellation.
+- Exercise concurrent validation requests while a plan executes and generation
+	runs. Verify independent results, plugin isolation, bounded resource use and
+	responsiveness of snapshot, status and cancellation. The parser-level
+	parse/compatibility serialization test is already in place.
 - Cover invalid XML, validator rejection, unavailable discovery, timeout and
 	overload; assert validation never causes execution or capability side effects.
 - Test delayed client replies under saturation, including the supported component
