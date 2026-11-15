@@ -1,0 +1,5 @@
+string plan
+---
+bool completed
+bool valid
+string message

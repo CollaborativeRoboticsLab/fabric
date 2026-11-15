@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <limits>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 
 #include <bondcpp/bond.hpp>
@@ -139,8 +140,7 @@ public:
    */
   void wait_until_ready(int timeout_sec = std::numeric_limits<int>::min())
   {
-    const int effective_timeout_sec =
-        timeout_sec == std::numeric_limits<int>::min() ? service_wait_timeout_sec_ : timeout_sec;
+    const int effective_timeout_sec = timeout_sec == std::numeric_limits<int>::min() ? service_wait_timeout_sec_ : timeout_sec;
 
     wait_for_service(get_interfaces_client_, get_interfaces_, effective_timeout_sec);
     wait_for_service(get_sem_interf_client_, get_semantic_interfaces_, effective_timeout_sec);
@@ -361,8 +361,109 @@ public:
       }
     }
 
-    RCLCPP_INFO(node_->get_logger(), "[Capability client] attached runnable metadata to %d capabilities\n",
-                static_cast<int>(capabilities.size()));
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] attached runnable metadata to %d capabilities\n", static_cast<int>(capabilities.size()));
+  }
+
+  std::vector<CapabilityInfo> get_validation_capabilities(int timeout_sec)
+  {
+    if (timeout_sec <= 0)
+    {
+      throw fabric::fabric_exception("Validation discovery timeout must be positive");
+    }
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeout_sec);
+    auto call = [deadline](const auto& client, const auto& request, const std::string& service_name) {
+      auto remaining = deadline - std::chrono::steady_clock::now();
+      if (remaining <= std::chrono::steady_clock::duration::zero() || !client->wait_for_service(remaining))
+      {
+        throw fabric::fabric_exception("Validation discovery service unavailable: " + service_name);
+      }
+      auto future = client->async_send_request(request);
+      remaining = deadline - std::chrono::steady_clock::now();
+      if (remaining <= std::chrono::steady_clock::duration::zero() || future.wait_for(remaining) != std::future_status::ready)
+      {
+        client->remove_pending_request(future);
+        throw fabric::fabric_exception("Validation discovery service timed out: " + service_name);
+      }
+      auto response = future.get();
+      if (!response)
+      {
+        throw fabric::fabric_exception("Validation discovery returned no response: " + service_name);
+      }
+      return response;
+    };
+
+    auto interfaces_response = call(get_interfaces_client_, std::make_shared<GetInterfaces::Request>(), get_interfaces_);
+    std::vector<CapabilityInfo> capabilities;
+    for (const auto& interface : interfaces_response->interfaces)
+    {
+      if (interface.empty())
+      {
+        throw fabric::fabric_exception("Capabilities2 returned an empty interface name");
+      }
+      CapabilityInfo capability;
+      capability.interface = interface;
+      capability.is_semantic = false;
+      capabilities.push_back(capability);
+    }
+
+    const size_t concrete_count = capabilities.size();
+    for (size_t index = 0; index < concrete_count; ++index)
+    {
+      auto request = std::make_shared<GetSemanticInterfaces::Request>();
+      request->interface = capabilities[index].interface;
+      auto response = call(get_sem_interf_client_, request, get_semantic_interfaces_);
+      for (const auto& interface : response->semantic_interfaces)
+      {
+        if (interface.empty())
+        {
+          throw fabric::fabric_exception("Capabilities2 returned an empty semantic interface name");
+        }
+        CapabilityInfo capability;
+        capability.interface = interface;
+        capability.is_semantic = true;
+        capabilities.push_back(capability);
+      }
+    }
+
+    for (auto& capability : capabilities)
+    {
+      auto request = std::make_shared<GetProviders::Request>();
+      request->interface = capability.interface;
+      request->include_semantic = capability.is_semantic;
+      auto response = call(get_providers_client_, request, get_providers_);
+      capability.provider = response->default_provider;
+      capability.alt_providers = response->providers;
+    }
+
+    auto runnable_response = call(get_runnable_specs_client_, std::make_shared<GetRunnableSpecs::Request>(), get_runnable_specs_);
+    if (runnable_response->index_of_specs.size() != runnable_response->runnable_specs.size())
+    {
+      throw fabric::fabric_exception("Runnable specification response has mismatched index and payload sizes");
+    }
+
+    std::unordered_map<std::string, CapabilityProviderInfo> provider_metadata;
+    for (size_t index = 0; index < runnable_response->index_of_specs.size(); ++index)
+    {
+      CapabilityInfo spec =
+          capability_info_from_runnable_spec(runnable_response->index_of_specs[index], runnable_response->runnable_specs[index].spec);
+      const auto inserted = provider_metadata.emplace(spec.provider, spec.provider_details.front());
+      if (!inserted.second)
+      {
+        throw fabric::fabric_exception("Capabilities2 returned duplicate runnable provider: " + spec.provider);
+      }
+    }
+
+    for (auto& capability : capabilities)
+    {
+      add_provider_details(capability, capability.provider, provider_metadata);
+      for (const auto& provider : capability.alt_providers)
+      {
+        add_provider_details(capability, provider, provider_metadata);
+      }
+    }
+
+    return capabilities;
   }
 
   /**
@@ -521,7 +622,8 @@ public:
       started_capabilities_.erase(std::remove(started_capabilities_.begin(), started_capabilities_.end(), capability), started_capabilities_.end());
   }
 
-  void connect_capability(const std::string& ownership_id, const std::string& bond_id, uint8_t code, const fabric::node& source, const fabric::node& target)
+  void connect_capability(const std::string& ownership_id, const std::string& bond_id, uint8_t code, const fabric::node& source,
+                          const fabric::node& target)
   {
     auto request = std::make_shared<ConnectCapability::Request>();
 
@@ -645,6 +747,28 @@ public:
     cv.wait(lock, [&completed]() { return completed; });
   }
 
+  static CapabilityInfo capability_info_from_runnable_spec(const std::string& index, const std::string& yaml_text)
+  {
+    const YAML::Node root = YAML::Load(yaml_text);
+    CapabilityInfo capability;
+    capability.interface = yaml_string_or_empty(root["interface"], "name");
+    capability.provider = yaml_string_or_empty(root["provider"], "name");
+    capability.is_semantic = false;
+
+    if (index.empty() || capability.interface.empty() || capability.provider.empty() || capability.provider != index)
+    {
+      throw fabric::fabric_exception("Runnable specification has missing or inconsistent interface/provider names");
+    }
+
+    CapabilityProviderInfo provider_info = parse_provider_info(yaml_text);
+    if (provider_info.provider != capability.provider)
+    {
+      throw fabric::fabric_exception("Runnable specification provider metadata is inconsistent");
+    }
+    capability.provider_details.push_back(std::move(provider_info));
+    return capability;
+  }
+
 protected:
   static std::string yaml_string_or_empty(const YAML::Node& node, const char* key)
   {
@@ -747,10 +871,8 @@ protected:
     return provider_info;
   }
 
-  static void add_provider_details(
-      CapabilityInfo& capability,
-      const std::string& provider_name,
-      const std::unordered_map<std::string, CapabilityProviderInfo>& provider_metadata_by_name)
+  static void add_provider_details(CapabilityInfo& capability, const std::string& provider_name,
+                                   const std::unordered_map<std::string, CapabilityProviderInfo>& provider_metadata_by_name)
   {
     if (provider_name.empty())
     {
@@ -809,8 +931,8 @@ protected:
     std::condition_variable cv;
     std::unique_lock<std::mutex> lock(mtx);
 
-    auto result_specs_future = get_runnable_specs_client_->async_send_request(
-        request_specs, [this, &completed, &cv](GetRunnableSpecsClient::SharedFuture future) {
+    auto result_specs_future =
+        get_runnable_specs_client_->async_send_request(request_specs, [this, &completed, &cv](GetRunnableSpecsClient::SharedFuture future) {
           if (!future.valid())
           {
             throw fabric::fabric_exception("Capabilities2 readiness probe failed");

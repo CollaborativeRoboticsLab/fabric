@@ -28,6 +28,7 @@
 #include <fabric_msgs/srv/get_plan_status.hpp>
 #include <fabric_msgs/srv/parse_plan.hpp>
 #include <fabric_msgs/msg/fabric_status.hpp>
+#include <fabric_msgs/srv/validate_plan.hpp>
 #include <fabric_msgs/action/generate_plan.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
@@ -46,6 +47,7 @@ public:
   using CompleteFabric = fabric_msgs::srv::CompleteFabric;
   using GetPlanStatus = fabric_msgs::srv::GetPlanStatus;
   using ParsePlan = fabric_msgs::srv::ParsePlan;
+  using ValidatePlan = fabric_msgs::srv::ValidatePlan;
   using GeneratePlan = fabric_msgs::action::GeneratePlan;
   using GoalHandleGeneratePlan = rclcpp_action::ServerGoalHandle<GeneratePlan>;
   using Trigger = std_srvs::srv::Trigger;
@@ -77,6 +79,10 @@ public:
   ~Fabric()
   {
     shutting_down_.store(true);
+    if (validation_service_executor_)
+    {
+      validation_service_executor_->cancel();
+    }
 
     {
       std::lock_guard<std::mutex> lock(plan_mutex_);
@@ -92,6 +98,10 @@ public:
     if (process_thread_.joinable())
     {
       process_thread_.join();
+    }
+    if (validation_service_thread_.joinable())
+    {
+      validation_service_thread_.join();
     }
   }
 
@@ -111,12 +121,18 @@ public:
     require_experience_ready_ = this->get_parameter("require_experience_ready").as_bool();
     this->declare_parameter("experience_ready_service", std::string("/experience/ready"));
     experience_ready_service_ = this->get_parameter("experience_ready_service").as_string();
+    this->declare_parameter<int>("validation_service_timeout_sec", 5);
+    validation_service_timeout_sec_ = this->get_parameter("validation_service_timeout_sec").as_int();
+    if (validation_service_timeout_sec_ <= 0)
+    {
+      throw std::runtime_error("Parameter 'validation_service_timeout_sec' must be positive");
+    }
 
     /*************************************************************************
      * Fabric services
      ************************************************************************/
     submit_plan_server_ = this->create_service<SubmitFabricPlan>(
-      "/fabric/plan/submit", std::bind(&Fabric::submitPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+        "/fabric/plan/submit", std::bind(&Fabric::submitPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     cancel_server_ = this->create_service<CancelFabricPlan>(
         "/fabric/plan/cancel", std::bind(&Fabric::cancelPlanCallback, this, std::placeholders::_1, std::placeholders::_2));
@@ -129,6 +145,11 @@ public:
 
     parse_plan_server_ = this->create_service<ParsePlan>("/fabric/plan/parse",
                                                          std::bind(&Fabric::parsePlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+    rclcpp::NodeOptions validation_node_options;
+    validation_node_options.context(this->get_node_base_interface()->get_context());
+    validation_service_node_ = std::make_shared<rclcpp::Node>("fabric_validation_service", validation_node_options);
+    validate_plan_server_ = validation_service_node_->create_service<ValidatePlan>(
+        "/fabric/plan/validate", std::bind(&Fabric::validatePlanCallback, this, std::placeholders::_1, std::placeholders::_2));
 
     /*************************************************************************
      * Fabric generate plan action
@@ -143,8 +164,10 @@ public:
      * Initialize Validation Plugins
      ************************************************************************/
 
-    this->declare_parameter<std::vector<std::string>>(
-        "validation_plugins", std::vector<std::string>{ "fabric::CompatibilityValidation", "fabric::ParameterValidation" });
+    this->declare_parameter<std::vector<std::string>>("validation_plugins", std::vector<std::string>{ "fabric::CompatibilityValidation", "fabric::"
+                                                                                                                                         "ParameterVa"
+                                                                                                                                         "lidatio"
+                                                                                                                                         "n" });
     std::vector<std::string> validation_plugin_names = this->get_parameter("validation_plugins").as_string_array();
     if (validation_plugin_names.empty())
     {
@@ -213,6 +236,12 @@ public:
       plan_queue_.push_back(starter_plan);
     }
 
+    rclcpp::ExecutorOptions validation_executor_options;
+    validation_executor_options.context = this->get_node_base_interface()->get_context();
+    validation_service_executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>(validation_executor_options);
+    validation_service_executor_->add_node(validation_service_node_);
+    validation_service_thread_ = std::thread([this]() { validation_service_executor_->spin(); });
+
     RCLCPP_INFO(this->get_logger(), "[server] Fabric node initialized. Waiting for capabilities2 readiness.");
 
     /*************************************************************************
@@ -258,7 +287,10 @@ protected:
         RCLCPP_INFO(this->get_logger(), "[server] Parsing the fabric plan.");
         current_plan_.status = PlanStatus::PARSING;
 
-        parsing_plugin_->parse(current_plan_);
+        {
+          std::lock_guard<std::mutex> lock(parser_mutex_);
+          parsing_plugin_->parse(current_plan_);
+        }
       }
       catch (const fabric::fabric_exception& e)
       {
@@ -293,6 +325,7 @@ protected:
       {
         RCLCPP_INFO(this->get_logger(), "[server] Validating the fabric plan for compatibility.");
 
+        std::lock_guard<std::mutex> lock(validation_mutex_);
         for (const auto& validation_plugin : validation_plugins_)
         {
           validation_plugin->validate(current_plan_, capability_list_);
@@ -443,8 +476,7 @@ protected:
     {
       if (!ready_client->wait_for_service(std::chrono::seconds(1)))
       {
-        RCLCPP_INFO(this->get_logger(), "[server] Waiting for experience ready service: %s",
-                    experience_ready_service_.c_str());
+        RCLCPP_INFO(this->get_logger(), "[server] Waiting for experience ready service: %s", experience_ready_service_.c_str());
         continue;
       }
 
@@ -453,8 +485,7 @@ protected:
 
       if (future.wait_for(std::chrono::seconds(1)) != std::future_status::ready)
       {
-        RCLCPP_INFO(this->get_logger(), "[server] Waiting for experience readiness response from %s",
-                    experience_ready_service_.c_str());
+        RCLCPP_INFO(this->get_logger(), "[server] Waiting for experience readiness response from %s", experience_ready_service_.c_str());
         continue;
       }
 
@@ -579,7 +610,12 @@ protected:
     // If auto_queue is true, check compatibility and queue the generated plan
     if (goal->auto_queue)
     {
-      if (!parsing_plugin_->check_compatibility(generated_plan))
+      bool compatible = false;
+      {
+        std::lock_guard<std::mutex> lock(parser_mutex_);
+        compatible = parsing_plugin_->check_compatibility(generated_plan);
+      }
+      if (!compatible)
       {
         RCLCPP_ERROR(this->get_logger(), "[server] Generated plan is not compatible with the loaded parser");
         goal_handle->abort(result);
@@ -604,8 +640,7 @@ protected:
     goal_handle->succeed(result);
   }
 
-  void submitPlanCallback(const std::shared_ptr<SubmitFabricPlan::Request> request,
-                          std::shared_ptr<SubmitFabricPlan::Response> response)
+  void submitPlanCallback(const std::shared_ptr<SubmitFabricPlan::Request> request, std::shared_ptr<SubmitFabricPlan::Response> response)
   {
     RCLCPP_INFO(this->get_logger(), "[server] Received the request with a plan and extended metadata");
 
@@ -617,7 +652,12 @@ protected:
     new_plan.metadata.candidate_plan_id = request->metadata.candidate_plan_id;
     new_plan.metadata.graph_hash = request->metadata.graph_hash;
 
-    if (!parsing_plugin_->check_compatibility(new_plan))
+    bool compatible = false;
+    {
+      std::lock_guard<std::mutex> lock(parser_mutex_);
+      compatible = parsing_plugin_->check_compatibility(new_plan);
+    }
+    if (!compatible)
     {
       RCLCPP_ERROR(this->get_logger(), "[server] Plan received via submit request not compatible with the loaded parser.");
       response->plan_id = "";
@@ -642,7 +682,10 @@ protected:
 
     try
     {
-      parsing_plugin_->parse(plan);
+      {
+        std::lock_guard<std::mutex> lock(parser_mutex_);
+        parsing_plugin_->parse(plan);
+      }
       response->success = true;
       response->error.clear();
       for (const auto& [connection_id, connection] : plan.connections)
@@ -673,6 +716,57 @@ protected:
       response->success = false;
       response->error = ex.what();
       response->connections.clear();
+    }
+  }
+
+  void validatePlanCallback(const std::shared_ptr<ValidatePlan::Request> request, std::shared_ptr<ValidatePlan::Response> response)
+  {
+    response->completed = false;
+    response->valid = false;
+    response->message.clear();
+
+    fabric::Plan plan;
+    plan.plan = request->plan;
+    plan.plan_id = "validate_only";
+
+    try
+    {
+      std::lock_guard<std::mutex> lock(parser_mutex_);
+      parsing_plugin_->parse(plan);
+    }
+    catch (const std::exception& exception)
+    {
+      response->completed = true;
+      response->message = exception.what();
+      return;
+    }
+
+    std::vector<CapabilityInfo> validation_capabilities;
+    try
+    {
+      validation_capabilities = capability_client_->get_validation_capabilities(validation_service_timeout_sec_);
+    }
+    catch (const std::exception& exception)
+    {
+      response->message = exception.what();
+      return;
+    }
+
+    try
+    {
+      std::lock_guard<std::mutex> lock(validation_mutex_);
+      for (const auto& validation_plugin : validation_plugins_)
+      {
+        validation_plugin->validate(plan, validation_capabilities);
+      }
+      response->completed = true;
+      response->valid = true;
+      response->message = "Configured Fabric validators passed. Parameter type/value completeness is not guaranteed.";
+    }
+    catch (const std::exception& exception)
+    {
+      response->completed = true;
+      response->message = exception.what();
     }
   }
 
@@ -895,12 +989,16 @@ protected:
   /** Deferred startup and process thread lifecycle */
   std::thread startup_thread_;
   std::thread process_thread_;
+  std::thread validation_service_thread_;
   std::mutex process_thread_mutex_;
+  std::mutex parser_mutex_;
+  std::mutex validation_mutex_;
   std::atomic<bool> capabilities_ready_{ false };
   std::atomic<bool> experience_ready_{ false };
 
   bool require_experience_ready_{ false };
   std::string experience_ready_service_;
+  int validation_service_timeout_sec_{ 5 };
   std::atomic<bool> process_thread_running_{ false };
   std::atomic<bool> shutting_down_{ false };
 
@@ -947,6 +1045,10 @@ protected:
 
   /** service to parse Fabric XML into connection graph data */
   rclcpp::Service<ParsePlan>::SharedPtr parse_plan_server_;
+  /** service for non-dispatching plan validation */
+  rclcpp::Service<ValidatePlan>::SharedPtr validate_plan_server_;
+  rclcpp::Node::SharedPtr validation_service_node_;
+  rclcpp::executors::SingleThreadedExecutor::SharedPtr validation_service_executor_;
 
   /** action server to generate a plan */
   rclcpp_action::Server<GeneratePlan>::SharedPtr generate_plan_server_;

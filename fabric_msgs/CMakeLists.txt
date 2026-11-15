@@ -23,6 +23,7 @@ set(srv_files
   "srv/CompleteFabric.srv"
   "srv/GetPlanStatus.srv"
   "srv/ParsePlan.srv"
+  "srv/ValidatePlan.srv"
 )
 
 set(msg_files
