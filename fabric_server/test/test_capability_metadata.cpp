@@ -55,7 +55,7 @@ protected:
 TEST_F(CapabilityMetadataTest, CollectsRunnableSpecsAsNativeDescriptors)
 {
   capabilities2_msgs::srv::GetRunnableSpecs::Response response;
-  response.index_of_specs.push_back("demo/Provider");
+  response.index_of_specs.push_back("demo/Move|demo/Provider");
   capabilities2_msgs::msg::RunnableSpec spec;
   spec.spec =
     R"(
@@ -137,7 +137,7 @@ TEST_F(CapabilityMetadataTest, TimesOutWhenRunnableSpecsServiceDoesNotRespond)
     "/fabric_test/unavailable_runnable_specs",
     [](const capabilities2_msgs::srv::GetRunnableSpecs::Request::SharedPtr,
     capabilities2_msgs::srv::GetRunnableSpecs::Response::SharedPtr response) {
-      response->index_of_specs.push_back("demo/Provider");
+      response->index_of_specs.push_back("demo/Move|demo/Provider");
       capabilities2_msgs::msg::RunnableSpec spec;
       spec.spec = "interface: {name: demo/Move}\nprovider: {name: demo/Provider}\n";
       response->runnable_specs.push_back(spec);
@@ -168,7 +168,7 @@ TEST_F(CapabilityMetadataTest, AcceptsMissingNullAndEmptyDefinitionMetadata)
   };
   capabilities2_msgs::srv::GetRunnableSpecs::Response response;
   for (size_t index = 0; index < definitions.size(); ++index) {
-    response.index_of_specs.push_back("demo/Provider" + std::to_string(index));
+    response.index_of_specs.push_back("demo/Move|demo/Provider");
     capabilities2_msgs::msg::RunnableSpec spec;
     spec.spec =
       "interface: {name: demo/Move, description: Move to a target}\n"
