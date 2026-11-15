@@ -4,6 +4,52 @@
 
 #include <fabric_parser_xml/xml_parser_plugin.hpp>
 
+class BlockingParser : public fabric::ParserBase
+{
+public:
+  explicit BlockingParser(std::shared_future<void> release) : release_(std::move(release))
+  {
+  }
+
+  bool load_file(const std::string&, fabric::plan::Plan&) override
+  {
+    return false;
+  }
+  void parse(fabric::plan::Plan&) override
+  {
+    entered_.set_value();
+    release_.wait();
+  }
+  bool check_compatibility(const fabric::plan::Plan&) override
+  {
+    return true;
+  }
+
+  std::promise<void> entered_;
+
+private:
+  std::shared_future<void> release_;
+};
+
+TEST(ParserConcurrencyTest, CompatibilityWaitsForParsingOnSameInstance)
+{
+  std::promise<void> release;
+  BlockingParser parser(release.get_future().share());
+  fabric::plan::Plan plan;
+  auto parsing = std::async(std::launch::async, [&]() { parser.parsePlan(plan); });
+  parser.entered_.get_future().wait();
+  std::promise<void> compatibility_started;
+  auto compatibility = std::async(std::launch::async, [&]() {
+    compatibility_started.set_value();
+    return parser.checkCompatibility(plan);
+  });
+  compatibility_started.get_future().wait();
+  EXPECT_EQ(compatibility.wait_for(std::chrono::milliseconds(100)), std::future_status::timeout);
+  release.set_value();
+  parsing.get();
+  EXPECT_TRUE(compatibility.get());
+}
+
 class InternalParsingTest : public ::testing::Test
 {
 protected:
@@ -29,16 +75,17 @@ protected:
 
 TEST_F(InternalParsingTest, ParsesConnectionsWithoutAService)
 {
-  const auto result = parser_.parsePlanDefinition(
-    "<Plan><Control type=\"sequential\">"
-    "<Runner interface=\"demo/First\" provider=\"demo/FirstProvider\"/>"
-    "<Runner interface=\"demo/Second\" provider=\"demo/SecondProvider\"/>"
-    "</Control></Plan>");
+  const auto result = parser_.parsePlanDefinition("<Plan><Control type=\"sequential\">"
+                                                  "<Runner interface=\"demo/First\" provider=\"demo/FirstProvider\"/>"
+                                                  "<Runner interface=\"demo/Second\" provider=\"demo/SecondProvider\"/>"
+                                                  "</Control></Plan>");
   ASSERT_TRUE(result.success) << result.error;
   ASSERT_GE(result.connections.size(), 2u);
   bool found_transition = false;
-  for (const auto & connection : result.connections) {
-    if (connection.source.interface == "demo/First") {
+  for (const auto& connection : result.connections)
+  {
+    if (connection.source.interface == "demo/First")
+    {
       EXPECT_EQ(connection.source.provider, "demo/FirstProvider");
       EXPECT_EQ(connection.on_success.interface, "demo/Second");
       EXPECT_EQ(connection.on_success.provider, "demo/SecondProvider");
@@ -50,8 +97,7 @@ TEST_F(InternalParsingTest, ParsesConnectionsWithoutAService)
 
 TEST_F(InternalParsingTest, ReturnsErrorsForMalformedOrInvalidPlans)
 {
-  for (const auto & xml : {"", "<Plan>", "<Other/>",
-      "<Plan><Runner interface=\"demo/First\"/></Plan>"})
+  for (const auto& xml : { "", "<Plan>", "<Other/>", "<Plan><Runner interface=\"demo/First\"/></Plan>" })
   {
     const auto result = parser_.parsePlanDefinition(xml);
     EXPECT_FALSE(result.success) << xml;
@@ -62,26 +108,26 @@ TEST_F(InternalParsingTest, ReturnsErrorsForMalformedOrInvalidPlans)
 
 TEST_F(InternalParsingTest, KeepsConsecutivePlansIndependent)
 {
-  ASSERT_TRUE(parser_.parsePlanDefinition(
-    "<Plan><Runner interface=\"demo/First\" provider=\"demo/FirstProvider\"/></Plan>").success);
-  const auto result = parser_.parsePlanDefinition(
-    "<Plan><Runner interface=\"demo/Second\" provider=\"demo/SecondProvider\"/></Plan>");
+  ASSERT_TRUE(parser_.parsePlanDefinition("<Plan><Runner interface=\"demo/First\" provider=\"demo/FirstProvider\"/></Plan>").success);
+  const auto result = parser_.parsePlanDefinition("<Plan><Runner interface=\"demo/Second\" provider=\"demo/SecondProvider\"/></Plan>");
   ASSERT_TRUE(result.success) << result.error;
-  for (const auto & connection : result.connections) {
+  for (const auto& connection : result.connections)
+  {
     EXPECT_NE(connection.source.interface, "demo/First");
   }
 }
 
 TEST_F(InternalParsingTest, PreservesTypedRunnerParameters)
 {
-  auto result = parser_.parsePlanDefinition(
-    "<Plan><Runner interface=\"demo/Move\" provider=\"demo/Provider\" "
-    "speed=\"0.5\" attempts=\"3\" enabled=\"true\" target=\"dock\"/></Plan>");
+  auto result = parser_.parsePlanDefinition("<Plan><Runner interface=\"demo/Move\" provider=\"demo/Provider\" "
+                                            "speed=\"0.5\" attempts=\"3\" enabled=\"true\" target=\"dock\"/></Plan>");
   ASSERT_TRUE(result.success) << result.error;
   bool found_runner = false;
-  for (auto & connection : result.connections) {
-    if (connection.source.interface == "demo/Move") {
-      auto & parameters = connection.source.parameters;
+  for (auto& connection : result.connections)
+  {
+    if (connection.source.interface == "demo/Move")
+    {
+      auto& parameters = connection.source.parameters;
       EXPECT_DOUBLE_EQ(std::any_cast<double>(parameters.get_value("speed", 0.0)), 0.5);
       EXPECT_EQ(std::any_cast<int>(parameters.get_value("attempts", 0)), 3);
       EXPECT_TRUE(std::any_cast<bool>(parameters.get_value("enabled", false)));
@@ -95,38 +141,44 @@ TEST_F(InternalParsingTest, PreservesTypedRunnerParameters)
 TEST_F(InternalParsingTest, SerializesPlanningAndDispatchParsing)
 {
   auto planning = std::async(std::launch::async, [this]() {
-        for (int attempt = 0; attempt < 5; ++attempt) {
-          const auto result = parser_.parsePlanDefinition(
-          "<Plan><Runner interface=\"demo/Planning\" provider=\"demo/Provider\"/></Plan>");
-          if (!result.success || result.connections.empty()) {
-            return false;
-          }
-          for (const auto & connection : result.connections) {
-            if (connection.source.interface == "demo/Dispatch") {
-              return false;
-            }
-          }
+    for (int attempt = 0; attempt < 5; ++attempt)
+    {
+      const auto result = parser_.parsePlanDefinition("<Plan><Runner interface=\"demo/Planning\" provider=\"demo/Provider\"/></Plan>");
+      if (!result.success || result.connections.empty())
+      {
+        return false;
+      }
+      for (const auto& connection : result.connections)
+      {
+        if (connection.source.interface == "demo/Dispatch")
+        {
+          return false;
         }
-        return true;
-    });
+      }
+    }
+    return true;
+  });
   auto dispatch = std::async(std::launch::async, [this]() {
-        for (int attempt = 0; attempt < 5; ++attempt) {
-          fabric::plan::Plan plan;
-          plan.plan_id = "dispatch-plan";
-          plan.plan =
-          "<Plan><Runner interface=\"demo/Dispatch\" provider=\"demo/Provider\"/></Plan>";
-          parser_.parsePlan(plan);
-          if (plan.connections.empty()) {
-            return false;
-          }
-          for (const auto & entry : plan.connections) {
-            if (entry.second.source.interface == "demo/Planning") {
-              return false;
-            }
-          }
+    for (int attempt = 0; attempt < 5; ++attempt)
+    {
+      fabric::plan::Plan plan;
+      plan.plan_id = "dispatch-plan";
+      plan.plan = "<Plan><Runner interface=\"demo/Dispatch\" provider=\"demo/Provider\"/></Plan>";
+      parser_.parsePlan(plan);
+      if (plan.connections.empty())
+      {
+        return false;
+      }
+      for (const auto& entry : plan.connections)
+      {
+        if (entry.second.source.interface == "demo/Planning")
+        {
+          return false;
         }
-        return true;
-    });
+      }
+    }
+    return true;
+  });
   EXPECT_TRUE(planning.get());
   EXPECT_TRUE(dispatch.get());
 }

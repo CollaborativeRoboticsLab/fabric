@@ -54,6 +54,12 @@ public:
     parse(plan);
   }
 
+  bool checkCompatibility(const fabric::plan::Plan& plan)
+  {
+    std::lock_guard<std::mutex> lock(parse_mutex_);
+    return check_compatibility(plan);
+  }
+
   fabric::capability::PlanDefinition parsePlanDefinition(const std::string& plan_xml)
   {
     fabric::capability::PlanDefinition result;

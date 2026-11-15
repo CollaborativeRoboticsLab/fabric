@@ -26,6 +26,12 @@ All parser plugins inherit from the `ParserBase` abstract class, which defines t
 
 This ensures that all plugins are interchangeable and can be managed uniformly by the Fabric core.
 
+Callers sharing a parser instance must use `parsePlan()` and `checkCompatibility()`
+instead of calling `parse()` or `check_compatibility()` directly. These wrappers
+serialize parsing and compatibility checks on that instance. Initialization and
+`load_file()` must finish before concurrent use; the wrappers do not coordinate
+shutdown or make separate instances or plugin-global state thread-safe.
+
 ## XMLParserPlugin: Reference Implementation
 
 The `XMLParserPlugin` is the default parser for standard XML plans. Its key features include:

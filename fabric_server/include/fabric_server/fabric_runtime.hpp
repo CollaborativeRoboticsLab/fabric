@@ -252,7 +252,7 @@ public:
     {
       throw std::runtime_error("Fabric runtime is shutting down");
     }
-    if (!parsing_plugin_->check_compatibility(plan))
+    if (!parsing_plugin_->checkCompatibility(plan))
     {
       throw std::runtime_error("[server] Plan is not compatible with the loaded parser.");
     }
@@ -277,6 +277,52 @@ public:
     plan.plan_id = "fabric_parse_request";
     parsing_plugin_->parsePlan(plan);
     return plan;
+  }
+
+  struct PlanValidationResult
+  {
+    bool completed{ false };
+    bool valid{ false };
+    std::string message;
+  };
+
+  /** @brief Parse and run configured validators without queueing or executing the plan. */
+  PlanValidationResult validatePlan(const std::string& xml, int timeout_sec)
+  {
+    fabric::plan::Plan plan;
+    plan.plan = xml;
+    plan.plan_id = "validate_only";
+    try
+    {
+      parsing_plugin_->parsePlan(plan);
+    }
+    catch (const std::exception& error)
+    {
+      return PlanValidationResult{ true, false, error.what() };
+    }
+
+    std::vector<fabric::capability::Descriptor> capabilities;
+    try
+    {
+      capabilities = capability_client_->get_validation_capabilities(timeout_sec);
+    }
+    catch (const std::exception& error)
+    {
+      return PlanValidationResult{ false, false, error.what() };
+    }
+
+    try
+    {
+      for (const auto& validation_plugin : plan_validation_plugins_)
+      {
+        validation_plugin->validate(plan, capabilities);
+      }
+    }
+    catch (const std::exception& error)
+    {
+      return PlanValidationResult{ true, false, error.what() };
+    }
+    return PlanValidationResult{ true, true, "Configured Fabric validators passed. Parameter type/value completeness is not guaranteed." };
   }
 
   /**
@@ -621,7 +667,7 @@ private:
       }
       if (request.auto_queue)
       {
-        if (!parsing_plugin_->check_compatibility(plan))
+        if (!parsing_plugin_->checkCompatibility(plan))
         {
           throw std::runtime_error("Generated plan is not compatible with the loaded parser");
         }

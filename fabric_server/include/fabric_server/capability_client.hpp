@@ -883,7 +883,7 @@ protected:
     using namespace std::chrono_literals;
 
     auto start = std::chrono::steady_clock::now();
-    while (rclcpp::ok())
+    while (rclcpp::ok() && !stopping_.load())
     {
       if (client->wait_for_service(1s))
       {
@@ -903,7 +903,7 @@ protected:
       }
     }
 
-    throw fabric::fabric_exception("ROS shutdown while waiting for service: " + service_name);
+    throw fabric::fabric_exception("Interrupted while waiting for service: " + service_name);
   }
 
   void probe_server_readiness()

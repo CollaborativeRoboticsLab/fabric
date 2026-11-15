@@ -40,6 +40,27 @@ protected:
   std::thread executor_thread_;
 };
 
+TEST_F(CapabilityLifecycleTest, CancelsReadinessWaitWhileRosRemainsRunning)
+{
+  rclcpp::NodeOptions options;
+  options.parameter_overrides({rclcpp::Parameter(
+    "capability_client.services.get_interfaces", "/fabric_test/missing_get_interfaces")});
+  auto node = std::make_shared<rclcpp::Node>("cancel_readiness_test", options);
+  fabric::CapabilityClient client;
+  client.initialize(node);
+  std::promise<void> started;
+  auto readiness = std::async(std::launch::async, [&]() {
+    started.set_value();
+    client.wait_until_ready(4);
+  });
+  started.get_future().wait();
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  client.cancel_pending_requests();
+  EXPECT_EQ(readiness.wait_for(std::chrono::seconds(2)), std::future_status::ready);
+  EXPECT_THROW(readiness.get(), fabric::fabric_exception);
+  EXPECT_TRUE(rclcpp::ok());
+}
+
 TEST_F(CapabilityLifecycleTest, RejectsConflictingProvidersForRepeatedInterface)
 {
   std::vector<std::string> requested_providers;
