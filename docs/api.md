@@ -43,10 +43,10 @@ completion. Thus cancellation and status can wait for blocking setup operations;
 the snapshot service reads a separately published copy. Execution can acquire
 the queue or completion mutex while holding the current-plan mutex; code taking
 the queue mutex must release it before acquiring the current-plan mutex. The
-generation operation mutex serializes generation and explicit scoring. Accepted
-generation requests currently create workers without an admission limit, and
-the plan and status queues are also unbounded. No validation overload policy has
-been implemented.
+generation operation mutex serializes generation and explicit scoring. Each
+accepted goal gets a worker; concurrent goals wait for the shared lock and are
+not rejected for overload. The plan and status queues remain unbounded. No
+validation overload policy has been implemented.
 
 Runtime shutdown signals cancellation, stops monitors, joins owned workers, and
 only then releases plugins and clients. Waiting for an unavailable startup

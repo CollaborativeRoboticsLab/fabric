@@ -41,7 +41,11 @@ The action goal contains:
 | `uuid` | Prompt/session identifier forwarded to the generation plugin |
 | `flush` | Cache-control flag forwarded to the generation plugin |
 
-The server behavior is:
+Each accepted goal gets a runtime-owned worker, while the generation and
+explicit scoring pipeline is serialized. Concurrent goals wait for the shared
+pipeline lock; generator and scorer plugins do not run concurrently.
+
+For direct generator mode, the server behavior is:
 
 1. Reject empty task goals.
 2. Publish `GENERATION_REQUESTED` feedback.
@@ -49,6 +53,15 @@ The server behavior is:
 4. Assign a new `plan_id` and mark the generated plan as `QUEUED`.
 5. If `auto_queue` is true, check parser compatibility and push the plan into `plan_queue_`.
 6. Publish `GENERATION_COMPLETE` feedback and return the XML plan plus `plan_id` in the action result.
+
+With `auto_queue: true`, direct generator output is compatibility-checked and
+added to the execution queue. With `experience.enabled: true`, the runtime uses
+its integrated planner, validator, and scorer pipeline instead. The selected
+candidate is queued only when `auto_queue` and
+`experience.dispatch_terminal_success_only` are both true and the scorer marks
+it feasible. Feasibility includes `RapfsScorerPlugin.feasibility.min_success_probability`
+and the configured runtime, energy, fault, resource, and uncertainty limits.
+Otherwise, the generated result is returned without queueing.
 
 ## Configuration
 

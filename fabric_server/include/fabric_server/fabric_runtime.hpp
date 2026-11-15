@@ -406,9 +406,11 @@ public:
    * @brief Schedule generation on a runtime-owned worker and reap completed workers.
    * @param request Task and generation options copied into the worker.
    * @param callbacks Optional cancellation, progress, and completion hooks.
-   * @return False if not ready or the task is empty; no hooks run on rejection.
-   * @note Accepted jobs share a serialized generation/scoring pipeline. Plugin
-   *       failures become failed results; worker-creation exceptions propagate.
+  * @return False if not ready, the task is empty, or the worker limit is reached;
+  *         no hooks run on rejection.
+  * @note Accepted jobs share a serialized generation/scoring pipeline. The
+  *       configured limit bounds running and waiting worker threads. Plugin
+  *       failures become failed results; worker-creation exceptions propagate.
    */
   bool startGeneration(GenerationRequest request, GenerationCallbacks callbacks)
   {
@@ -654,6 +656,33 @@ private:
       result.plan = selected.selected_plan;
       result.reasoning = selected.selected_reasoning;
       result.plan_id = selected.selected_candidate_plan_id;
+
+      if (request.auto_queue && dispatch_terminal_success_only_ && selectedPlanCanDispatch(selected))
+      {
+        fabric::plan::Plan plan;
+        plan.plan = selected.selected_plan;
+        plan.plan_id = generate_uuid();
+        plan.status = fabric::plan::Status::QUEUED;
+        plan.reasoning = selected.selected_reasoning;
+        plan.metadata.planning_request_id = planning_request.planning_request_id;
+        plan.metadata.candidate_plan_id = selected.selected_candidate_plan_id;
+        for (const auto& candidate : selected.candidates)
+        {
+          if (candidate.candidate_plan_id == selected.selected_candidate_plan_id)
+          {
+            plan.metadata.graph_hash = candidate.graph_hash;
+            break;
+          }
+        }
+        if (!parsing_plugin_->checkCompatibility(plan))
+        {
+          throw std::runtime_error("Selected experience plan is not compatible with the loaded parser");
+        }
+        result.plan_id = plan.plan_id;
+        enqueuePlan(plan);
+        start_execution_process_thread();
+      }
+
     }
     else
     {
@@ -1089,6 +1118,7 @@ private:
 
     node_.declare_parameter<double>("experience.telemetry.monitor_poll_frequency_hz", 2.0);
     monitor_poll_frequency_hz_ = node_.get_parameter("experience.telemetry.monitor_poll_frequency_hz").as_double();
+
   }
 
   /** @brief Load the ordered validation plugins used before execution. */

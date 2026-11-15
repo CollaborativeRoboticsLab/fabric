@@ -101,7 +101,7 @@ Common top-level switches include:
 | `experience.rebuild` | bool | `false` | Rebuild the knowledge core from persisted data. |
 | `experience.consume_feedback` | bool | `false` | Enable plan feedback ingestion. |
 | `experience.user_feedback_root_dir` | string | `""` | Root directory for external user feedback artifacts. |
-| `experience.dispatch_terminal_success_only` | bool | `false` | Restrict some feedback dispatch flows to terminal success outcomes. |
+| `experience.dispatch_terminal_success_only` | bool | `false` | Allow experience-mode auto-queue only for scorer-feasible selected plans when the generation action also sets `auto_queue`. |
 
 Additional planner, scorer, validation, and estimator settings are defined in `fabric.yaml` and are specific to the current Experience configuration.
 
