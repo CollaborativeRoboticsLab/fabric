@@ -18,6 +18,7 @@
 #include <fabric_msgs/srv/get_fabric_plan_snapshot.hpp>
 #include <fabric_msgs/srv/parse_plan.hpp>
 #include <fabric_msgs/srv/submit_fabric_plan.hpp>
+#include <fabric_msgs/srv/validate_plan.hpp>
 
 namespace fabric
 {
@@ -36,6 +37,7 @@ public:
   using GetPlanStatus = fabric_msgs::srv::GetPlanStatus;
   using GetFabricPlanSnapshot = fabric_msgs::srv::GetFabricPlanSnapshot;
   using ParsePlan = fabric_msgs::srv::ParsePlan;
+  using ValidatePlan = fabric_msgs::srv::ValidatePlan;
   using GetScoringEpoch = fabric_msgs::srv::GetScoringEpoch;
   using GetPlanScoreExplanation = fabric_msgs::srv::GetPlanScoreExplanation;
   using RecordPlanFeedback = fabric_msgs::srv::RecordPlanFeedback;
@@ -116,10 +118,12 @@ private:
     get_plan_status_server_ = this->create_service<GetPlanStatus>(
         "/fabric/plan/get_status", std::bind(&Fabric::getPlanStatusCallback, this, std::placeholders::_1, std::placeholders::_2));
     get_plan_snapshot_server_ = this->create_service<GetFabricPlanSnapshot>(
-      "/fabric/plan/get_snapshot", std::bind(&Fabric::getPlanSnapshotCallback, this, std::placeholders::_1, std::placeholders::_2),
-      rmw_qos_profile_services_default, snapshot_callback_group_);
+        "/fabric/plan/get_snapshot", std::bind(&Fabric::getPlanSnapshotCallback, this, std::placeholders::_1, std::placeholders::_2),
+        rmw_qos_profile_services_default, snapshot_callback_group_);
     parse_plan_server_ = this->create_service<ParsePlan>("/fabric/plan/parse",
                                                          std::bind(&Fabric::parsePlanCallback, this, std::placeholders::_1, std::placeholders::_2));
+    validate_plan_server_ = this->create_service<ValidatePlan>(
+      "/fabric/plan/validate", std::bind(&Fabric::validatePlanCallback, this, std::placeholders::_1, std::placeholders::_2));
   }
 
   /** @brief Register scoring, explanation, epoch, and external-feedback services. */
@@ -302,6 +306,25 @@ private:
     }
   }
 
+  /** @brief Validate a plan synchronously without queueing or executing it. */
+  void validatePlanCallback(const std::shared_ptr<ValidatePlan::Request> request, std::shared_ptr<ValidatePlan::Response> response)
+  {
+    const int timeout_sec = static_cast<int>(this->get_parameter("validation.discovery_timeout_sec").as_int());
+    try
+    {
+      const auto result = runtime_->validatePlan(request->plan, timeout_sec);
+      response->completed = result.completed;
+      response->valid = result.valid;
+      response->message = result.message;
+    }
+    catch (const std::exception& error)
+    {
+      response->completed = false;
+      response->valid = false;
+      response->message = error.what();
+    }
+  }
+
   /**
    * @brief Forward execution-plan cancellation to the runtime.
    * @param request Execution plan ID to cancel.
@@ -347,8 +370,7 @@ private:
   }
 
   /** @brief Return a nonblocking snapshot of the current dequeued plan and its intended connections. */
-  void getPlanSnapshotCallback(const std::shared_ptr<GetFabricPlanSnapshot::Request>,
-                               std::shared_ptr<GetFabricPlanSnapshot::Response> response)
+  void getPlanSnapshotCallback(const std::shared_ptr<GetFabricPlanSnapshot::Request>, std::shared_ptr<GetFabricPlanSnapshot::Response> response)
   {
     const auto snapshot = runtime_->getCurrentPlanSnapshot();
     fabric::server::plan_snapshot::populateResponse(snapshot.get(), *response);
@@ -529,6 +551,7 @@ private:
   rclcpp::Service<GetPlanStatus>::SharedPtr get_plan_status_server_;
   rclcpp::Service<GetFabricPlanSnapshot>::SharedPtr get_plan_snapshot_server_;
   rclcpp::Service<ParsePlan>::SharedPtr parse_plan_server_;
+  rclcpp::Service<ValidatePlan>::SharedPtr validate_plan_server_;
   rclcpp::Service<GetPlanScoreExplanation>::SharedPtr get_plan_score_explanation_service_;
   rclcpp::Service<ScorePlan>::SharedPtr score_plan_service_;
   rclcpp::Service<GetScoringEpoch>::SharedPtr get_scoring_epoch_service_;

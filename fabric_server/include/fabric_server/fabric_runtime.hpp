@@ -313,6 +313,7 @@ public:
 
     try
     {
+      std::lock_guard<std::mutex> validation_lock(plan_validation_plugins_mutex_);
       for (const auto& validation_plugin : plan_validation_plugins_)
       {
         validation_plugin->validate(plan, capabilities);
@@ -918,6 +919,7 @@ private:
       {
         RCLCPP_INFO(node_.get_logger(), "[server] Validating the fabric plan for compatibility.");
 
+        std::lock_guard<std::mutex> validation_lock(plan_validation_plugins_mutex_);
         for (const auto& validation_plugin : plan_validation_plugins_)
         {
           validation_plugin->validate(current_plan_, capability_list_);
@@ -1119,6 +1121,7 @@ private:
     node_.declare_parameter<double>("experience.telemetry.monitor_poll_frequency_hz", 2.0);
     monitor_poll_frequency_hz_ = node_.get_parameter("experience.telemetry.monitor_poll_frequency_hz").as_double();
 
+    node_.declare_parameter<int>("validation.discovery_timeout_sec", 5);
   }
 
   /** @brief Load the ordered validation plugins used before execution. */
@@ -1921,6 +1924,7 @@ private:
   std::mutex generation_workers_mutex_;
   std::mutex generation_operation_mutex_;
   std::vector<GenerationWorker> generation_workers_;
+  std::mutex plan_validation_plugins_mutex_;
   std::recursive_mutex current_plan_mutex_;
   /** Vector of plans */
   std::deque<fabric::plan::Plan> plan_queue_;
