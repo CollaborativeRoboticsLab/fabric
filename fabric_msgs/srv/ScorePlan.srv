@@ -1,0 +1,11 @@
+string task_description
+string plan_xml
+string planning_request_id
+string candidate_plan_id
+string candidate_node_id
+---
+bool scored
+bool node_found
+string message
+PlanScoreExplanation plan
+PlanNodeScoreExplanation node_explanation

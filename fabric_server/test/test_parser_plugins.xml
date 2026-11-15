@@ -1,0 +1,3 @@
+<library path="fabric_server_test_parser">
+  <class type="fabric::test::GatedParser" base_class_type="fabric::ParserBase"/>
+</library>

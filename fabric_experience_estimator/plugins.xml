@@ -1,0 +1,32 @@
+<library path="fabric_experience_estimator">
+  <class type="fabric::SuccessProbabilityPlugin" base_class_type="fabric::EstimateBase">
+    <description>
+      Estimate empirical or beta-smoothed capability success probability.
+    </description>
+  </class>
+  <class type="fabric::RuntimePlugin" base_class_type="fabric::EstimateBase">
+    <description>
+      Estimate expected capability runtime from accumulated duration samples.
+    </description>
+  </class>
+  <class type="fabric::EnergyPlugin" base_class_type="fabric::EstimateBase">
+    <description>
+      Estimate expected capability energy consumption from battery deltas.
+    </description>
+  </class>
+  <class type="fabric::FaultBurdenPlugin" base_class_type="fabric::EstimateBase">
+    <description>
+      Estimate severity-weighted fault burden from warning and error evidence.
+    </description>
+  </class>
+  <class type="fabric::ResourcePlugin" base_class_type="fabric::EstimateBase">
+    <description>
+      Report resource estimates as unavailable until quantitative resource telemetry exists.
+    </description>
+  </class>
+  <class type="fabric::UncertaintyPlugin" base_class_type="fabric::EstimateBase">
+    <description>
+      Estimate normalized uncertainty from sparse and missing evidence.
+    </description>
+  </class>
+</library>

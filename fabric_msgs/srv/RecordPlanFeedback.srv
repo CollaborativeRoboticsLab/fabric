@@ -1,0 +1,18 @@
+string planning_request_id
+string candidate_plan_id
+string graph_hash
+string terminal_outcome
+bool terminal_success
+string human_judgement
+string score_components
+string calibration_version
+string normalizer_version
+string estimator_version
+string weight_version
+int32 recorded_at_sec
+uint32 recorded_at_nanosec
+string provenance
+---
+bool stored
+bool found_existing
+string message

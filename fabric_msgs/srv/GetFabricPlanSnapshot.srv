@@ -1,0 +1,9 @@
+---
+std_msgs/Header header
+bool has_plan
+bool connections_complete
+string plan_id
+string bond_id
+FabricStatus status
+FabricNode[] instances
+FabricConnection[] connections

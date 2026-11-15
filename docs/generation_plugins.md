@@ -4,7 +4,7 @@
 
 ## Motivation and Design
 
-Generation plugins convert a task description into a `fabric::Plan`. The Fabric server loads one generation plugin at startup through the `generation_plugin` parameter and exposes plan generation through the `/fabric/plan/generate` ROS2 action.
+Generation plugins convert a task description into a `fabric::plan::Plan`. The Fabric server loads one generation plugin at startup through the `generation_plugin` parameter and exposes plan generation through the `/fabric/plan/generate` ROS2 action.
 
 This keeps task-to-plan generation separate from Fabric execution:
 
@@ -20,9 +20,9 @@ All generation plugins inherit from `fabric::GenerationBase` and implement:
 
 - `initialize(const rclcpp::Node::SharedPtr&)`: Prepares the plugin with the ROS2 node context and initializes any backend clients.
 
-- `generate(const std::string& task, const std::string& uuid, bool flush)`: Generates and returns a `fabric::Plan` from a task description.
+- `generate(const std::string& task, const std::string& uuid, bool flush)`: Generates and returns a `fabric::plan::Plan` from a task description.
 
-The returned `fabric::Plan` should contain the generated XML plan text in `plan.plan`. The Fabric server assigns the `plan_id` and handles queuing.
+The returned `fabric::plan::Plan` should contain the generated XML plan text in `plan.plan`. The Fabric server assigns the `plan_id` and handles queuing.
 
 ## Server Action Flow
 
@@ -81,7 +81,7 @@ The plugin waits for these services during initialization:
 1. Request runnable specs from `/capabilities/get_runnable_specs`.
 2. Build a prompt containing capability names, descriptions, and the user task.
 3. Send the prompt to `prompt/prompt` with `uuid`, cache settings, and model options.
-4. Return a `fabric::Plan` whose `plan.plan` is the prompt response text.
+4. Return a `fabric::plan::Plan` whose `plan.plan` is the prompt response text.
 
 The current implementation sets `model_family` to `openai`, uses cache by default, forwards `flush`, and requests a non-streaming model response.
 

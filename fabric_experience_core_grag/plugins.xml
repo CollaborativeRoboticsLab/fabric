@@ -1,0 +1,7 @@
+<library path="fabric_experience_core_grag">
+  <class type="fabric::KnowledgeCoreGraphRag" base_class_type="fabric::CoreBase">
+    <description>
+      Stores and retrieves experience data using a system-neutral graph knowledge core.
+    </description>
+  </class>
+</library>

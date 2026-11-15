@@ -1,0 +1,7 @@
+<library path="fabric_experience_planner">
+  <class type="fabric::PlanningPlugin" base_class_type="fabric::PlannerBase">
+    <description>
+      Planning plugin that generates candidate plans from retrieved knowledge.
+    </description>
+  </class>
+</library>

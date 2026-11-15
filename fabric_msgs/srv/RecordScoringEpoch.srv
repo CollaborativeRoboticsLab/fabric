@@ -1,0 +1,21 @@
+string epoch_id
+string strategy_name
+string calibration_version
+string normalizer_version
+string estimator_version
+string weight_version
+bool uncertainty_weight_locked
+string calibration_summary
+string selection_bias_summary
+bool active
+int32 start_sec
+uint32 start_nanosec
+int32 end_sec
+uint32 end_nanosec
+int32 recorded_at_sec
+uint32 recorded_at_nanosec
+string provenance
+---
+bool stored
+bool found_existing
+string message

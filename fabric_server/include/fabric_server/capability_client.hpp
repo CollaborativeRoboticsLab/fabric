@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <atomic>
 #include <condition_variable>
 #include <limits>
 #include <mutex>
@@ -9,15 +10,18 @@
 
 #include <bondcpp/bond.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #include <yaml-cpp/yaml.h>
 
-#include <fabric_base/utils/structs.hpp>
+#include <fabric_base/utils/metadata_structs.hpp>
+#include <fabric_base/utils/plan_structs.hpp>
 #include <fabric_base/utils/exception.hpp>
 #include <fabric_base/utils/xml_helper.hpp>
 
 #include <capabilities2_msgs/srv/establish_bond.hpp>
 #include <capabilities2_msgs/srv/get_interfaces.hpp>
 #include <capabilities2_msgs/srv/get_semantic_interfaces.hpp>
+#include <capabilities2_msgs/srv/get_event_snapshot.hpp>
 #include <capabilities2_msgs/srv/get_providers.hpp>
 #include <capabilities2_msgs/srv/get_runnable_specs.hpp>
 #include <capabilities2_msgs/srv/use_capability.hpp>
@@ -40,6 +44,7 @@ class CapabilityClient
 public:
   using GetInterfaces = capabilities2_msgs::srv::GetInterfaces;
   using GetSemanticInterfaces = capabilities2_msgs::srv::GetSemanticInterfaces;
+  using GetEventSnapshot = capabilities2_msgs::srv::GetEventSnapshot;
   using GetProviders = capabilities2_msgs::srv::GetProviders;
   using GetRunnableSpecs = capabilities2_msgs::srv::GetRunnableSpecs;
   using EstablishBond = capabilities2_msgs::srv::EstablishBond;
@@ -47,11 +52,13 @@ public:
   using FreeCapability = capabilities2_msgs::srv::FreeCapability;
   using ConnectCapability = capabilities2_msgs::srv::ConnectCapability;
   using TriggerCapability = capabilities2_msgs::srv::TriggerCapability;
+  using Ready = std_srvs::srv::Trigger;
 
   using CapabilityEventCode = capabilities2_msgs::msg::CapabilityEventCode;
 
   using GetInterfacesClient = rclcpp::Client<GetInterfaces>;
   using GetSemanticInterfacesClient = rclcpp::Client<GetSemanticInterfaces>;
+  using GetEventSnapshotClient = rclcpp::Client<GetEventSnapshot>;
   using GetProvidersClient = rclcpp::Client<GetProviders>;
   using GetRunnableSpecsClient = rclcpp::Client<GetRunnableSpecs>;
   using EstablishBondClient = rclcpp::Client<EstablishBond>;
@@ -59,12 +66,28 @@ public:
   using FreeCapabilityClient = rclcpp::Client<FreeCapability>;
   using ConnectCapabilityClient = rclcpp::Client<ConnectCapability>;
   using TriggerCapabilityClient = rclcpp::Client<TriggerCapability>;
+  using ReadyClient = rclcpp::Client<Ready>;
 
-  CapabilityClient() {
-
+  struct CapabilityEventSnapshot
+  {
+    builtin_interfaces::msg::Time stamp;
+    uint64_t oldest_sequence{ 0 };
+    uint64_t latest_sequence{ 0 };
+    uint32_t max_events{ 0 };
+    bool truncated{ false };
+    std::vector<capabilities2_msgs::msg::CapabilityEventStamped> events;
   };
 
+  CapabilityClient()
+  {
+  }
+
   virtual ~CapabilityClient() = default;
+
+  void cancel_pending_requests()
+  {
+    stopping_.store(true);
+  }
 
   static capabilities2_msgs::msg::CapabilityParameter to_capability_parameter_msg(const fabric::Parameter& parameter)
   {
@@ -79,7 +102,9 @@ public:
   {
     capabilities2_msgs::msg::Capability msg;
     for (const auto& option : parameters.options)
+    {
       msg.parameters.push_back(to_capability_parameter_msg(option));
+    }
     return msg;
   }
 
@@ -93,11 +118,14 @@ public:
     node_ = node;
 
     if (!node_->has_parameter("capability_client.service_wait_timeout_sec"))
+    {
       node_->declare_parameter<int>("capability_client.service_wait_timeout_sec", -1);
+    }
     service_wait_timeout_sec_ = node_->get_parameter("capability_client.service_wait_timeout_sec").as_int();
 
     node_->declare_parameter<std::string>("capability_client.services.get_interfaces", "/capabilities/get_interfaces");
     node_->declare_parameter<std::string>("capability_client.services.get_semantic_interfaces", "/capabilities/get_semantic_interfaces");
+    node_->declare_parameter<std::string>("capability_client.services.get_event_snapshot", "/capabilities/get_event_snapshot");
     node_->declare_parameter<std::string>("capability_client.services.get_providers", "/capabilities/get_providers");
     node_->declare_parameter<std::string>("capability_client.services.get_runnable_specs", "/capabilities/get_runnable_specs");
     node_->declare_parameter<std::string>("capability_client.services.establish_bond", "/capabilities/establish_bond");
@@ -105,9 +133,11 @@ public:
     node_->declare_parameter<std::string>("capability_client.services.free_capability", "/capabilities/free_capability");
     node_->declare_parameter<std::string>("capability_client.services.trigger_capability", "/capabilities/trigger_capability");
     node_->declare_parameter<std::string>("capability_client.services.connect_capability", "/capabilities/connect_capability");
+    node_->declare_parameter<std::string>("capability_client.services.ready", "/capabilities/ready");
 
     node_->get_parameter("capability_client.services.get_interfaces", get_interfaces_);
     node_->get_parameter("capability_client.services.get_semantic_interfaces", get_semantic_interfaces_);
+    node_->get_parameter("capability_client.services.get_event_snapshot", get_event_snapshot_);
     node_->get_parameter("capability_client.services.get_providers", get_providers_);
     node_->get_parameter("capability_client.services.get_runnable_specs", get_runnable_specs_);
     node_->get_parameter("capability_client.services.establish_bond", establish_bond_);
@@ -115,16 +145,20 @@ public:
     node_->get_parameter("capability_client.services.free_capability", free_capability_);
     node_->get_parameter("capability_client.services.trigger_capability", trigger_capability_);
     node_->get_parameter("capability_client.services.connect_capability", connect_capability_);
+    node_->get_parameter("capability_client.services.ready", ready_);
 
-    get_interfaces_client_ = node_->create_client<GetInterfaces>(get_interfaces_);
-    get_sem_interf_client_ = node_->create_client<GetSemanticInterfaces>(get_semantic_interfaces_);
-    get_providers_client_ = node_->create_client<GetProviders>(get_providers_);
-    get_runnable_specs_client_ = node_->create_client<GetRunnableSpecs>(get_runnable_specs_);
-    establish_bond_client_ = node_->create_client<EstablishBond>(establish_bond_);
-    use_capability_client_ = node_->create_client<UseCapability>(use_capability_);
-    free_capability_client_ = node_->create_client<FreeCapability>(free_capability_);
-    trig_capability_client_ = node_->create_client<TriggerCapability>(trigger_capability_);
-    connect_capability_client_ = node_->create_client<ConnectCapability>(connect_capability_);
+    callback_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+    get_interfaces_client_ = node_->create_client<GetInterfaces>(get_interfaces_, rmw_qos_profile_services_default, callback_group_);
+    get_sem_interf_client_ = node_->create_client<GetSemanticInterfaces>(get_semantic_interfaces_, rmw_qos_profile_services_default, callback_group_);
+    get_event_snapshot_client_ = node_->create_client<GetEventSnapshot>(get_event_snapshot_, rmw_qos_profile_services_default, callback_group_);
+    get_providers_client_ = node_->create_client<GetProviders>(get_providers_, rmw_qos_profile_services_default, callback_group_);
+    get_runnable_specs_client_ = node_->create_client<GetRunnableSpecs>(get_runnable_specs_, rmw_qos_profile_services_default, callback_group_);
+    establish_bond_client_ = node_->create_client<EstablishBond>(establish_bond_, rmw_qos_profile_services_default, callback_group_);
+    use_capability_client_ = node_->create_client<UseCapability>(use_capability_, rmw_qos_profile_services_default, callback_group_);
+    free_capability_client_ = node_->create_client<FreeCapability>(free_capability_, rmw_qos_profile_services_default, callback_group_);
+    trig_capability_client_ = node_->create_client<TriggerCapability>(trigger_capability_, rmw_qos_profile_services_default, callback_group_);
+    connect_capability_client_ = node_->create_client<ConnectCapability>(connect_capability_, rmw_qos_profile_services_default, callback_group_);
+    ready_client_ = node_->create_client<Ready>(ready_, rmw_qos_profile_services_default, callback_group_);
 
     RCLCPP_INFO(node_->get_logger(), "[Capability client] initialized.");
   }
@@ -144,6 +178,7 @@ public:
 
     wait_for_service(get_interfaces_client_, get_interfaces_, effective_timeout_sec);
     wait_for_service(get_sem_interf_client_, get_semantic_interfaces_, effective_timeout_sec);
+    wait_for_service(get_event_snapshot_client_, get_event_snapshot_, effective_timeout_sec);
     wait_for_service(get_providers_client_, get_providers_, effective_timeout_sec);
     wait_for_service(get_runnable_specs_client_, get_runnable_specs_, effective_timeout_sec);
     wait_for_service(establish_bond_client_, establish_bond_, effective_timeout_sec);
@@ -151,6 +186,7 @@ public:
     wait_for_service(free_capability_client_, free_capability_, effective_timeout_sec);
     wait_for_service(trig_capability_client_, trigger_capability_, effective_timeout_sec);
     wait_for_service(connect_capability_client_, connect_capability_, effective_timeout_sec);
+    wait_for_service(ready_client_, ready_, effective_timeout_sec);
 
     probe_server_readiness();
     RCLCPP_INFO(node_->get_logger(), "[Capability client] capabilities2 server is ready.");
@@ -161,6 +197,47 @@ public:
     wait_until_ready(timeout_sec);
   }
 
+  CapabilityEventSnapshot getEventSnapshot(uint64_t after_sequence = 0, uint32_t max_events = 0)
+  {
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting event snapshot after_sequence=%llu max_events=%u",
+                static_cast<unsigned long long>(after_sequence), static_cast<unsigned int>(max_events));
+
+    auto request = std::make_shared<GetEventSnapshot::Request>();
+    request->after_sequence = after_sequence;
+    request->max_events = max_events;
+
+    bool completed = false;
+    std::mutex mtx;
+    std::condition_variable cv;
+    std::unique_lock<std::mutex> lock(mtx);
+    CapabilityEventSnapshot snapshot;
+
+    auto future = get_event_snapshot_client_->async_send_request(
+        request, [this, &completed, &cv, &snapshot](GetEventSnapshotClient::SharedFuture future_response) {
+          if (!future_response.valid())
+          {
+            throw fabric::fabric_exception("Failed to get event snapshot from capabilities2 server");
+          }
+
+          const auto response = future_response.get();
+          snapshot.stamp = response->header.stamp;
+          snapshot.oldest_sequence = response->oldest_sequence;
+          snapshot.latest_sequence = response->latest_sequence;
+          snapshot.max_events = response->max_events;
+          snapshot.truncated = response->truncated;
+          snapshot.events = response->events;
+
+          completed = true;
+          cv.notify_all();
+        });
+
+    cv.wait(lock, [&completed]() { return completed; });
+
+    RCLCPP_INFO(node_->get_logger(), "[Capability client] received event snapshot latest_sequence=%llu events=%zu truncated=%s",
+                static_cast<unsigned long long>(snapshot.latest_sequence), snapshot.events.size(), snapshot.truncated ? "true" : "false");
+    return snapshot;
+  }
+
   /**
    * @brief Get the Interfaces from the capabilities2 server via related service client.
    * @throws `fabric::fabric_exception` if the service call fails
@@ -168,7 +245,7 @@ public:
    * @param interfaces std::vector of interfaces for which the information will be requested
    *
    */
-  void getInterfaces(std::vector<CapabilityInfo>& capabilities)
+  void getInterfaces(std::vector<fabric::capability::Info>& capabilities)
   {
     RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting Interface information");
 
@@ -192,7 +269,7 @@ public:
 
           for (const auto& interface : response->interfaces)
           {
-            CapabilityInfo info;
+            fabric::capability::Info info;
             info.interface = interface;
             info.is_semantic = false;
 
@@ -215,9 +292,9 @@ public:
    *
    * @param interfaces std::vector of interfaces for which the semantic interfaces will be requested
    */
-  void getSemanticInterfaces(std::vector<CapabilityInfo>& capabilities)
+  void getSemanticInterfaces(std::vector<fabric::capability::Info>& capabilities)
   {
-    std::vector<CapabilityInfo> new_capabilities;
+    std::vector<fabric::capability::Info> new_capabilities;
 
     for (auto& capability : capabilities)
     {
@@ -244,7 +321,7 @@ public:
             // add semantic interfaces to the capability info
             for (const auto& interface : response->semantic_interfaces)
             {
-              CapabilityInfo info;
+              fabric::capability::Info info;
               info.interface = interface;
               info.is_semantic = true;
 
@@ -268,10 +345,10 @@ public:
    * @brief Get the Provider information for the related interfaces. T
    * @throws `fabric::fabric_exception` if the service call fails
    *
-   * @param capabilities std::vector of CapabilityInfo for which the provider information will be requested
+   * @param capabilities std::vector of fabric::capability::Info for which provider information will be requested
    *
    */
-  void getProviders(std::vector<CapabilityInfo>& capabilities)
+  void getProviders(std::vector<fabric::capability::Info>& capabilities)
   {
     for (auto& capability : capabilities)
     {
@@ -310,45 +387,20 @@ public:
     }
   }
 
-  void getRunnableSpecs(std::vector<CapabilityInfo>& capabilities)
+  void getRunnableSpecs(std::vector<fabric::capability::Info>& capabilities)
   {
     RCLCPP_INFO(node_->get_logger(), "[Capability client] requesting runnable specifications");
+    std::unordered_map<std::string, fabric::capability::ProviderInfo> provider_metadata_by_name;
 
-    auto request_specs = std::make_shared<GetRunnableSpecs::Request>();
-
-    bool completed = false;
-    std::mutex mtx;
-    std::condition_variable cv;
-    std::unique_lock<std::mutex> lock(mtx);
-    std::unordered_map<std::string, CapabilityProviderInfo> provider_metadata_by_name;
-
-    auto result_specs_future = get_runnable_specs_client_->async_send_request(
-        request_specs, [this, &provider_metadata_by_name, &completed, &cv](GetRunnableSpecsClient::SharedFuture future) {
-          if (!future.valid())
-          {
-            throw fabric::fabric_exception("Failed to get runnable specifications from server");
-          }
-
-          auto response = future.get();
-          if (response->index_of_specs.size() != response->runnable_specs.size())
-          {
-            throw fabric::fabric_exception("Runnable specification response has mismatched index and payload sizes");
-          }
-
-          for (const auto& runnable_spec : response->runnable_specs)
-          {
-            CapabilityProviderInfo provider_info = parse_provider_info(runnable_spec.spec);
-            if (!provider_info.provider.empty())
-            {
-              provider_metadata_by_name[provider_info.provider] = provider_info;
-            }
-          }
-
-          completed = true;
-          cv.notify_all();
-        });
-
-    cv.wait(lock, [&completed]() { return completed; });
+    const auto runnable_specs = fetch_runnable_spec_yaml();
+    for (const auto& runnable_spec : runnable_specs)
+    {
+      fabric::capability::ProviderInfo provider_info = parse_provider_info(runnable_spec);
+      if (!provider_info.provider.empty())
+      {
+        provider_metadata_by_name[provider_info.provider] = provider_info;
+      }
+    }
 
     for (auto& capability : capabilities)
     {
@@ -478,32 +530,8 @@ public:
     // create bond establishing server request
     auto request_bond = std::make_shared<EstablishBond::Request>();
 
-    std::string bond_id;
-    bool completed = false;
-    std::mutex mtx;
-    std::condition_variable cv;
-    std::unique_lock<std::mutex> lock(mtx);
-
-    // send the request
-    auto result_future =
-        establish_bond_client_->async_send_request(request_bond, [&bond_id, &completed, &cv, this](EstablishBondClient::SharedFuture future) {
-          if (!future.valid())
-          {
-            throw fabric::fabric_exception("Failed to establish bond with capabilities2 server");
-          }
-
-          auto response = future.get();
-          bond_id = response->bond_id;
-          RCLCPP_INFO(node_->get_logger(), "[Capability client] received bond id : %s\n", bond_id.c_str());
-
-          completed = true;
-          cv.notify_all();
-        });
-
-    // wait for the response
-    cv.wait(lock, [&completed]() { return completed; });
-
-    return bond_id;
+    auto future = establish_bond_client_->async_send_request(request_bond);
+    return await_response(establish_bond_client_, future, "establish bond")->bond_id;
   }
 
   /**
@@ -513,13 +541,18 @@ public:
    * @param plan Fabric plan containing the bond id and capabilities to be used
    *
    */
-  void use_capabilities(fabric::Plan& plan)
+  void use_capabilities(fabric::plan::Plan& plan)
   {
+    std::lock_guard<std::mutex> ownership_lock(started_capabilities_mutex_);
     int index = 0;
 
     for (const auto& [id, connection] : plan.connections)
     {
       index++;
+
+      auto& acquired = started_capabilities_[plan.bond_id];
+      const bool already_acquired =
+          std::find(acquired.begin(), acquired.end(), connection.source.interface) != acquired.end();
 
       auto request_use = std::make_shared<UseCapability::Request>();
       request_use->capability = connection.source.interface;
@@ -528,27 +561,18 @@ public:
 
       RCLCPP_INFO(node_->get_logger(), "[Capability client] starting capability %d : %s", index, connection.source.interface.c_str());
 
-      bool completed = false;
-      std::mutex mtx;
-      std::condition_variable cv;
-      std::unique_lock<std::mutex> lock(mtx);
-
-      auto result_future = use_capability_client_->async_send_request(request_use, [this, &completed, &cv](UseCapabilityClient::SharedFuture future) {
-        if (!future.valid())
-        {
-          throw fabric::fabric_exception("Failed to use capability");
-        }
-
-        auto response = future.get();
-        completed = true;
-        cv.notify_all();
-      });
-
-      // wait for the response
-      cv.wait(lock, [&completed]() { return completed; });
+      auto future = use_capability_client_->async_send_request(request_use);
+      const auto response = await_response(use_capability_client_, future, "use capability");
+      if (!response->successful)
+      {
+        throw fabric::fabric_exception("Failed to use capability " + connection.source.interface + ": " + response->error_message);
+      }
 
       RCLCPP_INFO(node_->get_logger(), "[Capability client] capability %s started successfully.\n", connection.source.interface.c_str());
-      started_capabilities_.push_back(connection.source.interface);
+      if (!already_acquired)
+      {
+        acquired.push_back(connection.source.interface);
+      }
     }
   }
 
@@ -559,67 +583,26 @@ public:
    * @param plan Fabric plan containing the bond id and capabilities to be freed
    *
    */
-  void free_capabilities(fabric::Plan& plan)
+  void free_capabilities(fabric::plan::Plan& plan)
   {
-    // track freed capabilities
-    std::vector<std::string> freed_capabilities;
-
-    // prepare to free all started capabilities
-    for (const auto& capability : started_capabilities_)
+    std::lock_guard<std::mutex> ownership_lock(started_capabilities_mutex_);
+    auto entry = started_capabilities_.find(plan.bond_id);
+    if (entry == started_capabilities_.end())
     {
-      // check if the capability is part of the plan connections
-      bool found = false;
-      for (const auto& [id, connection] : plan.connections)
-      {
-        if (connection.source.interface == capability)
-        {
-          found = true;
-          break;
-        }
-      }
-
-      bool completed = false;
-      std::mutex mtx;
-      std::condition_variable cv;
-      std::unique_lock<std::mutex> lock(mtx);
-
-      if (found)
-      {
-        // create free capability request
-        auto request_free = std::make_shared<FreeCapability::Request>();
-        request_free->capability = capability;
-        request_free->bond_id = plan.bond_id;
-
-        // send the request
-        auto result_future = free_capability_client_->async_send_request(
-            request_free, [this, &completed, &cv, &capability](FreeCapabilityClient::SharedFuture future) {
-              if (!future.valid())
-              {
-                throw fabric::fabric_exception("Failed to free capability " + capability);
-              }
-
-              auto response = future.get();
-              RCLCPP_INFO(node_->get_logger(), "[Capability client] capability %s freed successfully.\n", capability.c_str());
-              completed = true;
-              cv.notify_all();
-            });
-
-        // wait for the response
-        cv.wait(lock, [&completed]() { return completed; });
-
-        // track successfully freed capabilities
-        freed_capabilities.push_back(capability);
-      }
-      else
-      {
-        RCLCPP_WARN(node_->get_logger(), "[Capability client] capability %s was not started as part of the plan, skipping free request.",
-                    capability.c_str());
-      }
+      return;
     }
-
-    // remove freed capabilities from started list
-    for (const auto& capability : freed_capabilities)
-      started_capabilities_.erase(std::remove(started_capabilities_.begin(), started_capabilities_.end(), capability), started_capabilities_.end());
+    while (!entry->second.empty())
+    {
+      const auto capability = entry->second.back();
+      auto request_free = std::make_shared<FreeCapability::Request>();
+      request_free->capability = capability;
+      request_free->bond_id = plan.bond_id;
+      auto future = free_capability_client_->async_send_request(request_free);
+      await_response(free_capability_client_, future, "free capability");
+      entry->second.pop_back();
+      RCLCPP_INFO(node_->get_logger(), "[Capability client] capability %s freed successfully.", capability.c_str());
+    }
+    started_capabilities_.erase(entry);
   }
 
   void connect_capability(const std::string& ownership_id, const std::string& bond_id, uint8_t code, const fabric::node& source,
@@ -642,28 +625,12 @@ public:
     request->connection.target.provider = target.provider;
     request->connection.target.instance_id = std::to_string(target.instance_id);
 
-    bool completed = false;
-    std::mutex mtx;
-    std::condition_variable cv;
-    std::unique_lock<std::mutex> lock(mtx);
-
-    // send the request
-    auto result_future =
-        connect_capability_client_->async_send_request(request, [this, &completed, &cv](ConnectCapabilityClient::SharedFuture future) {
-          if (!future.valid())
-          {
-            throw fabric::fabric_exception("Failed to configure capability connection event");
-          }
-
-          auto response = future.get();
-
-          RCLCPP_INFO(node_->get_logger(), "[Capability client] capability connection event configured successfully.\n");
-          completed = true;
-          cv.notify_all();
-        });
-
-    // wait for the response
-    cv.wait(lock, [&completed]() { return completed; });
+    auto future = connect_capability_client_->async_send_request(request);
+    const auto response = await_response(connect_capability_client_, future, "connect capability");
+    if (!response->successful)
+    {
+      throw fabric::fabric_exception("Failed to configure capability connection: " + response->error_message);
+    }
   }
 
   /**
@@ -672,7 +639,7 @@ public:
    *
    * @param plan Fabric plan containing the bond id and connections to be established
    */
-  void connect_capabilities(fabric::Plan& plan)
+  void connect_capabilities(fabric::plan::Plan& plan)
   {
     for (const auto& [id, connection] : plan.connections)
     {
@@ -715,36 +682,21 @@ public:
    *
    * @param plan Fabric plan containing the bond id and connections to be triggered
    */
-  void trigger_first_node(fabric::Plan& plan)
+  void trigger_first_node(fabric::plan::Plan& plan)
   {
     auto request_trigger = std::make_shared<TriggerCapability::Request>();
-
-    bool completed = false;
-    std::mutex mtx;
-    std::condition_variable cv;
-    std::unique_lock<std::mutex> lock(mtx);
 
     request_trigger->bond_id = plan.bond_id;
     request_trigger->capability.instance_id = std::to_string(plan.connections[0].source.instance_id);
     request_trigger->capability.capability = plan.connections[0].source.interface;
     request_trigger->capability.parameters = to_capability_msg(plan.connections[0].source.parameters).parameters;
 
-    // send the request
-    auto result_future =
-        trig_capability_client_->async_send_request(request_trigger, [this, &completed, &cv](TriggerCapabilityClient::SharedFuture future) {
-          if (!future.valid())
-          {
-            throw fabric::fabric_exception("Failed to trigger the first capability.");
-          }
-
-          auto response = future.get();
-          completed = true;
-          cv.notify_all();
-          RCLCPP_INFO(node_->get_logger(), "[Capability client] first capability triggered successfully.");
-        });
-
-    // wait for the response
-    cv.wait(lock, [&completed]() { return completed; });
+    auto future = trig_capability_client_->async_send_request(request_trigger);
+    const auto response = await_response(trig_capability_client_, future, "trigger capability");
+    if (!response->successful)
+    {
+      throw fabric::fabric_exception("Failed to trigger the first capability: " + response->error_message);
+    }
   }
 
   static CapabilityInfo capability_info_from_runnable_spec(const std::string& index, const std::string& yaml_text)
@@ -770,6 +722,29 @@ public:
   }
 
 protected:
+  template <typename Client, typename Future>
+  auto await_response(const std::shared_ptr<Client>& client, Future& future, const std::string& operation) -> decltype(future.get())
+  {
+    const auto start = std::chrono::steady_clock::now();
+    while (future.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready)
+    {
+      if (stopping_.load() || !rclcpp::ok() ||
+          (service_wait_timeout_sec_ >= 0 && std::chrono::steady_clock::now() - start >= std::chrono::seconds(service_wait_timeout_sec_)))
+      {
+        client->remove_pending_request(future);
+        throw fabric::fabric_exception("Interrupted or timed out waiting to " + operation);
+      }
+    }
+    try
+    {
+      return future.get();
+    }
+    catch (const std::exception& error)
+    {
+      throw fabric::fabric_exception("Failed to " + operation + ": " + error.what());
+    }
+  }
+
   static std::string yaml_string_or_empty(const YAML::Node& node, const char* key)
   {
     if (!node || !node[key])
@@ -819,9 +794,9 @@ protected:
     return serialized;
   }
 
-  static CapabilityParameterInfo parse_parameter_info(const YAML::Node& node)
+  static fabric::capability::ParameterInfo parse_parameter_info(const YAML::Node& node)
   {
-    CapabilityParameterInfo parameter;
+    fabric::capability::ParameterInfo parameter;
     parameter.name = yaml_string_or_empty(node, "name");
     parameter.type = yaml_string_or_empty(node, "type");
     parameter.description = yaml_string_or_empty(node, "description");
@@ -835,9 +810,9 @@ protected:
     return parameter;
   }
 
-  static std::vector<CapabilityParameterInfo> parse_parameter_list(const YAML::Node& node)
+  static std::vector<fabric::capability::ParameterInfo> parse_parameter_list(const YAML::Node& node)
   {
-    std::vector<CapabilityParameterInfo> parameters;
+    std::vector<fabric::capability::ParameterInfo> parameters;
     if (!node || !node.IsSequence())
     {
       return parameters;
@@ -851,9 +826,29 @@ protected:
     return parameters;
   }
 
-  static CapabilityProviderInfo parse_provider_info(const std::string& yaml_text)
+  static std::vector<fabric::capability::Relation> parse_relation_list(const YAML::Node& node)
   {
-    CapabilityProviderInfo provider_info;
+    std::vector<fabric::capability::Relation> relations;
+    if (!node || !node.IsSequence())
+    {
+      return relations;
+    }
+
+    for (const auto& item : node)
+    {
+      fabric::capability::Relation relation;
+      relation.subject = yaml_string_or_empty(item, "subject");
+      relation.predicate = yaml_string_or_empty(item, "predicate");
+      relation.object = yaml_string_or_empty(item, "object");
+      relations.push_back(relation);
+    }
+
+    return relations;
+  }
+
+  static fabric::capability::ProviderInfo parse_provider_info(const std::string& yaml_text)
+  {
+    fabric::capability::ProviderInfo provider_info;
     const YAML::Node root = YAML::Load(yaml_text);
     provider_info.provider = yaml_string_or_empty(root["provider"], "name");
 
@@ -866,13 +861,50 @@ protected:
     provider_info.configuration_parameters = parse_parameter_list(definition["configuration_parameters"]);
 
     const YAML::Node runtime_parameters = definition["runtime_parameters"];
-    provider_info.runtime_input_parameters = parse_parameter_list(runtime_parameters["input"]);
-    provider_info.runtime_output_parameters = parse_parameter_list(runtime_parameters["output"]);
+    if (runtime_parameters && runtime_parameters.IsMap())
+    {
+      provider_info.runtime_input_parameters = parse_parameter_list(runtime_parameters["input"]);
+      provider_info.runtime_output_parameters = parse_parameter_list(runtime_parameters["output"]);
+    }
     return provider_info;
   }
 
   static void add_provider_details(CapabilityInfo& capability, const std::string& provider_name,
                                    const std::unordered_map<std::string, CapabilityProviderInfo>& provider_metadata_by_name)
+  static fabric::capability::Descriptor parse_descriptor(const std::string& yaml_text)
+  {
+    fabric::capability::Descriptor descriptor;
+    const YAML::Node root = YAML::Load(yaml_text);
+
+    const YAML::Node interface = root["interface"];
+    descriptor.interface_name = yaml_string_or_empty(interface, "name");
+    descriptor.interface_description = yaml_string_or_empty(interface, "description");
+
+    const YAML::Node provider = root["provider"];
+    descriptor.provider_name = yaml_string_or_empty(provider, "name");
+    descriptor.provider_description = yaml_string_or_empty(provider, "description");
+
+    descriptor.relations = parse_relation_list(root["relations"]);
+    const YAML::Node definition = root["definition"];
+    if (!definition || !definition.IsMap())
+    {
+      return descriptor;
+    }
+
+    descriptor.command = yaml_string_or_empty(definition, "command");
+    descriptor.configuration_parameters = parse_parameter_list(definition["configuration_parameters"]);
+
+    const YAML::Node runtime_parameters = definition["runtime_parameters"];
+    if (runtime_parameters && runtime_parameters.IsMap())
+    {
+      descriptor.runtime_input_parameters = parse_parameter_list(runtime_parameters["input"]);
+      descriptor.runtime_output_parameters = parse_parameter_list(runtime_parameters["output"]);
+    }
+    return descriptor;
+  }
+
+  static void add_provider_details(fabric::capability::Info& capability, const std::string& provider_name,
+                                   const std::unordered_map<std::string, fabric::capability::ProviderInfo>& provider_metadata_by_name)
   {
     if (provider_name.empty())
     {
@@ -886,6 +918,25 @@ protected:
     }
 
     capability.provider_details.push_back(it->second);
+  }
+
+  std::vector<std::string> fetch_runnable_spec_yaml()
+  {
+    auto request_specs = std::make_shared<GetRunnableSpecs::Request>();
+    std::vector<std::string> runnable_specs;
+    auto future = get_runnable_specs_client_->async_send_request(request_specs);
+    const auto response = await_response(get_runnable_specs_client_, future, "get runnable capability descriptors");
+    if (response->index_of_specs.size() != response->runnable_specs.size())
+    {
+      throw fabric::fabric_exception("Runnable specification response has mismatched index and payload sizes");
+    }
+
+    runnable_specs.reserve(response->runnable_specs.size());
+    for (const auto& runnable_spec : response->runnable_specs)
+    {
+      runnable_specs.push_back(runnable_spec.spec);
+    }
+    return runnable_specs;
   }
 
   /**
@@ -924,7 +975,7 @@ protected:
   {
     RCLCPP_INFO(node_->get_logger(), "[Capability client] probing capabilities2 server readiness");
 
-    auto request_specs = std::make_shared<GetRunnableSpecs::Request>();
+    auto request_ready = std::make_shared<Ready::Request>();
 
     bool completed = false;
     std::mutex mtx;
@@ -950,14 +1001,17 @@ protected:
    * @brief pointer to the ROS2 node
    */
   rclcpp::Node::SharedPtr node_;
+  rclcpp::CallbackGroup::SharedPtr callback_group_;
 
   int service_wait_timeout_sec_{ -1 };
+  std::atomic<bool> stopping_{ false };
 
   /**
    * @brief service names
    */
   std::string get_interfaces_;
   std::string get_semantic_interfaces_;
+  std::string get_event_snapshot_;
   std::string get_providers_;
   std::string get_runnable_specs_;
   std::string establish_bond_;
@@ -966,19 +1020,24 @@ protected:
   std::string trigger_capability_;
   std::string configure_capability_;
   std::string connect_capability_;
+  std::string ready_;
 
   /**
    * @brief Heart beat bond with capabilities server
    */
   std::shared_ptr<bond::Bond> bond_;
 
-  std::vector<std::string> started_capabilities_;
+  std::mutex started_capabilities_mutex_;
+  std::unordered_map<std::string, std::vector<std::string>> started_capabilities_;
 
   /** Get interfaces from capabilities server */
   GetInterfacesClient::SharedPtr get_interfaces_client_;
 
   /** Get semantic interfaces from capabilities server */
   GetSemanticInterfacesClient::SharedPtr get_sem_interf_client_;
+
+  /** Get capability event snapshots from capabilities server */
+  GetEventSnapshotClient::SharedPtr get_event_snapshot_client_;
 
   /** Get providers from capabilities server */
   GetProvidersClient::SharedPtr get_providers_client_;
@@ -1000,5 +1059,8 @@ protected:
 
   /** trigger an selected capability */
   TriggerCapabilityClient::SharedPtr trig_capability_client_;
+
+  /** readiness probe */
+  ReadyClient::SharedPtr ready_client_;
 };
 }  // namespace fabric

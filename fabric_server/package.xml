@@ -7,11 +7,11 @@
 
   <maintainer email="kalanaratnayake95@gmail.com">Kalana Ratnayake</maintainer>
   <maintainer email="kalana.ratnayakemudiyanselage@canberra.edu.au">Kalana Ratnayake</maintainer>
+  
+  <license>MIT</license>
 
   <author email="kalana.ratnayakemudiyanselage@canberra.edu.au">Kalana Ratnayake</author>
   <author email="kalanaratnayake95@gmail.com">Kalana Ratnayake</author>
-  
-  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -25,10 +25,22 @@
   <depend>fabric_msgs</depend>
   <depend>fabric_base</depend>
   <depend>capabilities2_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>rcl_interfaces</depend>
+  <depend>sensor_msgs</depend>
   <depend>yaml-cpp</depend>
+  <exec_depend>fabric_monitor</exec_depend>
+  <exec_depend>capabilities2_server</exec_depend>
+  <exec_depend>capabilities2_launch_proxy</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <test_depend>fabric_parser_xml</test_depend>
+  <test_depend>ament_index_python</test_depend>
+  <test_depend>composition_interfaces</test_depend>
+  <test_depend>prompt_msgs</test_depend>
+  <test_depend>python3-yaml</test_depend>
+  <test_depend>rclpy</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

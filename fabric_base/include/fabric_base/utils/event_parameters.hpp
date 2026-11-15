@@ -5,22 +5,10 @@
 #include <string>
 #include <vector>
 
+#include <fabric_base/utils/exception.hpp>
+
 namespace fabric
 {
-
-struct options_exception : public std::runtime_error
-{
-  using std::runtime_error::runtime_error;
-
-  options_exception(const std::string& what) : std::runtime_error(what)
-  {
-  }
-
-  virtual const char* what() const noexcept override
-  {
-    return std::runtime_error::what();
-  }
-};
 
 enum class OptionType
 {
@@ -76,7 +64,7 @@ struct Parameter
       case OptionType::VECTOR_STRING:
         return value;
       default:
-        throw options_exception("Unsupported OptionType");
+        throw fabric::parameter_exception("Unsupported OptionType");
     }
   }
 
@@ -128,7 +116,7 @@ struct Parameter
         value = std::any_cast<std::vector<std::string>>(new_value);
         return;
       default:
-        throw options_exception("Unsupported OptionType");
+        throw fabric::parameter_exception("Unsupported OptionType");
     }
   }
 };
@@ -163,7 +151,7 @@ struct EventParameters
           }
           catch (const std::exception& e)
           {
-            throw options_exception("Failed to convert option '" + option.key + "': " + e.what());
+            throw fabric::parameter_exception("Failed to convert option '" + option.key + "': " + e.what());
           }
         }
       }
@@ -185,7 +173,7 @@ struct EventParameters
         }
         catch (const std::exception& e)
         {
-          throw options_exception("Failed to set option '" + option.key + "': " + e.what());
+          throw fabric::parameter_exception("Failed to set option '" + option.key + "': " + e.what());
         }
       }
 

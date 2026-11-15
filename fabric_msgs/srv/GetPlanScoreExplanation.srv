@@ -1,0 +1,10 @@
+string planning_request_id
+string candidate_plan_id
+string graph_hash
+string candidate_node_id
+---
+bool found
+bool node_found
+string message
+PlanScoreExplanation plan
+PlanNodeScoreExplanation node_explanation

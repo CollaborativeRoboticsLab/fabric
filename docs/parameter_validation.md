@@ -70,7 +70,7 @@ Optional runtime inputs are not treated as blocking validation failures.
 
 - `fabric_base/utils/structs.hpp`: capability and provider parameter metadata used during validation
 - `fabric_server/capability_client.hpp`: fetches runnable specs and attaches provider metadata
-- `fabric_server/server.hpp`: loads and runs ordered validation plugins
+- `fabric_server/fabric_runtime.hpp`: loads and runs ordered validation plugins
 - `fabric_validator/compatibility_plugin.hpp`: compatibility validation
 - `fabric_validator/parameter_plugin.hpp`: required runtime-input validation
 - `fabric/docs/validation_plugins.md`: plugin-system overview

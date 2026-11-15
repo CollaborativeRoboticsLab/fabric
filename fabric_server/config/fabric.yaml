@@ -1,15 +1,261 @@
 /**:
-  ros__parameters:      
-    validation_plugins: [fabric::CompatibilityValidation, fabric::ParameterValidation]
+  ros__parameters:
+    use_sim_time: false
+
+    # Empty selects the installed default; launch can override this value.
+    plan_file_path: ""
+    bond:
+      connect_timeout_sec: 10.0
+      heartbeat_timeout_sec: 10.0
+      heartbeat_period_sec: 0.1
+    capability_client:
+      service_wait_timeout_sec: -1
+      services:
+        get_interfaces: "/capabilities/get_interfaces"
+        get_semantic_interfaces: "/capabilities/get_semantic_interfaces"
+        get_event_snapshot: "/capabilities/get_event_snapshot"
+        get_providers: "/capabilities/get_providers"
+        get_runnable_specs: "/capabilities/get_runnable_specs"
+        establish_bond: "/capabilities/establish_bond"
+        use_capability: "/capabilities/use_capability"
+        free_capability: "/capabilities/free_capability"
+        trigger_capability: "/capabilities/trigger_capability"
+        connect_capability: "/capabilities/connect_capability"
+        ready: "/capabilities/ready"
+
+    validation_plugins:
+      - "fabric::CompatibilityValidation"
+      - "fabric::ParameterValidation"
+
     parsing_plugin : fabric::XMLParser
-    # generation_plugin: fabric::PromptToolsGenerator
-    generation_plugin: fabric::ExperienceGenerator
+    llm_analysis_plugin: fabric::PromptToolsLlmAnalysis
+    generation_plugin: fabric::PromptToolsGenerator
+
+    PromptToolsLlmAnalysis:
+      service_wait_timeout_sec: 10
+      request_timeout_sec: 90
+      services:
+        prompt: "/prompt/prompt"
+        embedding: "/prompt/embedding"
+        tokenize: "/prompt/tokenizer"
+
     PromptToolsGenerator:
+      service_wait_timeout_sec: 10
+      prompt_request_timeout_sec: 90
+      services:
+        get_runnable_specs: "/capabilities/get_runnable_specs"
       model_family: openai
-      model: gpt-5.1
+      model: gpt-6.1-terra
       use_cache: true
       use_chat_mode: false
-    capability_client:
-      bond_topic: "/capabilities/bond"
-      service_wait_timeout_sec: -1
 
+    telemetry:
+      fabric_status_topic: "/fabric/status"
+
+    experience:
+      enabled: true
+      rebuild: false
+      consume_feedback: true
+      user_feedback_root_dir: ""
+      dispatch_terminal_success_only: false
+
+      telemetry:
+        retention_seconds: 300
+        monitor_poll_frequency_hz: 2.0
+        monitor_plugins:
+          - "fabric::ResourceMonitor"
+          - "fabric::BatteryMonitor"
+          - "fabric::ExecutionStatusMonitor"
+          - "fabric::CapabilityEventMonitor"
+          - "fabric::RosoutMonitor"
+          - "fabric::RosDiagnosticsMonitor"
+
+      ResourceMonitor:
+        topic: "/capabilities2_launch_proxy/resources"
+        frequency: 1.0
+
+      BatteryMonitor:
+        enable: true
+        topic: "/battery_state"
+        frequency: 1.0
+
+      ExecutionStatusMonitor:
+        topic: "/fabric/status"
+        frequency: 1.0
+
+      CapabilityEventMonitor:
+        topic: ""
+        frequency: 1.0
+        service_name: "/capabilities/get_event_snapshot"
+        service_wait_timeout_sec: -1
+        max_events: 100
+
+      RosoutMonitor:
+        topic: "/rosout"
+        frequency: 1.0
+        minimum_log_level: WARN
+        excluded_loggers: [prompt_bridge]
+        model_family: openai
+        model: gpt-6-luna
+
+      RosDiagnosticsMonitor:
+        topic: "/diagnostics"
+        frequency: 1.0
+        model_family: openai
+        model: gpt-6-luna
+
+      planner_plugin: "fabric::PlanningPlugin"
+      core_plugin: "fabric::KnowledgeCoreGraphRag"
+      scorer_plugin: "fabric::RapfsScorerPlugin"
+
+      PlanningPlugin:
+        model_family: "openai"
+        model: "gpt-6.1-terra"
+        use_cache: true
+        use_chat_mode: false
+        max_capability_context: 8
+        semantic_context_mode: "detailed"
+        log_semantic_context_comparison: true
+        persist_prompt_audit: true
+        prompt_audit_dir: "planner_prompt_audit"
+        prompt_audit_include_full_text: false
+        refinement:
+          max_attempts: 2
+          retry_on_penalty_findings: true
+          retry_on_warning_findings: false
+
+      KnowledgeCoreGraphRag:
+        embedding_dim: 1536
+        embed:
+          model_name: "text-embedding-3-small"
+          model_family: "openai"
+        prompt:
+          model_name: "gpt-6-luna"
+          model_family: "openai"
+        tokenize:
+          model_name: "O200K_BASE"
+          model_family: "openai"
+          tokens_per_document: 20000
+          tokens_per_document_overlap: 2000
+          tokens_per_embedding: 8191
+          tokens_per_embedding_overlap: 100
+        graph:
+          clustering_algorithm: "KMEANS"
+          num_clusters: 5
+        edge:
+          parameter:
+            min_score: 0.35
+            strong_score: 0.65
+            max_weak_dependencies: 2
+      
+      validation_plugins:
+        - "fabric::CompatibilityValidation"
+        - "fabric::ExtendedCompatibilityValidation"
+        - "fabric::ParameterValidation"
+        - "fabric::DependencyValidation"
+        - "fabric::DataflowValidation"
+        - "fabric::SemanticValidation"
+
+      DataflowValidation:
+        weak_match_penalty_scale: 0.20
+        external_penalty: 0.08
+        configuration_penalty: 0.05
+        default_penalty: 0.03
+        partial_coverage_penalty: 0.05
+
+      SemanticValidation:
+        prompt_service: "prompt/prompt"
+        model_family: "openai"
+        model: "gpt-6-luna"
+        use_cache: true
+        flush_cache: false
+        use_chat_mode: false
+        request_timeout_sec: 5.0
+        warning_confidence_threshold: 0.60
+        low_confidence_penalty: 0.10
+        warn_when_unavailable: true
+
+      estimator_plugins:
+        - "fabric::SuccessProbabilityPlugin"
+        - "fabric::RuntimePlugin"
+        - "fabric::EnergyPlugin"
+        - "fabric::FaultBurdenPlugin"
+        - "fabric::ResourcePlugin"
+        - "fabric::UncertaintyPlugin"
+
+      RapfsScorerPlugin:
+        calibration_version: "heldout_eval_v1"
+        normalizer_version: "calibrated_v1"
+        weight_version: "tuned_outcome_alignment_v1"
+        estimator_version: "baseline_v1"
+        non_success_terminal_policy: "count_as_failure"
+        plan_uncertainty_aggregation: "scenario_weighted_mean"
+        default_success_probability: 0.5
+        default_uncertainty: 1.0
+        uncertainty_statistical_weight: 0.40
+        uncertainty_task_ambiguity_weight: 0.15
+        uncertainty_unfamiliarity_weight: 0.25
+        uncertainty_missing_evidence_weight: 0.20
+        uncertainty_weight_locked: true
+        uncertainty_weight_target: ""
+        unknown_unfamiliarity_prior: 0.75
+        
+        estimator_names: ["success", "time", "energy", "fault", "resource", "uncertainty"]
+        estimators:
+          success:
+            type: "fabric::SuccessProbabilityPlugin"
+            weight: 0.25
+          time:
+            type: "fabric::RuntimePlugin"
+            weight: 0.10
+          energy:
+            type: "fabric::EnergyPlugin"
+            weight: 0.00
+          fault:
+            type: "fabric::FaultBurdenPlugin"
+            weight: 0.10
+          resource:
+            type: "fabric::ResourcePlugin"
+            weight: 0.00
+          uncertainty:
+            type: "fabric::UncertaintyPlugin"
+            weight: 0.45
+
+        feasibility:
+          min_success_probability: 0.20
+          max_runtime_seconds: 300.0
+          max_energy_delta_percentage: 50.0
+          max_fault_burden: 1.5
+          max_resource_demand: 1.0
+          max_uncertainty: 0.95
+
+        transforms:
+          runtime_seconds:
+            inputs: [0.0, 30.0, 60.0, 120.0, 300.0]
+            outputs: [0.0, 0.15, 0.35, 0.70, 1.0]
+          energy_delta_percentage:
+            inputs: [0.0, 5.0, 10.0, 25.0, 50.0]
+            outputs: [0.0, 0.15, 0.35, 0.75, 1.0]
+          fault_burden:
+            inputs: [0.0, 0.25, 0.50, 1.0, 2.0]
+            outputs: [0.0, 0.15, 0.35, 0.75, 1.0]
+          resource_demand:
+            inputs: [0.0, 0.25, 0.50, 1.0, 2.0]
+            outputs: [0.0, 0.15, 0.40, 0.75, 1.0]
+          semantic_familiarity:
+            inputs: [0.0, 0.25, 0.50, 0.75, 1.0]
+            outputs: [1.0, 0.80, 0.50, 0.20, 0.0]
+
+      SuccessProbabilityPlugin:
+        alpha: 1.0
+        beta: 1.0
+        use_beta_smoothing: true
+
+      UncertaintyPlugin:
+        alpha: 1.0
+        beta: 1.0
+        credible_interval_z: 1.96
+
+      FaultBurdenPlugin:
+        warning_weight: 1.0
+        error_weight: 3.0
